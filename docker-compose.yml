@@ -1,0 +1,124 @@
+version: "3.8"
+
+services:
+  # Reader DB - PostgreSQL database with pgvector for storing transferred articles
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: reader-db
+    environment:
+      POSTGRES_DB: reader_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432" # Map to port 5433 externally to avoid conflicts with news-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - reader_network
+
+  # News API - External API providing access to news articles
+  # This is a reference to an external service running elsewhere
+  # In a real setup, we'd use network aliases to connect to it
+
+  # Article Transfer Service - Transfers articles from news-api to reader-db
+  article-transfer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: article-transfer
+    depends_on:
+      - postgres
+    environment:
+      # Reader DB connection
+      READER_DB_HOST: postgres # Use container name within Docker network
+      READER_DB_PORT: 5432 # Internal port in Docker network
+      READER_DB_NAME: reader_db
+      READER_DB_USER: postgres
+      READER_DB_PASSWORD: postgres
+      # News API connection
+      NEWS_API_BASE_URL: http://localhost:8000 # Connect to news-api on host
+      # Polling interval
+      POLLING_INTERVAL: 300
+    command: ["python", "src/main.py"]
+    volumes:
+      - ./src:/app/src # Mount source code for easier development
+    networks:
+      - reader_network
+      - external-network # To connect to the news-api if needed
+
+  # pgAdmin - Web interface for database management
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: reader-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@reader.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5051:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - reader_network
+
+  # Backend service for database setup and management
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reader-backend
+    environment:
+      READER_DB_HOST: postgres # Use container name within Docker network
+      READER_DB_PORT: 5432 # Internal port in Docker network
+      READER_DB_NAME: reader_db
+      READER_DB_USER: postgres
+      READER_DB_PASSWORD: postgres
+      WAIT_FOR_DB: "true"
+      WAIT_SECONDS: "10"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src # Mount source code for easier development
+    restart: unless-stopped
+    networks:
+      - reader_network
+    command: ["python", "src/database/db_setup.py"]
+
+  # NOTE: If you already have news-db running in another docker-compose setup,
+  # you can comment out this section and just connect the existing container
+  # to the reader_network using:
+  # docker network connect reader_network news-db
+  #
+  # news-db:
+  #   image: postgres:15
+  #   container_name: news-db
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: news_db
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - news_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - reader_network
+
+# Define Docker networks
+networks:
+  reader_network:
+    driver: bridge
+  external-network:
+    external: true
+    name: scraper-ultimate_app_network # Network where news-api is running
+
+# Define persistent volumes
+volumes:
+  postgres_data: # Persistent volume for reader-db data
+  # news_data:
