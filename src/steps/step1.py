@@ -503,13 +503,11 @@ def run(max_workers: int = None) -> int:
             logger.info("No articles need embeddings. Step 1.6 complete.")
         else:
             logger.info(
-                f"Found {len(articles_for_embedding)} articles with suitable character count (≤ {max_char_limit}) for embedding generation")
+                f"Found {len(articles_for_embedding)} articles for embedding generation")
 
             # Import the rate limiter
             from src.steps.rate_limit import RateLimiter
             rate_limiter = RateLimiter()
-            logger.info(
-                f"Using rate limiter with {rate_limiter.max_calls_per_minute} calls per minute limit")
 
             # Track embedding statistics
             embedding_success = 0
@@ -548,7 +546,7 @@ def run(max_workers: int = None) -> int:
 
                 last_db_update_time = time.time()
                 logger.info(
-                    f"Incremental embedding update: inserted {success_count}/{len(embeddings_to_insert)} embeddings")
+                    f"Database update: inserted {success_count} embeddings")
                 return success_count
 
             # Define worker function for embedding generation
@@ -579,20 +577,9 @@ def run(max_workers: int = None) -> int:
 
                         return (article_id, True)
                     else:
-                        # Log the specific issue with the embedding
-                        if embedding is None:
-                            logger.error(
-                                f"Embedding generation returned None for article {article_id}")
-                        elif not isinstance(embedding, list):
-                            logger.error(
-                                f"Embedding is not a list but {type(embedding)} for article {article_id}")
-                        elif len(embedding) == 0:
-                            logger.error(
-                                f"Embedding list is empty for article {article_id}")
-                        else:
-                            logger.error(
-                                f"Unknown embedding error for article {article_id}")
-
+                        # Consolidate error logging to a single line
+                        logger.error(
+                            f"Failed to generate valid embedding for article {article_id}")
                         return (article_id, False)
 
                 except Exception as e:
@@ -618,10 +605,14 @@ def run(max_workers: int = None) -> int:
                         else:
                             embedding_failure += 1
 
-                        # Log progress periodically
-                        if (i + 1) % 20 == 0 or (i + 1) == len(articles_for_embedding):
-                            logger.info(f"Embedding progress: {i+1}/{len(articles_for_embedding)} "
-                                        f"({(i+1)/len(articles_for_embedding)*100:.1f}%)")
+                        # Only log progress at reasonable intervals (5%, 10%, 25%, 50%, 75%, 100%)
+                        total_articles = len(articles_for_embedding)
+                        progress_pct = (i + 1) / total_articles * 100
+                        log_thresholds = [5, 10, 25, 50, 75, 100]
+
+                        if any(threshold - 2 < progress_pct <= threshold for threshold in log_thresholds) or (i + 1) == total_articles:
+                            logger.info(
+                                f"Embedding progress: {i+1}/{total_articles} ({progress_pct:.1f}%)")
 
                         # Instead of forcing DB update every 100 articles, check if we need to update based on time
                         current_time = time.time()
@@ -631,8 +622,6 @@ def run(max_workers: int = None) -> int:
                         if time_since_last_update >= embedding_checkpoint_interval:
                             with pending_embeddings_lock:
                                 if pending_embeddings:
-                                    logger.info(
-                                        f"Time-based checkpoint: {time_since_last_update:.1f}s since last update")
                                     update_embedding_database()
 
                     except Exception as e:
@@ -644,13 +633,13 @@ def run(max_workers: int = None) -> int:
             if pending_embeddings:
                 final_count = update_embedding_database()
                 logger.info(
-                    f"Final embedding update: inserted {final_count} embeddings")
+                    f"Final database update: inserted {final_count} embeddings")
 
             embedding_elapsed_time = time.time() - embedding_start_time
-            logger.info(f"STEP 1.6 COMPLETE: Processed {embedding_success + embedding_failure} embeddings "
-                        f"in {embedding_elapsed_time:.2f} seconds")
             logger.info(
-                f"Embedding results: {embedding_success} successful, {embedding_failure} failed")
+                f"STEP 1.6 COMPLETE: Processed {embedding_success + embedding_failure} embeddings in {embedding_elapsed_time:.2f} seconds")
+            logger.info(
+                f"Results: {embedding_success} successful, {embedding_failure} failed")
 
     except Exception as e:
         logger.error(f"Error during embedding generation step: {e}")

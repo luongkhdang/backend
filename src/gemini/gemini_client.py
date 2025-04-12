@@ -112,13 +112,15 @@ class GeminiClient:
         max_chars = max_tokens * 4
 
         if len(text) > max_chars:
-            logger.warning(f"Text length ({len(text)} chars) exceeds recommended limit of {max_chars} chars. " +
-                           f"This may cause embedding generation to fail.")
+            logger.warning(
+                f"Text length ({len(text)} chars) exceeds recommended limit of {max_chars} chars")
 
         for attempt in range(retries):
             try:
-                logger.debug(
-                    f"Generating embedding for text of length {len(text)} (attempt {attempt+1}/{retries})")
+                # Log only on first attempt or if we've had failures
+                if attempt > 0:
+                    logger.info(
+                        f"Retry attempt {attempt+1}/{retries} for embedding generation")
 
                 # Apply rate limiting if a rate limiter is provided
                 if self.rate_limiter:
@@ -135,10 +137,6 @@ class GeminiClient:
                 if self.rate_limiter:
                     self.rate_limiter.register_call()
 
-                # Log the raw result structure for debugging
-                logger.debug(f"Raw API response type: {type(result)}")
-                logger.debug(f"Raw API response dir: {dir(result)}")
-
                 # Different versions of the API may have different response structures
                 # Try different attribute paths that might contain the embedding
                 embedding = None
@@ -154,7 +152,6 @@ class GeminiClient:
                     embedding = result["embedding"]
                 elif isinstance(result, dict) and "embeddings" in result:
                     embedding = result["embeddings"]
-
                 # For some API versions, result might be a list of embedding objects
                 elif isinstance(result, list) and len(result) > 0:
                     if hasattr(result[0], "embedding"):
@@ -164,36 +161,21 @@ class GeminiClient:
 
                 # Validate the embedding we found (if any)
                 if embedding is not None and isinstance(embedding, list) and len(embedding) > 0:
-                    logger.debug(
-                        f"Successfully generated embedding of dimension {len(embedding)}")
                     return embedding
 
-                # Log detailed error based on what we found
-                if embedding is None:
+                # Only log the error format once to avoid cluttering logs
+                if attempt == 0:
                     logger.warning(
-                        f"Could not find embedding in result: {result}")
-                elif not isinstance(embedding, list):
-                    logger.warning(
-                        f"Embedding is not a list but {type(embedding)}")
-                elif len(embedding) == 0:
-                    logger.warning(f"Embedding is an empty list")
-
-                # Log full structure as string for debugging
-                # Limit to 500 chars to avoid huge logs
-                result_repr = str(result)[:500]
-                logger.warning(
-                    f"Invalid embedding result format: {result_repr}...")
+                        f"Invalid embedding format received from API")
 
             except Exception as e:
-                logger.warning(
-                    f"Embedding generation error (attempt {attempt+1}/{retries}): {e}")
+                logger.warning(f"Embedding generation error: {e}")
 
             # Try again unless this was the last attempt
             if attempt < retries - 1:
                 # Add jitter to backoff delay
                 jitter = random.random() * 0.5 + 0.5  # 0.5-1.0 multiplier
                 sleep_time = delay * jitter
-                logger.info(f"Retrying in {sleep_time:.2f} seconds...")
                 time.sleep(sleep_time)
                 delay *= 2  # Exponential backoff
             else:

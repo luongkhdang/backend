@@ -50,8 +50,9 @@ class RateLimiter:
         self.call_history = deque(maxlen=self.max_calls_per_minute)
         self.lock = Lock()  # For thread safety
 
+        # Only log at initialization to avoid excessive repetition
         logger.info(
-            f"Initialized rate limiter: {self.max_calls_per_minute} calls per minute maximum")
+            f"Rate limiter: {self.max_calls_per_minute} calls/minute maximum")
 
     def wait_if_needed(self) -> float:
         """
@@ -63,10 +64,9 @@ class RateLimiter:
         wait_time = self.get_wait_time()
 
         if wait_time > 0:
-            # Log only for significant waits
-            if wait_time > 0.5:
-                logger.info(
-                    f"Rate limit approaching - waiting {wait_time:.2f} seconds before next API call")
+            # Log only for significant waits (>1 second)
+            if wait_time > 1.0:
+                logger.info(f"Rate limit pause: waiting {wait_time:.1f}s")
             time.sleep(wait_time)
             return wait_time
         return 0

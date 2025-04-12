@@ -66,10 +66,7 @@ def main():
     step1_result = run_step1(max_workers=args.workers)
 
     if step1_result == 0:
-        logger.warning(
-            "Step 1 did not process any articles or encountered an error.")
-        logger.info(
-            "Pipeline will continue with subsequent steps if implemented.")
+        logger.warning("Step 1 did not process any articles.")
     else:
         logger.info(f"Step 1 successfully processed {step1_result} articles.")
 
