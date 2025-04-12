@@ -41,7 +41,7 @@ class ReaderDBClient:
     - insert_scraper_ids(article_ids): Inserts minimal article records with just scraper_ids
     - get_article_by_scraper_id(scraper_id): Retrieves an article by its scraper_id
     - get_error_articles(): Retrieves articles with null or error content
-    - get_articles_needing_embedding(max_word_count): Gets articles without embeddings under word limit
+    - get_articles_needing_embedding(max_char_count): Gets articles without embeddings under character limit
     - insert_entity(entity): Inserts an entity into the database
     - link_article_entity(article_id, entity_id, mention_count): Links an article to an entity
     - insert_embedding(article_id, embedding): Inserts an embedding for an article
@@ -1055,13 +1055,16 @@ class ReaderDBClient:
             if conn:
                 self.release_connection(conn)
 
-    def get_articles_needing_embedding(self, max_word_count: int = 1450) -> List[Dict[str, Any]]:
+    def get_articles_needing_embedding(self, max_char_count: int = 8000) -> List[Dict[str, Any]]:
         """
-        Get articles that need embeddings and have a content length under the specified word count.
+        Get articles that need embeddings and have a content length under the specified character count.
+
+        This method selects articles with valid character counts instead of truncating them,
+        as there's a future plan for handling long articles separately.
 
         Args:
-            max_word_count: Maximum number of words in the article content (default: 1450)
-                           to stay within Gemini embedding model's token limit (~2048 tokens)
+            max_char_count: Maximum number of characters in the article content (default: 8000)
+                           to stay within Gemini embedding model's token limit (~2048 tokens at 4 chars/token)
 
         Returns:
             List[Dict[str, Any]]: List of articles needing embeddings, each containing 'id' and 'content'
@@ -1072,6 +1075,7 @@ class ReaderDBClient:
             cursor = conn.cursor()
 
             # Query for articles that have valid content and don't have embeddings yet
+            # This query retrieves all articles first, then we filter by length in Python
             cursor.execute("""
                 SELECT a.id, a.content 
                 FROM articles a
@@ -1085,20 +1089,26 @@ class ReaderDBClient:
 
             # Fetch all results
             results = cursor.fetchall()
+            total_articles = len(results)
 
-            # Filter based on word count in Python
+            # Filter based on character count
             filtered_articles = []
+            skipped_articles = 0
+
             for article_id, content in results:
-                # Count words in the content
-                word_count = len(content.split())
-                if word_count < max_word_count:
+                # Check character count
+                char_count = len(content)
+                if char_count <= max_char_count:
                     filtered_articles.append({
                         'id': article_id,
                         'content': content
                     })
+                else:
+                    skipped_articles += 1
 
-            logger.info(f"Found {len(filtered_articles)} articles needing embeddings "
-                        f"(out of {len(results)} total articles without embeddings)")
+            # More detailed logging to track skipped articles
+            logger.info(f"Found {len(filtered_articles)} articles suitable for embedding "
+                        f"(skipped {skipped_articles} articles exceeding {max_char_count} characters)")
             return filtered_articles
 
         except Exception as e:

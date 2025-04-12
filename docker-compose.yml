@@ -31,6 +31,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: article-transfer
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,10 +49,11 @@ services:
       MAX_WORKERS: 4 # Number of parallel workers for processing
       # Gemini API settings
       GEMINI_API_KEY: ${GEMINI_API_KEY:-YOUR_API_KEY_HERE}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-models/text-embedding-004}
       GEMINI_EMBEDDING_TASK_TYPE: ${GEMINI_EMBEDDING_TASK_TYPE:-CLUSTERING}
       GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT: ${GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT:-2048}
       GEMINI_EMBEDDING_OUTPUT_DIMENSION: ${GEMINI_EMBEDDING_OUTPUT_DIMENSION:-768}
+      GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE: ${GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE:-1500}
       # Python path for Google imports
       PYTHONPATH: /app
       # Debug flag for imports
@@ -93,7 +95,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
-    restart: unless-stopped
 
   # pgAdmin - Web interface for database management
   pgadmin:
@@ -124,10 +125,11 @@ services:
       READER_DB_PASSWORD: postgres
       # Gemini API settings
       GEMINI_API_KEY: ${GEMINI_API_KEY:-YOUR_API_KEY_HERE}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-models/text-embedding-004}
       GEMINI_EMBEDDING_TASK_TYPE: ${GEMINI_EMBEDDING_TASK_TYPE:-CLUSTERING}
       GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT: ${GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT:-2048}
       GEMINI_EMBEDDING_OUTPUT_DIMENSION: ${GEMINI_EMBEDDING_OUTPUT_DIMENSION:-768}
+      GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE: ${GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE:-1500}
       # Python path for Google imports
       PYTHONPATH: /app
       # Debug flag for imports

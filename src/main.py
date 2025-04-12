@@ -79,6 +79,8 @@ def main():
     # step4_result = run_step4()
 
     logger.info("========= DATA REFINERY PIPELINE COMPLETE =========")
+    # Make sure to explicitly exit with status code 0 to avoid container restart
+    sys.exit(0)
 
 
 if __name__ == "__main__":

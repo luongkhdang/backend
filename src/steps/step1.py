@@ -305,7 +305,7 @@ def run(max_workers: int = None) -> int:
     - Validate article content and prepare for storage (Step 1.3)
     - Store processed articles in reader-db incrementally (Step 1.4)
     - Output debug information for articles with errors (Step 1.5)
-    - Generate embeddings for suitable articles (Step 1.6)
+    - Generate embeddings for suitable articles (Step 1.6) - Always executed
 
     Args:
         max_workers: Maximum number of worker processes to use for parallel processing.
@@ -338,246 +338,330 @@ def run(max_workers: int = None) -> int:
     # STEP 1.1: Fetch articles from news-db
     raw_articles = fetch_articles_for_processing()
 
-    if not raw_articles:
-        logger.warning("No articles retrieved. Step 1 cannot proceed.")
-        return 0
+    processed_count = 0
+    inserted_count = 0
 
-    # PRE-PROCESSING: Get list of already processed articles
-    reader_client = initialize_reader_db_client()
-    try:
-        processed_ids = get_processed_scraper_ids(reader_client)
-    finally:
-        reader_client.close()
+    if raw_articles:
+        # PRE-PROCESSING: Get list of already processed articles
+        reader_client = initialize_reader_db_client()
+        try:
+            processed_ids = get_processed_scraper_ids(reader_client)
+        finally:
+            reader_client.close()
 
-    # Filter out already processed articles
-    articles_to_process = []
-    for article in raw_articles:
-        article_id = article.get('id')
-        if article_id not in processed_ids:
-            articles_to_process.append(article)
+        # Filter out already processed articles
+        articles_to_process = []
+        for article in raw_articles:
+            article_id = article.get('id')
+            if article_id not in processed_ids:
+                articles_to_process.append(article)
 
-    skipped_count = len(raw_articles) - len(articles_to_process)
-    logger.info(f"Filtered out {skipped_count} already processed articles")
-    logger.info(f"Remaining articles to process: {len(articles_to_process)}")
-
-    if not articles_to_process:
+        skipped_count = len(raw_articles) - len(articles_to_process)
+        logger.info(f"Filtered out {skipped_count} already processed articles")
         logger.info(
-            "All articles have already been processed. Step 1 complete.")
-        return 0
+            f"Remaining articles to process: {len(articles_to_process)}")
 
-    # Initialize a DB client that will be kept open for the duration of processing
-    # This avoids the overhead of creating connections for each batch
-    reader_db = initialize_reader_db_client()
-
-    try:
-        # Test DB connection
-        test_result = reader_db.test_connection()
-        if "error" in test_result:
-            logger.error(
-                f"Cannot connect to reader-db: {test_result['error']}")
-            return 0
-
-        logger.info(
-            f"DB Connection verified, available tables: {', '.join(test_result.get('tables', []))}")
-
-        # STEP 1.2 & 1.3: Process articles and prepare for storage in parallel
-        logger.info(
-            f"Processing {len(articles_to_process)} articles with {max_workers} parallel workers...")
-        start_time = time.time()
-        last_db_update_time = start_time
-
-        # Track processing statistics
-        total_articles = len(articles_to_process)
-        processed_count = 0
-        inserted_count = 0
-        pending_articles = []  # Articles ready for DB insertion
-
-        # Initialize a thread-safe lock for concurrent access to the pending_articles list
-        pending_articles_lock = Lock()
-
-        def update_database():
-            """Helper function to update the database with pending articles"""
-            nonlocal inserted_count, pending_articles
-
-            if not pending_articles:
-                return 0
-
-            with pending_articles_lock:
-                articles_to_insert = pending_articles.copy()
-                pending_articles = []
-
-            if articles_to_insert:
-                logger.info(
-                    f"Performing incremental database update with {len(articles_to_insert)} articles...")
-                # Use batch insert method directly on the persistent connection
-                count = reader_db.batch_insert_articles(articles_to_insert)
-                inserted_count += count
-                return count
-            return 0
-
-        # Use thread pool for I/O bound tasks
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all articles for processing
-            future_to_article = {executor.submit(
-                process_article, article): article for article in articles_to_process}
-
-            # Process results as they complete
-            for future in concurrent.futures.as_completed(future_to_article):
-                article = future_to_article[future]
-                processed_count += 1
-
-                try:
-                    processed_article = future.result()
-
-                    # Add to pending articles for database insertion
-                    with pending_articles_lock:
-                        pending_articles.append(processed_article)
-
-                    # Check if it's time for a database update
-                    current_time = time.time()
-                    time_since_last_update = current_time - last_db_update_time
-
-                    if len(pending_articles) >= batch_size or time_since_last_update >= checkpoint_interval:
-                        update_count = update_database()
-                        last_db_update_time = time.time()
-                        logger.info(
-                            f"Incremental update: inserted {update_count} articles")
-
-                    # Log progress periodically
-                    if processed_count % 10 == 0 or processed_count == total_articles:
-                        elapsed = current_time - start_time
-                        rate = processed_count / elapsed if elapsed > 0 else 0
-                        logger.info(f"Processed {processed_count}/{total_articles} articles "
-                                    f"({processed_count/total_articles*100:.1f}%, {rate:.2f} articles/sec)")
-
-                except Exception as e:
-                    logger.error(
-                        f"Exception processing article {article.get('id')}: {e}")
-
-        # Final database update for any remaining articles
-        if pending_articles:
-            final_count = update_database()
-            logger.info(
-                f"Final database update: inserted {final_count} articles")
-
-        elapsed_time = time.time() - start_time
-        logger.info(f"STEP 1.2 & 1.3 COMPLETE: Processed {processed_count} articles "
-                    f"in {elapsed_time:.2f} seconds ({processed_count/elapsed_time:.2f} articles/sec)")
-        logger.info(f"Total articles inserted into database: {inserted_count}")
-
-        # STEP 1.5: Generate debug information for articles with errors
-        output_error_articles_json(reader_db)
-
-        if inserted_count > 0:
-            logger.info(
-                f"========= STEP 1 COMPLETE: {inserted_count} of {len(articles_to_process)} NEW articles processed and stored =========")
-            logger.info(
-                f"Total articles considered: {len(raw_articles)} (including {skipped_count} previously processed)")
-
-            # STEP 1.6: Generate embeddings for suitable articles
-            logger.info(
-                "========= STARTING STEP 1.6: EMBEDDING GENERATION =========")
+        if articles_to_process:
+            # Initialize a DB client that will be kept open for the duration of processing
+            # This avoids the overhead of creating connections for each batch
+            reader_db = initialize_reader_db_client()
 
             try:
-                # Get articles that need embeddings (content < 1450 words)
-                articles_for_embedding = reader_db.get_articles_needing_embedding()
+                # Test DB connection
+                test_result = reader_db.test_connection()
+                if "error" in test_result:
+                    logger.error(
+                        f"Cannot connect to reader-db: {test_result['error']}")
+                    return 0
 
-                if not articles_for_embedding:
-                    logger.info(
-                        "No articles need embeddings. Step 1.6 complete.")
-                else:
-                    logger.info(
-                        f"Found {len(articles_for_embedding)} articles suitable for embedding generation")
+                logger.info(
+                    f"DB Connection verified, available tables: {', '.join(test_result.get('tables', []))}")
 
-                    # Track embedding statistics
-                    embedding_success = 0
-                    embedding_failure = 0
+                # STEP 1.2 & 1.3: Process articles and prepare for storage in parallel
+                logger.info(
+                    f"Processing {len(articles_to_process)} articles with {max_workers} parallel workers...")
+                start_time = time.time()
+                last_db_update_time = start_time
 
-                    # Initialize a single Gemini client for all embedding tasks
-                    gemini_client = GeminiClient()
-                    logger.info(
-                        "Initialized Gemini client for embedding generation")
+                # Track processing statistics
+                total_articles = len(articles_to_process)
+                processed_count = 0
+                inserted_count = 0
+                pending_articles = []  # Articles ready for DB insertion
 
-                    # Define worker function for embedding generation
-                    def process_embedding_task(article_data: Dict[str, Any]) -> Tuple[int, bool]:
-                        article_id = article_data['id']
-                        content = article_data['content']
+                # Initialize a thread-safe lock for concurrent access to the pending_articles list
+                pending_articles_lock = Lock()
+
+                def update_database():
+                    """Helper function to update the database with pending articles"""
+                    nonlocal inserted_count, pending_articles
+
+                    if not pending_articles:
+                        return 0
+
+                    with pending_articles_lock:
+                        articles_to_insert = pending_articles.copy()
+                        pending_articles = []
+
+                    if articles_to_insert:
+                        logger.info(
+                            f"Performing incremental database update with {len(articles_to_insert)} articles...")
+                        # Use batch insert method directly on the persistent connection
+                        count = reader_db.batch_insert_articles(
+                            articles_to_insert)
+                        inserted_count += count
+                        return count
+                    return 0
+
+                # Use thread pool for I/O bound tasks
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    # Submit all articles for processing
+                    future_to_article = {executor.submit(
+                        process_article, article): article for article in articles_to_process}
+
+                    # Process results as they complete
+                    for future in concurrent.futures.as_completed(future_to_article):
+                        article = future_to_article[future]
+                        processed_count += 1
 
                         try:
-                            # Generate embedding
-                            embedding = gemini_client.generate_embedding(
-                                content)
+                            processed_article = future.result()
 
-                            if embedding is not None:
-                                # Insert embedding into database
-                                result = reader_db.insert_embedding(
-                                    article_id, embedding)
-                                if result:
-                                    return (article_id, True)
-                                else:
-                                    logger.error(
-                                        f"Failed to insert embedding for article {article_id}")
-                            else:
-                                logger.error(
-                                    f"Failed to generate embedding for article {article_id}")
+                            # Add to pending articles for database insertion
+                            with pending_articles_lock:
+                                pending_articles.append(processed_article)
 
-                            return (article_id, False)
+                            # Check if it's time for a database update
+                            current_time = time.time()
+                            time_since_last_update = current_time - last_db_update_time
+
+                            if len(pending_articles) >= batch_size or time_since_last_update >= checkpoint_interval:
+                                update_count = update_database()
+                                last_db_update_time = time.time()
+                                logger.info(
+                                    f"Incremental update: inserted {update_count} articles")
+
+                            # Log progress periodically
+                            if processed_count % 10 == 0 or processed_count == total_articles:
+                                elapsed = current_time - start_time
+                                rate = processed_count / elapsed if elapsed > 0 else 0
+                                logger.info(f"Processed {processed_count}/{total_articles} articles "
+                                            f"({processed_count/total_articles*100:.1f}%, {rate:.2f} articles/sec)")
 
                         except Exception as e:
                             logger.error(
-                                f"Error in embedding process for article {article_id}: {e}")
-                            return (article_id, False)
+                                f"Exception processing article {article.get('id')}: {e}")
 
-                    # Process embeddings in parallel
-                    embedding_start_time = time.time()
-
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                        # Submit embedding tasks
-                        future_to_article = {executor.submit(process_embedding_task, article): article
-                                             for article in articles_for_embedding}
-
-                        # Process results as they complete
-                        for i, future in enumerate(concurrent.futures.as_completed(future_to_article)):
-                            article = future_to_article[future]
-
-                            try:
-                                article_id, success = future.result()
-
-                                if success:
-                                    embedding_success += 1
-                                else:
-                                    embedding_failure += 1
-
-                                # Log progress periodically
-                                if (i + 1) % 50 == 0 or (i + 1) == len(articles_for_embedding):
-                                    logger.info(f"Embedding progress: {i+1}/{len(articles_for_embedding)} "
-                                                f"({(i+1)/len(articles_for_embedding)*100:.1f}%)")
-
-                            except Exception as e:
-                                logger.error(
-                                    f"Exception processing embedding task: {e}")
-                                embedding_failure += 1
-
-                    embedding_elapsed_time = time.time() - embedding_start_time
-                    logger.info(f"STEP 1.6 COMPLETE: Processed {embedding_success + embedding_failure} embeddings "
-                                f"in {embedding_elapsed_time:.2f} seconds")
+                # Final database update for any remaining articles
+                if pending_articles:
+                    final_count = update_database()
                     logger.info(
-                        f"Embedding results: {embedding_success} successful, {embedding_failure} failed")
+                        f"Final database update: inserted {final_count} articles")
 
-            except Exception as e:
-                logger.error(f"Error during embedding generation step: {e}")
+                elapsed_time = time.time() - start_time
+                logger.info(f"STEP 1.2 & 1.3 COMPLETE: Processed {processed_count} articles "
+                            f"in {elapsed_time:.2f} seconds ({processed_count/elapsed_time:.2f} articles/sec)")
+                logger.info(
+                    f"Total articles inserted into database: {inserted_count}")
 
-            return inserted_count
+                # STEP 1.5: Generate debug information for articles with errors
+                output_error_articles_json(reader_db)
+
+                if inserted_count > 0:
+                    logger.info(
+                        f"========= STEP 1 COMPLETE: {inserted_count} of {len(articles_to_process)} NEW articles processed and stored =========")
+                    logger.info(
+                        f"Total articles considered: {len(raw_articles)} (including {skipped_count} previously processed)")
+                else:
+                    logger.info(
+                        "========= STEP 1 COMPLETE: No new articles were inserted =========")
+            finally:
+                # Always close the DB connection
+                if reader_db:
+                    reader_db.close()
+                    logger.info("Database connection closed")
         else:
-            logger.error(
-                "========= STEP 1 FAILED: No articles were inserted =========")
-            return 0
+            logger.info("All articles have already been processed.")
+    else:
+        logger.warning("No articles retrieved from news-db.")
+
+    # STEP 1.6: Generate embeddings for suitable articles
+    # This step now runs independently, regardless of whether new articles were processed
+    logger.info("========= STARTING STEP 1.6: EMBEDDING GENERATION =========")
+
+    # Create a new database connection for embedding generation
+    reader_db = initialize_reader_db_client()
+
+    try:
+        # Get articles that need embeddings (content length <= 8000 characters, ~2000 tokens)
+        # This filters articles by character count without truncation, as there's a future plan for handling long articles
+        max_char_limit = 8000
+        articles_for_embedding = reader_db.get_articles_needing_embedding(
+            max_char_count=max_char_limit)
+
+        if not articles_for_embedding:
+            logger.info("No articles need embeddings. Step 1.6 complete.")
+        else:
+            logger.info(
+                f"Found {len(articles_for_embedding)} articles with suitable character count (≤ {max_char_limit}) for embedding generation")
+
+            # Import the rate limiter
+            from src.steps.rate_limit import RateLimiter
+            rate_limiter = RateLimiter()
+            logger.info(
+                f"Using rate limiter with {rate_limiter.max_calls_per_minute} calls per minute limit")
+
+            # Track embedding statistics
+            embedding_success = 0
+            embedding_failure = 0
+
+            # Initialize a single Gemini client for all embedding tasks
+            gemini_client = GeminiClient(rate_limiter=rate_limiter)
+            logger.info("Initialized Gemini client for embedding generation")
+
+            # Setup batch processing parameters
+            embedding_batch_size = 20  # Insert to DB every 20 articles
+            pending_embeddings = []
+            pending_embeddings_lock = Lock()  # Thread-safe lock
+            embedding_checkpoint_interval = 60  # Also update DB every 60 seconds
+
+            # Initialize timestamp for db updates - shared across threads
+            embedding_start_time = time.time()
+            last_db_update_time = embedding_start_time
+
+            # Define function to update database with pending embeddings
+            def update_embedding_database():
+                nonlocal pending_embeddings, last_db_update_time
+
+                with pending_embeddings_lock:
+                    if not pending_embeddings:
+                        return 0
+
+                    embeddings_to_insert = pending_embeddings.copy()
+                    pending_embeddings = []
+
+                success_count = 0
+                for article_id, embedding in embeddings_to_insert:
+                    result = reader_db.insert_embedding(article_id, embedding)
+                    if result:
+                        success_count += 1
+
+                last_db_update_time = time.time()
+                logger.info(
+                    f"Incremental embedding update: inserted {success_count}/{len(embeddings_to_insert)} embeddings")
+                return success_count
+
+            # Define worker function for embedding generation
+            def process_embedding_task(article_data: Dict[str, Any]) -> Tuple[int, bool]:
+                nonlocal last_db_update_time
+                article_id = article_data['id']
+                content = article_data['content']
+
+                try:
+                    # Generate embedding
+                    embedding = gemini_client.generate_embedding(content)
+
+                    if embedding is not None and isinstance(embedding, list) and len(embedding) > 0:
+                        # Add to pending embeddings for batch insertion
+                        with pending_embeddings_lock:
+                            pending_embeddings.append((article_id, embedding))
+
+                            # Check if it's time for a database update
+                            current_time = time.time()
+                            time_since_last_update = current_time - last_db_update_time
+
+                            should_update = (len(pending_embeddings) >= embedding_batch_size or
+                                             time_since_last_update >= embedding_checkpoint_interval)
+
+                        # Update if needed (outside the lock to prevent deadlock)
+                        if should_update:
+                            update_embedding_database()
+
+                        return (article_id, True)
+                    else:
+                        # Log the specific issue with the embedding
+                        if embedding is None:
+                            logger.error(
+                                f"Embedding generation returned None for article {article_id}")
+                        elif not isinstance(embedding, list):
+                            logger.error(
+                                f"Embedding is not a list but {type(embedding)} for article {article_id}")
+                        elif len(embedding) == 0:
+                            logger.error(
+                                f"Embedding list is empty for article {article_id}")
+                        else:
+                            logger.error(
+                                f"Unknown embedding error for article {article_id}")
+
+                        return (article_id, False)
+
+                except Exception as e:
+                    logger.error(
+                        f"Error in embedding process for article {article_id}: {e}")
+                    return (article_id, False)
+
+            # Process embeddings in parallel
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit embedding tasks
+                future_to_article = {executor.submit(process_embedding_task, article): article
+                                     for article in articles_for_embedding}
+
+                # Process results as they complete
+                for i, future in enumerate(concurrent.futures.as_completed(future_to_article)):
+                    article = future_to_article[future]
+
+                    try:
+                        article_id, success = future.result()
+
+                        if success:
+                            embedding_success += 1
+                        else:
+                            embedding_failure += 1
+
+                        # Log progress periodically
+                        if (i + 1) % 20 == 0 or (i + 1) == len(articles_for_embedding):
+                            logger.info(f"Embedding progress: {i+1}/{len(articles_for_embedding)} "
+                                        f"({(i+1)/len(articles_for_embedding)*100:.1f}%)")
+
+                        # Instead of forcing DB update every 100 articles, check if we need to update based on time
+                        current_time = time.time()
+                        time_since_last_update = current_time - last_db_update_time
+
+                        # Update if it's been a while since the last update
+                        if time_since_last_update >= embedding_checkpoint_interval:
+                            with pending_embeddings_lock:
+                                if pending_embeddings:
+                                    logger.info(
+                                        f"Time-based checkpoint: {time_since_last_update:.1f}s since last update")
+                                    update_embedding_database()
+
+                    except Exception as e:
+                        logger.error(
+                            f"Exception processing embedding task: {e}")
+                        embedding_failure += 1
+
+            # Final database update for any remaining embeddings
+            if pending_embeddings:
+                final_count = update_embedding_database()
+                logger.info(
+                    f"Final embedding update: inserted {final_count} embeddings")
+
+            embedding_elapsed_time = time.time() - embedding_start_time
+            logger.info(f"STEP 1.6 COMPLETE: Processed {embedding_success + embedding_failure} embeddings "
+                        f"in {embedding_elapsed_time:.2f} seconds")
+            logger.info(
+                f"Embedding results: {embedding_success} successful, {embedding_failure} failed")
+
+    except Exception as e:
+        logger.error(f"Error during embedding generation step: {e}")
 
     finally:
         # Always close the DB connection
         if reader_db:
             reader_db.close()
-            logger.info("Database connection closed")
+            logger.info("Embedding database connection closed")
+
+    return inserted_count
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 gemini_client.py - Client for Google's Gemini API
 
 This module provides a client for Google's Gemini API, specifically for generating
-text embeddings using the text-embedding-004 model.
+text embeddings using the models/text-embedding-004 model.
 
 Exported functions/classes:
 - GeminiClient: Class for interacting with the Gemini API
@@ -36,11 +36,14 @@ logger = logging.getLogger(__name__)
 class GeminiClient:
     """Client for interacting with Google's Gemini API."""
 
-    def __init__(self):
+    def __init__(self, rate_limiter=None):
         """
         Initialize the Gemini API client.
 
         Loads the API key from environment variables and configures the client.
+
+        Args:
+            rate_limiter: Optional rate limiter instance to control API call frequency
         """
         # Load environment variables
         load_dotenv()
@@ -54,14 +57,23 @@ class GeminiClient:
 
         # Get model name and task type from environment (or use defaults)
         self.embedding_model = os.getenv(
-            "GEMINI_EMBEDDING_MODEL", "text-embedding-004")
+            "GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
+
+        # Ensure model name has "models/" prefix if not already present
+        if not self.embedding_model.startswith("models/"):
+            self.embedding_model = f"models/{self.embedding_model}"
+
         self.default_task_type = os.getenv(
             "GEMINI_EMBEDDING_TASK_TYPE", "CLUSTERING")
+
+        # Store the rate limiter
+        self.rate_limiter = rate_limiter
 
         # Initialize the Gemini client
         try:
             genai.configure(api_key=self.api_key)
-            self.client = genai.Client(api_key=self.api_key)
+            # The Client class doesn't exist - use the top-level genai module directly
+            # self.client = genai.Client(api_key=self.api_key)
             logger.info(
                 f"Initialized Gemini client with model: {self.embedding_model}, default task type: {self.default_task_type}")
         except Exception as e:
@@ -87,45 +99,105 @@ class GeminiClient:
         task_type = task_type or self.default_task_type
         delay = initial_delay
 
+        # Validate input text
+        if not text or not isinstance(text, str) or len(text.strip()) == 0:
+            logger.error(f"Invalid input text for embedding: {text[:30]}...")
+            return None
+
+        # Check if text is within limits (but don't truncate)
+        # For Gemini models, 1 token ≈ 4 characters as per Google documentation
+        max_tokens = int(
+            os.getenv("GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT", "2048"))
+        # Character limit based on token ratio of 1:4
+        max_chars = max_tokens * 4
+
+        if len(text) > max_chars:
+            logger.warning(f"Text length ({len(text)} chars) exceeds recommended limit of {max_chars} chars. " +
+                           f"This may cause embedding generation to fail.")
+
         for attempt in range(retries):
             try:
                 logger.debug(
                     f"Generating embedding for text of length {len(text)} (attempt {attempt+1}/{retries})")
 
-                # Create embedding config with task type
-                # Use dict-based configuration instead of types module
-                embed_config = {"task_type": task_type}
+                # Apply rate limiting if a rate limiter is provided
+                if self.rate_limiter:
+                    self.rate_limiter.wait_if_needed()
 
-                # Generate embedding using the client.models API
-                result = self.client.models.embed_content(
+                # Generate embedding using the genai embeddings API
+                result = genai.embed_content(
                     model=self.embedding_model,
-                    contents=text,
-                    config=embed_config
+                    content=text,
+                    task_type=task_type
                 )
 
-                # Extract embeddings from result
-                if result and hasattr(result, "embeddings"):
-                    embeddings = result.embeddings
+                # Register this call with the rate limiter if provided
+                if self.rate_limiter:
+                    self.rate_limiter.register_call()
+
+                # Log the raw result structure for debugging
+                logger.debug(f"Raw API response type: {type(result)}")
+                logger.debug(f"Raw API response dir: {dir(result)}")
+
+                # Different versions of the API may have different response structures
+                # Try different attribute paths that might contain the embedding
+                embedding = None
+
+                # First try the expected path in newer versions
+                if hasattr(result, "embedding"):
+                    embedding = result.embedding
+                # Try accessing 'embeddings' attribute (plural) from older versions
+                elif hasattr(result, "embeddings"):
+                    embedding = result.embeddings
+                # Try dict-style access
+                elif isinstance(result, dict) and "embedding" in result:
+                    embedding = result["embedding"]
+                elif isinstance(result, dict) and "embeddings" in result:
+                    embedding = result["embeddings"]
+
+                # For some API versions, result might be a list of embedding objects
+                elif isinstance(result, list) and len(result) > 0:
+                    if hasattr(result[0], "embedding"):
+                        embedding = result[0].embedding
+                    elif hasattr(result[0], "embeddings"):
+                        embedding = result[0].embeddings
+
+                # Validate the embedding we found (if any)
+                if embedding is not None and isinstance(embedding, list) and len(embedding) > 0:
                     logger.debug(
-                        f"Successfully generated embedding of dimension {len(embeddings)}")
-                    return embeddings
-                else:
+                        f"Successfully generated embedding of dimension {len(embedding)}")
+                    return embedding
+
+                # Log detailed error based on what we found
+                if embedding is None:
                     logger.warning(
-                        f"Empty or invalid embedding result: {result}")
+                        f"Could not find embedding in result: {result}")
+                elif not isinstance(embedding, list):
+                    logger.warning(
+                        f"Embedding is not a list but {type(embedding)}")
+                elif len(embedding) == 0:
+                    logger.warning(f"Embedding is an empty list")
+
+                # Log full structure as string for debugging
+                # Limit to 500 chars to avoid huge logs
+                result_repr = str(result)[:500]
+                logger.warning(
+                    f"Invalid embedding result format: {result_repr}...")
 
             except Exception as e:
                 logger.warning(
                     f"Embedding generation error (attempt {attempt+1}/{retries}): {e}")
 
-                if attempt < retries - 1:
-                    # Add jitter to backoff delay
-                    jitter = random.random() * 0.5 + 0.5  # 0.5-1.0 multiplier
-                    sleep_time = delay * jitter
-                    logger.info(f"Retrying in {sleep_time:.2f} seconds...")
-                    time.sleep(sleep_time)
-                    delay *= 2  # Exponential backoff
-                else:
-                    logger.error(
-                        f"Failed to generate embedding after {retries} attempts: {e}")
+            # Try again unless this was the last attempt
+            if attempt < retries - 1:
+                # Add jitter to backoff delay
+                jitter = random.random() * 0.5 + 0.5  # 0.5-1.0 multiplier
+                sleep_time = delay * jitter
+                logger.info(f"Retrying in {sleep_time:.2f} seconds...")
+                time.sleep(sleep_time)
+                delay *= 2  # Exponential backoff
+            else:
+                logger.error(
+                    f"Failed to generate embedding after {retries} attempts")
 
         return None
