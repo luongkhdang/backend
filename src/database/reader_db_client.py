@@ -41,6 +41,7 @@ class ReaderDBClient:
     - insert_scraper_ids(article_ids): Inserts minimal article records with just scraper_ids
     - get_article_by_scraper_id(scraper_id): Retrieves an article by its scraper_id
     - get_error_articles(): Retrieves articles with null or error content
+    - get_articles_needing_embedding(max_word_count): Gets articles without embeddings under word limit
     - insert_entity(entity): Inserts an entity into the database
     - link_article_entity(article_id, entity_id, mention_count): Links an article to an entity
     - insert_embedding(article_id, embedding): Inserts an embedding for an article
@@ -56,6 +57,7 @@ class ReaderDBClient:
     Related files:
     - src/main.py: Uses this client to store processed articles
     - src/database/news_api_client.py: Fetches articles for processing
+    - src/gemini/gemini_client.py: Generates embeddings for articles
     """
 
     def __init__(self,
@@ -1047,6 +1049,60 @@ class ReaderDBClient:
         except Exception as e:
             logger.error(
                 f"Error retrieving articles with null/error content: {e}")
+            return []
+
+        finally:
+            if conn:
+                self.release_connection(conn)
+
+    def get_articles_needing_embedding(self, max_word_count: int = 1450) -> List[Dict[str, Any]]:
+        """
+        Get articles that need embeddings and have a content length under the specified word count.
+
+        Args:
+            max_word_count: Maximum number of words in the article content (default: 1450)
+                           to stay within Gemini embedding model's token limit (~2048 tokens)
+
+        Returns:
+            List[Dict[str, Any]]: List of articles needing embeddings, each containing 'id' and 'content'
+        """
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Query for articles that have valid content and don't have embeddings yet
+            cursor.execute("""
+                SELECT a.id, a.content 
+                FROM articles a
+                LEFT JOIN embeddings e ON a.id = e.article_id
+                WHERE 
+                    a.content IS NOT NULL 
+                    AND a.content != 'ERROR'
+                    AND LENGTH(TRIM(a.content)) > 0
+                    AND e.article_id IS NULL;
+            """)
+
+            # Fetch all results
+            results = cursor.fetchall()
+
+            # Filter based on word count in Python
+            filtered_articles = []
+            for article_id, content in results:
+                # Count words in the content
+                word_count = len(content.split())
+                if word_count < max_word_count:
+                    filtered_articles.append({
+                        'id': article_id,
+                        'content': content
+                    })
+
+            logger.info(f"Found {len(filtered_articles)} articles needing embeddings "
+                        f"(out of {len(results)} total articles without embeddings)")
+            return filtered_articles
+
+        except Exception as e:
+            logger.error(f"Error retrieving articles needing embeddings: {e}")
             return []
 
         finally:

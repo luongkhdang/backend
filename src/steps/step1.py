@@ -14,6 +14,7 @@ Related files:
 - src/database/news_api_client.py: Client for fetching articles
 - src/database/reader_db_client.py: Client for storing processed articles
 - src/refinery/content_processor.py: Functions for processing article content
+- src/gemini/gemini_client.py: Client for generating embeddings
 """
 from src.database.news_api_client import NewsAPIClient
 from src.database.reader_db_client import ReaderDBClient
@@ -31,6 +32,9 @@ import concurrent.futures
 from multiprocessing import cpu_count
 from threading import Lock
 
+# Import for Step 1.6: Embedding Generation
+from src.gemini.gemini_client import GeminiClient
+
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -38,6 +42,16 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+
+def get_project_root():
+    """
+    Get the absolute path to the project root directory.
+
+    Returns:
+        str: Absolute path to the project root
+    """
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 
 def fetch_articles_for_processing() -> List[Dict[str, Any]]:
@@ -205,12 +219,15 @@ def output_error_articles_json(reader_client: ReaderDBClient) -> None:
                     article[key] = value.isoformat()
 
         # Create logs directory if it doesn't exist
-        logs_dir = Path("logs")
-        logs_dir.mkdir(exist_ok=True)
+        logs_dir = os.path.join("/app", "logs")
+
+        # Make sure logs directory exists
+        os.makedirs(logs_dir, exist_ok=True)
 
         # Generate timestamp for filename
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = logs_dir / f"error_articles_{timestamp}.json"
+        output_file = os.path.join(
+            logs_dir, f"error_articles_{timestamp}.json")
 
         # Write to JSON file
         with open(output_file, 'w') as f:
@@ -288,6 +305,7 @@ def run(max_workers: int = None) -> int:
     - Validate article content and prepare for storage (Step 1.3)
     - Store processed articles in reader-db incrementally (Step 1.4)
     - Output debug information for articles with errors (Step 1.5)
+    - Generate embeddings for suitable articles (Step 1.6)
 
     Args:
         max_workers: Maximum number of worker processes to use for parallel processing.
@@ -455,6 +473,100 @@ def run(max_workers: int = None) -> int:
                 f"========= STEP 1 COMPLETE: {inserted_count} of {len(articles_to_process)} NEW articles processed and stored =========")
             logger.info(
                 f"Total articles considered: {len(raw_articles)} (including {skipped_count} previously processed)")
+
+            # STEP 1.6: Generate embeddings for suitable articles
+            logger.info(
+                "========= STARTING STEP 1.6: EMBEDDING GENERATION =========")
+
+            try:
+                # Get articles that need embeddings (content < 1450 words)
+                articles_for_embedding = reader_db.get_articles_needing_embedding()
+
+                if not articles_for_embedding:
+                    logger.info(
+                        "No articles need embeddings. Step 1.6 complete.")
+                else:
+                    logger.info(
+                        f"Found {len(articles_for_embedding)} articles suitable for embedding generation")
+
+                    # Track embedding statistics
+                    embedding_success = 0
+                    embedding_failure = 0
+
+                    # Initialize a single Gemini client for all embedding tasks
+                    gemini_client = GeminiClient()
+                    logger.info(
+                        "Initialized Gemini client for embedding generation")
+
+                    # Define worker function for embedding generation
+                    def process_embedding_task(article_data: Dict[str, Any]) -> Tuple[int, bool]:
+                        article_id = article_data['id']
+                        content = article_data['content']
+
+                        try:
+                            # Generate embedding
+                            embedding = gemini_client.generate_embedding(
+                                content)
+
+                            if embedding is not None:
+                                # Insert embedding into database
+                                result = reader_db.insert_embedding(
+                                    article_id, embedding)
+                                if result:
+                                    return (article_id, True)
+                                else:
+                                    logger.error(
+                                        f"Failed to insert embedding for article {article_id}")
+                            else:
+                                logger.error(
+                                    f"Failed to generate embedding for article {article_id}")
+
+                            return (article_id, False)
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error in embedding process for article {article_id}: {e}")
+                            return (article_id, False)
+
+                    # Process embeddings in parallel
+                    embedding_start_time = time.time()
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        # Submit embedding tasks
+                        future_to_article = {executor.submit(process_embedding_task, article): article
+                                             for article in articles_for_embedding}
+
+                        # Process results as they complete
+                        for i, future in enumerate(concurrent.futures.as_completed(future_to_article)):
+                            article = future_to_article[future]
+
+                            try:
+                                article_id, success = future.result()
+
+                                if success:
+                                    embedding_success += 1
+                                else:
+                                    embedding_failure += 1
+
+                                # Log progress periodically
+                                if (i + 1) % 50 == 0 or (i + 1) == len(articles_for_embedding):
+                                    logger.info(f"Embedding progress: {i+1}/{len(articles_for_embedding)} "
+                                                f"({(i+1)/len(articles_for_embedding)*100:.1f}%)")
+
+                            except Exception as e:
+                                logger.error(
+                                    f"Exception processing embedding task: {e}")
+                                embedding_failure += 1
+
+                    embedding_elapsed_time = time.time() - embedding_start_time
+                    logger.info(f"STEP 1.6 COMPLETE: Processed {embedding_success + embedding_failure} embeddings "
+                                f"in {embedding_elapsed_time:.2f} seconds")
+                    logger.info(
+                        f"Embedding results: {embedding_success} successful, {embedding_failure} failed")
+
+            except Exception as e:
+                logger.error(f"Error during embedding generation step: {e}")
+
             return inserted_count
         else:
             logger.error(

@@ -18,3 +18,6 @@ python-dateutil==2.8.2  # For date parsing
 # Content processing
 beautifulsoup4==4.13.3  # Latest stable version as of April 2024
 spacy==3.7.5  # Latest version compatible with Python 3.10 in Dockerfile 
+
+# AI and embeddings
+google-generativeai==0.7.1  # Google's Gemini API 
