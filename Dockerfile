@@ -10,16 +10,19 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     curl \
     net-tools \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file first
+# Copy ONLY requirements file first (better caching)
 COPY requirements.txt .
 
-# Install non-Google dependencies first
-RUN pip install -r requirements.txt
-
-# Install Docker SDK for Python (for network connectivity check)
-RUN pip install docker
+# Make a separate stage for non-Google dependencies
+# This ensures pip actually installs everything and fails if there are issues
+RUN pip install -r requirements.txt \
+    && pip install torch transformers sentencepiece docker \
+    && python -c "import transformers; print(f'Successfully installed transformers {transformers.__version__}')" \
+    && python -c "import torch; print(f'Successfully installed torch {torch.__version__}')" \
+    && python -c "import google.generativeai; print('Successfully installed google.generativeai')"
 
 # Download spaCy model
 RUN python -m spacy download en_core_web_lg
@@ -27,7 +30,7 @@ RUN python -m spacy download en_core_web_lg
 # Create logs directory for error reports
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
-# Copy application code
+# Copy application code - AFTER dependencies are installed
 COPY . .
 
 # Set environment variables
@@ -56,6 +59,14 @@ ENV GEMINI_INPUT_CONTEXT_WINDOW_TOKEN=1048576
 ENV GEMINI_FLASH_OUTPUT_WINDOW_TOKEN=8192
 ENV GEMINI_FLASH_RATE_LIMIT_PER_MINUTE=15
 ENV GEMINI_FLASH_RATE_LIMIT_PER_DAY=1500
+
+# Verify module imports work - This will cause build failure if imports don't work!
+RUN python -c "import sys; print(sys.path)" && \
+    python -c "import google.generativeai; print('Verified google.generativeai')" && \
+    python -c "import transformers; print('Verified transformers')" && \
+    python -c "import src.gemini.gemini_client; print('Verified gemini_client')" && \
+    python -c "from src.steps.step1 import run; print('Verified step1')" && \
+    echo "ALL IMPORTS VERIFIED SUCCESSFULLY"
 
 # Command to run the application
 CMD ["python", "src/database/db_setup.py"] 

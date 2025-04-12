@@ -338,10 +338,9 @@ def run(max_workers: int = None) -> int:
     # Configure Step 1.7 settings from environment variables
     run_step_1_7 = os.getenv("RUN_STEP_1_7", "true").lower() == "true"
     local_nlp_model = os.getenv("LOCAL_NLP_MODEL", "facebook/bart-large-cnn")
-    # Reduce the default max summary length to avoid warnings - BART models typically have a 1024 token limit
-    # and summarization outputs should be shorter than inputs
-    max_summary_tokens = int(os.getenv("MAX_SUMMARY_TOKENS", "512"))
-    min_summary_tokens = int(os.getenv("MIN_SUMMARY_TOKENS", "150"))
+    # Ensure this is within embedding limits
+    max_summary_tokens = int(os.getenv("MAX_SUMMARY_TOKENS", "1800"))
+    min_summary_tokens = int(os.getenv("MIN_SUMMARY_TOKENS", "200"))
 
     logger.info(
         f"========= STARTING STEP 1: DATA COLLECTION, PROCESSING AND STORAGE (USING {max_workers} WORKERS) =========")
@@ -536,49 +535,30 @@ def run(max_workers: int = None) -> int:
 
             def update_embedding_database_1_6():
                 nonlocal pending_embeddings_1_6, last_db_update_time_1_6, embedding_success_1_6
-                # Use a lock to safely access the shared list
+                success_count = 0
                 with pending_embeddings_lock_1_6:
                     if not pending_embeddings_1_6:
-                        return 0  # Nothing to insert
-                    # Make a copy of the list to insert and clear the original
-                    embeddings_to_insert = pending_embeddings_1_6[:]
+                        return 0
+                    embeddings_to_insert = pending_embeddings_1_6[:]  # Copy
                     pending_embeddings_1_6 = []
 
-                # Perform the insertion outside the lock
                 if embeddings_to_insert:
                     logger.info(
-                        f"Performing database update (Step 1.6) with {len(embeddings_to_insert)} embeddings..."
-                    )
-                    success_count_in_batch = 0
-                    try:
-                        # Loop through articles in the copied list
-                        for article_id, embedding in embeddings_to_insert:
-                            result = reader_db_embed.insert_embedding(
-                                article_id, embedding
-                            )
-                            if result:
-                                success_count_in_batch += 1
-                        # Update total count and timestamp after processing the batch
-                        embedding_success_1_6 += success_count_in_batch
-                        last_db_update_time_1_6 = time.time()
-                        logger.info(
-                            f"Database update (Step 1.6): inserted {success_count_in_batch} embeddings"
-                        )
-                        return success_count_in_batch  # Return count for this batch
-                    except Exception as e:
-                        logger.error(
-                            f"Error during batch insert (Step 1.6): {e}")
-                        # Even if there's an error, update the total count with successes so far
-                        embedding_success_1_6 += success_count_in_batch
-                        last_db_update_time_1_6 = time.time()  # Update time anyway
-                        logger.info(
-                            f"Database update (Step 1.6) partially completed: inserted {success_count_in_batch} embeddings before error"
-                        )
-                        return success_count_in_batch  # Return partial count
-                else:
-                    # This case should ideally not be reached if the check at the start works,
-                    # but returning 0 is safe.
-                    return 0
+                        f"Performing database update (Step 1.6) with {len(embeddings_to_insert)} embeddings...")
+                    # Loop through articles to insert
+                    for article_id, embedding in embeddings_to_insert:
+                        # This block is indented under the for loop
+                        result = reader_db_embed.insert_embedding(
+                            article_id, embedding)
+                        if result:
+                            success_count += 1
+                    # This block is outside the for loop, but inside the 'if embeddings_to_insert'
+                    embedding_success_1_6 += success_count  # Update total count here
+                    last_db_update_time_1_6 = time.time()
+                    logger.info(
+                        f"Database update (Step 1.6): inserted {success_count} embeddings")
+                # This return is for the function update_embedding_database_1_6
+                return success_count
 
             def process_embedding_task_1_6(article_data: Dict[str, Any]) -> Tuple[int, bool]:
                 nonlocal last_db_update_time_1_6
@@ -590,6 +570,7 @@ def run(max_workers: int = None) -> int:
                         with pending_embeddings_lock_1_6:
                             pending_embeddings_1_6.append(
                                 (article_id, embedding))
+                            # Check if it's time for DB update (outside lock to prevent deadlock)
                             current_time = time.time()
                             time_since_last_update = current_time - last_db_update_time_1_6
                             should_update = (len(pending_embeddings_1_6) >= embedding_batch_size or
@@ -610,6 +591,7 @@ def run(max_workers: int = None) -> int:
                 future_to_article_1_6 = {executor.submit(process_embedding_task_1_6, article): article
                                          for article in articles_for_embedding}
                 for i, future in enumerate(concurrent.futures.as_completed(future_to_article_1_6)):
+                    # Update failure count inside loop if needed, otherwise success is tracked in DB update
                     try:
                         _, success = future.result()
                         if not success:
@@ -618,6 +600,7 @@ def run(max_workers: int = None) -> int:
                         logger.error(
                             f"Exception processing embedding task future (Step 1.6): {e}")
                         embedding_failure_1_6 += 1
+                    # Log progress periodically
                     total = len(articles_for_embedding)
                     processed = i + 1
                     if processed % 50 == 0 or processed == total:
@@ -683,9 +666,6 @@ def run(max_workers: int = None) -> int:
                             embedding_failure_1_7 = 0
                             pending_embeddings_1_7 = []
                             pending_embeddings_lock_1_7 = Lock()
-                            # Define batch size and checkpoint interval for Step 1.7
-                            embedding_checkpoint_interval = 60  # Same as in Step 1.6
-                            embedding_batch_size = 20  # Same as in Step 1.6
 
                             summarization_start_time = time.time()
                             last_db_update_time_1_7 = summarization_start_time

@@ -1118,3 +1118,50 @@ class ReaderDBClient:
         finally:
             if conn:
                 self.release_connection(conn)
+
+    def get_articles_needing_summarization(self, min_char_count: int = 8000) -> List[Dict[str, Any]]:
+        """
+        Get articles that need summarization because their content length exceeds the specified limit.
+
+        Args:
+            min_char_count: Minimum character count for an article to require summarization (exclusive).
+
+        Returns:
+            List[Dict[str, Any]]: List of articles needing summarization, each containing 'id' and 'content'
+        """
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Query for articles that have valid content, exceed the char count, and don't have embeddings yet
+            query = """
+                SELECT a.id, a.content
+                FROM articles a
+                LEFT JOIN embeddings e ON a.id = e.article_id
+                WHERE
+                    a.content IS NOT NULL
+                    AND a.content != 'ERROR'
+                    AND LENGTH(a.content) > %s
+                    AND e.article_id IS NULL;
+            """
+            cursor.execute(query, (min_char_count,))
+
+            columns = [desc[0] for desc in cursor.description]
+            articles_to_summarize = []
+
+            for row in cursor.fetchall():
+                articles_to_summarize.append(dict(zip(columns, row)))
+
+            logger.info(
+                f"Found {len(articles_to_summarize)} articles needing summarization (content > {min_char_count} chars)")
+            return articles_to_summarize
+
+        except Exception as e:
+            logger.error(
+                f"Error retrieving articles needing summarization: {e}")
+            return []
+
+        finally:
+            if conn:
+                self.release_connection(conn)

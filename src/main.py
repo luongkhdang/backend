@@ -18,10 +18,13 @@ This script orchestrates the entire data refinery pipeline by executing each ste
 Each step is implemented in its own module in the src/steps/ directory.
 
 Usage:
-  python src/main.py [--workers N]
+  python src/main.py [--workers N] [--skip-network-check] [--network-retries N] [--retry-delay N]
   
 Options:
-  --workers N    Number of parallel workers to use for processing (default: auto)
+  --workers N          Number of parallel workers to use for processing (default: auto)
+  --skip-network-check Skip the network connectivity check
+  --network-retries N  Number of retries for network connectivity check (default: 3)
+  --retry-delay N      Delay in seconds between retries (default: 5)
 """
 import logging
 import sys
@@ -56,15 +59,21 @@ def parse_arguments():
                         help="Number of parallel workers to use (default: auto)")
     parser.add_argument("--skip-network-check", action="store_true",
                         help="Skip the network connectivity check")
+    parser.add_argument("--network-retries", type=int, default=3,
+                        help="Number of retries for network connectivity check (default: 3)")
+    parser.add_argument("--retry-delay", type=int, default=5,
+                        help="Delay in seconds between retries (default: 5)")
     return parser.parse_args()
 
 
-def check_network(skip_check=False):
+def check_network(skip_check=False, retry_count=3, retry_delay=5):
     """
     Step 0: Check network connectivity to required services.
 
     Args:
         skip_check: Whether to skip the network check
+        retry_count: Number of times to retry connectivity checks
+        retry_delay: Delay between retries in seconds
 
     Returns:
         bool: True if network check passed or was skipped, False if check failed
@@ -75,20 +84,54 @@ def check_network(skip_check=False):
 
     logger.info(
         "========= STARTING STEP 0: NETWORK CONNECTIVITY CHECK =========")
-    wait_seconds = int(os.getenv("WAIT_SECONDS", "5"))
-    logger.info(f"Waiting {wait_seconds} seconds for services to be ready...")
-    time.sleep(wait_seconds)
 
-    # Run network connectivity check
-    logger.info("Running network connectivity check...")
-    results = check_network_connectivity()
+    # Get initial wait time from environment or use default
+    initial_wait_seconds = int(os.getenv("INITIAL_WAIT_SECONDS", "5"))
+    if initial_wait_seconds > 0:
+        logger.info(
+            f"Waiting {initial_wait_seconds} seconds for services to be ready...")
+        time.sleep(initial_wait_seconds)
+
+    # Run network connectivity check with retries
+    logger.info(
+        f"Running network connectivity check (retries: {retry_count}, delay: {retry_delay}s)...")
+    results = check_network_connectivity(
+        retry_count=retry_count, retry_delay=retry_delay)
     print_results(results)
 
     if not results["success"]:
         logger.error(
             "Network connectivity check failed. Please check your Docker network configuration.")
+
+        # Check Docker network status
+        if "docker_network" in results and results["docker_network"]:
+            network_results = results["docker_network"]
+            if not network_results["exists"]:
+                logger.error(
+                    "Docker network 'reader_network' does not exist. Network connector service may have failed.")
+                logger.error(
+                    "Try running: docker network create --driver bridge reader_network")
+            elif "connected_containers" in network_results and len(network_results["connected_containers"]) == 0:
+                logger.error(
+                    "Docker network exists but no containers are connected to it.")
+            else:
+                # Check which essential services are missing
+                essential_services = ["reader-db",
+                                      "news-api", "reader-pgadmin"]
+                missing = []
+                for service in essential_services:
+                    if not any(container.startswith(service) for container in network_results.get("connected_containers", [])):
+                        missing.append(service)
+
+                if missing:
+                    logger.error(
+                        f"Essential services missing from network: {', '.join(missing)}")
+                    for service in missing:
+                        logger.error(
+                            f"Try running: docker network connect reader_network {service}")
+
         logger.error(
-            "You may need to run the connect_networks.ps1 script manually or restart the application.")
+            "You may need to restart the network-connector service: docker-compose up -d --force-recreate network-connector")
 
         # Check if we should proceed anyway based on environment variable
         force_continue = os.getenv(
@@ -115,7 +158,11 @@ def main():
     logger.info("========= STARTING DATA REFINERY PIPELINE =========")
 
     # Step 0: Check network connectivity
-    if not check_network(skip_check=args.skip_network_check):
+    if not check_network(
+        skip_check=args.skip_network_check,
+        retry_count=args.network_retries,
+        retry_delay=args.retry_delay
+    ):
         logger.error("Aborting pipeline due to network connectivity issues.")
         return 1
 

@@ -21,3 +21,14 @@ spacy==3.7.5  # Latest version compatible with Python 3.10 in Dockerfile
 
 # AI and embeddings
 google-generativeai==0.7.1  # Google's Gemini API 
+
+# Local NLP (Transformers)
+transformers==4.41.1
+torch==2.3.0
+sentencepiece==0.2.0
+
+# Add protobuf for potential compatibility issues with transformers/torch
+protobuf==4.25.3
+
+# Consider adding accelerate for potential performance improvements
+# accelerate==0.30.0 
