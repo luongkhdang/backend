@@ -1,10 +1,38 @@
 version: "3.8"
 
 services:
+  # Network connector service - runs before other services to ensure network connectivity
+  network-connector:
+    image: docker
+    container_name: reader-network-connector
+    command: >
+      sh -c "
+        # Create reader_network if it doesn't exist
+        docker network inspect reader_network >/dev/null 2>&1 || docker network create --driver bridge reader_network;
+        
+        # Connect essential containers if they exist and aren't already connected
+        for container in news-api pgadmin news-db reader-ultimate; do
+          if docker ps -q -f name=$$container; then
+            docker network connect reader_network $$container || echo \"$$container already connected or error connecting\";
+          fi;
+        done;
+        
+        # Exit with success to allow other services to start
+        exit 0;
+      "
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: "no"
+    networks:
+      - reader_network
+
   # Reader DB - PostgreSQL database with pgvector for storing transferred articles
   postgres:
     image: ankane/pgvector:latest
     container_name: reader-db
+    depends_on:
+      network-connector:
+        condition: service_completed_successfully
     environment:
       POSTGRES_DB: reader_db
       POSTGRES_USER: postgres
@@ -33,6 +61,8 @@ services:
     container_name: article-transfer
     restart: "no"
     depends_on:
+      network-connector:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     environment:
@@ -100,13 +130,16 @@ services:
   pgadmin:
     image: dpage/pgadmin4
     container_name: reader-pgadmin
+    depends_on:
+      network-connector:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@reader.com
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5051:80"
-    depends_on:
-      - postgres
     restart: unless-stopped
     networks:
       - reader_network
@@ -117,6 +150,11 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: reader-backend
+    depends_on:
+      network-connector:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     environment:
       READER_DB_HOST: postgres # Use container name within Docker network
       READER_DB_PORT: 5432 # Internal port in Docker network
@@ -145,9 +183,6 @@ services:
       GEMINI_FLASH_RATE_LIMIT_PER_DAY: ${GEMINI_FLASH_RATE_LIMIT_PER_DAY:-1500}
       WAIT_FOR_DB: "true"
       WAIT_SECONDS: "10"
-    depends_on:
-      postgres:
-        condition: service_healthy
     volumes:
       - ./src:/app/src # Mount source code for easier development
     restart: unless-stopped

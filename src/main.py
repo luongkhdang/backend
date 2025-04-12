@@ -3,6 +3,7 @@
 main.py - Orchestrator for Data Refinery Pipeline
 
 This script orchestrates the entire data refinery pipeline by executing each step in sequence:
+- Step 0: Network Connectivity Check
 - Step 1: Data Collection, Processing and Storage
   - Step 1.1: Data Collection from news-db
   - Step 1.2: Article Content Processing
@@ -32,6 +33,9 @@ from dotenv import load_dotenv
 # Import step modules
 from src.steps.step1 import run as run_step1
 
+# Import network checker
+from src.utils.network_checker import check_network_connectivity, print_results
+
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -50,7 +54,55 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Data Refinery Pipeline")
     parser.add_argument("--workers", type=int, default=None,
                         help="Number of parallel workers to use (default: auto)")
+    parser.add_argument("--skip-network-check", action="store_true",
+                        help="Skip the network connectivity check")
     return parser.parse_args()
+
+
+def check_network(skip_check=False):
+    """
+    Step 0: Check network connectivity to required services.
+
+    Args:
+        skip_check: Whether to skip the network check
+
+    Returns:
+        bool: True if network check passed or was skipped, False if check failed
+    """
+    if skip_check:
+        logger.info("Network connectivity check skipped.")
+        return True
+
+    logger.info(
+        "========= STARTING STEP 0: NETWORK CONNECTIVITY CHECK =========")
+    wait_seconds = int(os.getenv("WAIT_SECONDS", "5"))
+    logger.info(f"Waiting {wait_seconds} seconds for services to be ready...")
+    time.sleep(wait_seconds)
+
+    # Run network connectivity check
+    logger.info("Running network connectivity check...")
+    results = check_network_connectivity()
+    print_results(results)
+
+    if not results["success"]:
+        logger.error(
+            "Network connectivity check failed. Please check your Docker network configuration.")
+        logger.error(
+            "You may need to run the connect_networks.ps1 script manually or restart the application.")
+
+        # Check if we should proceed anyway based on environment variable
+        force_continue = os.getenv(
+            "FORCE_CONTINUE_ON_NETWORK_ERROR", "false").lower() == "true"
+        if force_continue:
+            logger.warning(
+                "FORCE_CONTINUE_ON_NETWORK_ERROR is set to true, continuing despite network errors...")
+            return True
+        else:
+            return False
+
+    logger.info(
+        "Network connectivity check passed. All required services are reachable.")
+    return True
 
 
 def main():
@@ -61,6 +113,11 @@ def main():
     args = parse_arguments()
 
     logger.info("========= STARTING DATA REFINERY PIPELINE =========")
+
+    # Step 0: Check network connectivity
+    if not check_network(skip_check=args.skip_network_check):
+        logger.error("Aborting pipeline due to network connectivity issues.")
+        return 1
 
     # Execute Step 1: Data Collection, Processing and Storage
     step1_result = run_step1(max_workers=args.workers)
@@ -77,8 +134,9 @@ def main():
 
     logger.info("========= DATA REFINERY PIPELINE COMPLETE =========")
     # Make sure to explicitly exit with status code 0 to avoid container restart
-    sys.exit(0)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    sys.exit(exit_code)

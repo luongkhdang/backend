@@ -17,7 +17,10 @@ COPY requirements.txt .
 
 # Install non-Google dependencies first
 RUN pip install -r requirements.txt
- 
+
+# Install Docker SDK for Python (for network connectivity check)
+RUN pip install docker
+
 # Download spaCy model
 RUN python -m spacy download en_core_web_lg
 
