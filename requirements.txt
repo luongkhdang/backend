@@ -7,7 +7,14 @@ requests==2.31.0
 # Environment variables
 python-dotenv==1.0.0
 
+# Command line parsing
 argparse==1.4.0
 
+# Data processing
 numpy==1.26.0
-pydantic==2.4.2 
+pydantic==2.4.2
+python-dateutil==2.8.2  # For date parsing
+
+# Content processing
+beautifulsoup4==4.13.3  # Latest stable version as of April 2024
+spacy==3.7.5  # Latest version compatible with Python 3.10 in Dockerfile 

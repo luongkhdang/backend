@@ -9,6 +9,12 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 
+# For date parsing
+try:
+    from dateutil import parser as dateutil_parser
+except ImportError:
+    dateutil_parser = None
+
 # Load environment variables
 load_dotenv()
 
@@ -19,7 +25,38 @@ logger = logging.getLogger(__name__)
 
 
 class ReaderDBClient:
-    """Client for interactions with the reader-db database."""
+    """
+    Client for interactions with the reader-db database.
+
+    This client provides a direct connection to the reader-db PostgreSQL database
+    and handles connection pooling, retries, and query execution.
+
+    Exported functions:
+    - test_connection(): Tests database connection, returns connection details
+    - get_connection(): Gets a connection from the connection pool
+    - release_connection(conn): Releases a connection back to the pool
+    - initialize_tables(): Initializes required database tables
+    - insert_article(article): Inserts a single article into reader-db
+    - batch_insert_articles(articles): Inserts multiple articles in batches
+    - insert_scraper_ids(article_ids): Inserts minimal article records with just scraper_ids
+    - get_article_by_scraper_id(scraper_id): Retrieves an article by its scraper_id
+    - get_error_articles(): Retrieves articles with null or error content
+    - insert_entity(entity): Inserts an entity into the database
+    - link_article_entity(article_id, entity_id, mention_count): Links an article to an entity
+    - insert_embedding(article_id, embedding): Inserts an embedding for an article
+    - insert_cluster(centroid, is_hot): Inserts a new cluster
+    - update_article_cluster(article_id, cluster_id): Updates an article's cluster assignment
+    - insert_essay(essay): Inserts an essay into the database
+    - link_essay_entity(essay_id, entity_id): Links an essay to an entity
+    - get_similar_articles(embedding, limit): Finds articles with similar embeddings
+    - get_hot_articles(limit): Gets articles marked as 'hot'
+    - get_entities_by_influence(limit): Gets entities sorted by influence score
+    - close(): Closes the connection pool
+
+    Related files:
+    - src/main.py: Uses this client to store processed articles
+    - src/database/news_api_client.py: Fetches articles for processing
+    """
 
     def __init__(self,
                  host=os.getenv("READER_DB_HOST", "localhost"),
@@ -881,3 +918,137 @@ class ReaderDBClient:
         if hasattr(self, 'connection_pool') and self.connection_pool:
             self.connection_pool.closeall()
             logger.info("Closed all Reader DB connections")
+
+    def batch_insert_articles(self, articles: List[Dict[str, Any]]) -> int:
+        """
+        Insert multiple processed articles into reader-db in batches.
+
+        Args:
+            articles: List of prepared article dictionaries with fields:
+                     scraper_id, title, pub_date, domain, content, processed_at
+
+        Returns:
+            int: Number of successfully inserted records
+        """
+        if not articles:
+            logger.info("No articles to insert")
+            return 0
+
+        logger.info(
+            f"Preparing to insert {len(articles)} articles into reader-db in batches...")
+
+        successful_inserts = 0
+        failed_inserts = 0
+
+        # Process and insert articles in batches
+        batch_size = 100
+        total_batches = (len(articles) + batch_size - 1) // batch_size
+
+        for batch_num in range(total_batches):
+            start_idx = batch_num * batch_size
+            end_idx = min(start_idx + batch_size, len(articles))
+            current_batch = articles[start_idx:end_idx]
+
+            logger.info(
+                f"Processing batch {batch_num+1}/{total_batches} ({len(current_batch)} articles)")
+
+            conn = None
+            try:
+                conn = self.get_connection()
+                cursor = conn.cursor()
+
+                for article in current_batch:
+                    # Handle processed_at field
+                    processed_at = article.get('processed_at')
+
+                    # Convert processed_at to proper format if it's a string
+                    if isinstance(processed_at, str):
+                        try:
+                            processed_at = dateutil_parser.parse(processed_at)
+                        except:
+                            # If parsing fails, use current timestamp
+                            processed_at = datetime.now()
+
+                    # Insert with content and processed_at fields
+                    cursor.execute("""
+                        INSERT INTO articles (
+                            scraper_id, title, pub_date, domain, content, processed_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (scraper_id) DO UPDATE
+                        SET title = EXCLUDED.title,
+                            pub_date = EXCLUDED.pub_date,
+                            domain = EXCLUDED.domain,
+                            content = EXCLUDED.content,
+                            processed_at = EXCLUDED.processed_at
+                        RETURNING id;
+                    """, (
+                        article.get('scraper_id'),
+                        article.get(
+                            'title', f"Article {article.get('scraper_id')}"),
+                        article.get('pub_date'),
+                        article.get('domain', ''),
+                        article.get('content', ''),
+                        processed_at  # Use the processed value
+                    ))
+
+                    result = cursor.fetchone()
+                    if result and result[0]:
+                        successful_inserts += 1
+                    else:
+                        failed_inserts += 1
+
+                conn.commit()
+                if successful_inserts % 100 == 0 and successful_inserts > 0:
+                    logger.info(
+                        f"Inserted {successful_inserts} articles so far")
+
+            except Exception as e:
+                logger.error(f"Error processing batch {batch_num+1}: {e}")
+                if conn:
+                    conn.rollback()
+            finally:
+                if conn:
+                    self.release_connection(conn)
+
+        logger.info(
+            f"Batch insertion complete: {successful_inserts} successful, {failed_inserts} failed")
+        return successful_inserts
+
+    def get_error_articles(self) -> List[Dict[str, Any]]:
+        """
+        Get all articles with null or error content.
+
+        Returns:
+            List[Dict[str, Any]]: List of articles with null or error content
+        """
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT id, scraper_id, title, content, pub_date, domain, processed_at
+                FROM articles
+                WHERE content IS NULL OR content = 'ERROR' OR LENGTH(TRIM(content)) = 0
+                ORDER BY processed_at DESC;
+            """)
+
+            columns = [desc[0] for desc in cursor.description]
+            error_articles = []
+
+            for row in cursor.fetchall():
+                error_articles.append(dict(zip(columns, row)))
+
+            logger.info(
+                f"Found {len(error_articles)} articles with null/error content")
+            return error_articles
+
+        except Exception as e:
+            logger.error(
+                f"Error retrieving articles with null/error content: {e}")
+            return []
+
+        finally:
+            if conn:
+                self.release_connection(conn)

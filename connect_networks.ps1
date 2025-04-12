@@ -47,6 +47,66 @@ if (docker ps | Select-String -Pattern "reader-ultimate") {
     Write-Host "reader-ultimate container not found"
 }
 
+# PowerShell script to connect the news-api container to reader_network
+# This helps establish communication between separate Docker Compose projects
+
+# Check if network exists
+$networkExists = docker network ls | Select-String "reader_network"
+if (-not $networkExists) {
+    Write-Host "Creating reader_network..." -ForegroundColor Yellow
+    docker network create --driver bridge reader_network
+}
+
+# Check if news-api container is running
+$containerExists = docker ps | Select-String "news-api"
+if (-not $containerExists) {
+    Write-Host "WARNING: news-api container is not running!" -ForegroundColor Red
+    Write-Host "Please start the news-api container first, then run this script again."
+    exit 1
+}
+
+# Try to connect news-api to the reader_network
+try {
+    Write-Host "Connecting news-api container to reader_network..." -ForegroundColor Cyan
+    docker network connect reader_network news-api
+    Write-Host "Successfully connected news-api to reader_network." -ForegroundColor Green
+} catch {
+    # If it's already connected, this is fine
+    if ($_.Exception.Message -like "*endpoint with name news-api already exists*") {
+        Write-Host "news-api is already connected to reader_network." -ForegroundColor Green
+    } else {
+        Write-Host "Error connecting news-api to reader_network: $_" -ForegroundColor Red
+    }
+}
+
+# Make sure our containers are connected to the network
+Write-Host "Verifying network connections..." -ForegroundColor Cyan
+$networkInfo = docker network inspect reader_network -f "{{json .Containers}}" | ConvertFrom-Json
+
+# Get container names in the network
+$containerNames = $networkInfo.PSObject.Properties | ForEach-Object { 
+    $_.Value.Name 
+}
+
+Write-Host "Containers in reader_network: $($containerNames -join ', ')" -ForegroundColor Yellow
+
+# Check for essential containers
+$essentialContainers = @("news-api", "article-transfer", "reader-db", "postgres", "reader-pgadmin")
+foreach ($container in $essentialContainers) {
+    if ($containerNames -contains $container) {
+        Write-Host "✅ $container is connected to the network" -ForegroundColor Green
+    } else {
+        Write-Host "❌ $container is NOT connected to the network" -ForegroundColor Red
+    }
+}
+
+# Provide troubleshooting info
+Write-Host "`nNetwork connection complete. If you still have connection issues:"
+Write-Host "1. Restart the article-transfer container: docker restart article-transfer"
+Write-Host "2. Check logs: docker logs article-transfer"
+Write-Host "3. Run API connectivity test: docker exec article-transfer python src/utils/api_tester.py"
+Write-Host "4. Verify network settings: docker network inspect reader_network"
+
 Write-Host "Done connecting containers to network"
 Write-Host ""
 Write-Host "To verify connections, use:"

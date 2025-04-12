@@ -32,7 +32,8 @@ services:
       dockerfile: Dockerfile
     container_name: article-transfer
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       # Reader DB connection
       READER_DB_HOST: postgres # Use container name within Docker network
@@ -40,16 +41,40 @@ services:
       READER_DB_NAME: reader_db
       READER_DB_USER: postgres
       READER_DB_PASSWORD: postgres
-      # News API connection
-      NEWS_API_BASE_URL: http://localhost:8000 # Connect to news-api on host
+      # News API connection options (will try these in order)
+      NEWS_API_BASE_URL: http://news-api:8000 # Try container name first
+      NEWS_API_FALLBACK_URLS: "http://host.docker.internal:8000,http://172.17.0.1:8000,http://localhost:8000"
+      # Processing settings
+      MAX_WORKERS: 4 # Number of parallel workers for processing
+      # Debugging options
+      LOG_LEVEL: INFO
       # Polling interval
       POLLING_INTERVAL: 300
-    command: ["python", "src/main.py"]
+      WAIT_SECONDS: 10
+    command: ["python", "src/main.py", "--workers", "4"]
     volumes:
       - ./src:/app/src # Mount source code for easier development
+      - ./logs:/app/logs # Mount logs directory for error reports
     networks:
       - reader_network
-      - external-network # To connect to the news-api if needed
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import requests; requests.get('http://postgres:5432')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
 
   # pgAdmin - Web interface for database management
   pgadmin:
@@ -114,9 +139,7 @@ services:
 networks:
   reader_network:
     driver: bridge
-  external-network:
-    external: true
-    name: scraper-ultimate_app_network # Network where news-api is running
+    name: reader_network
 
 # Define persistent volumes
 volumes:

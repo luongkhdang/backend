@@ -1,0 +1,15 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+DO NOT EVER USE DUMMY/FALLBACK DATA. IN THIS PROJECT, IT IS IMPORTANT TO RAISE ERROR AND NEVER TO USE DYMMY NOR FALLBACK DATA. I MIGHT GO TO JAIL IF WE DO.
+
+At the top of each file, include a concise, informative header comment summarizing the file's purpose and key details. The header must include:
+- A brief description of the file’s functionality or role.
+- A list of exported functions/classes with their parameters (including type annotations), return types, and required arguments. Adopt the type restriction from Typescript strictly.
+- A list of immediately related files (e.g., dependencies or files that directly interact with this one).
+Use a consistent format (e.g., docstring or block comment) and keep it under 10 lines unless complexity demands more. Update the header if the file’s purpose or dependencies change.
