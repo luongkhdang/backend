@@ -88,9 +88,6 @@ class ReaderDBClient:
         self.retry_delay = retry_delay
         self.connection_pool = None
 
-        logger.info(
-            f"Initializing connection to Reader DB at {host}:{port} with user '{user}' and database '{dbname}'")
-
         self._initialize_connection_pool()
 
         # Initialize all required tables
@@ -110,8 +107,6 @@ class ReaderDBClient:
                     password=self.password,
                     connect_timeout=10
                 )
-                logger.info(
-                    f"Successfully connected to Reader DB at {self.host}:{self.port}")
                 return
             except Exception as e:
                 retries += 1
@@ -149,8 +144,6 @@ class ReaderDBClient:
 
             # 1. Create or update articles table
             if migrate_articles:
-                logger.info("Checking for articles table migration needs")
-
                 # Check if it has the new schema
                 cursor.execute("""
                     SELECT column_name 
@@ -199,14 +192,11 @@ class ReaderDBClient:
                             FROM articles_old
                             WHERE title IS NOT NULL AND content IS NOT NULL;
                         """)
-                        logger.info(
-                            "Data migration from old articles table completed")
                     except Exception as e:
                         logger.error(f"Error migrating article data: {e}")
 
                     conn.commit()
             else:
-                logger.info("Creating articles table")
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS articles (
                         id SERIAL PRIMARY KEY,
@@ -289,8 +279,6 @@ class ReaderDBClient:
             """)
 
             conn.commit()
-            logger.info(
-                "Successfully initialized all required database tables")
 
         except Exception as e:
             logger.error(f"Error initializing database tables: {e}")
@@ -372,10 +360,6 @@ class ReaderDBClient:
             conn = self.get_connection()
             cursor = conn.cursor()
 
-            # Insert the article with the new schema
-            logger.info(
-                f"Inserting article: {article.get('title', '')[:50]}...")
-
             cursor.execute("""
                 INSERT INTO articles (
                     scraper_id, title, content, 
@@ -422,11 +406,7 @@ class ReaderDBClient:
             int: Number of successfully inserted records
         """
         if not article_ids:
-            logger.info("No article IDs to insert")
             return 0
-
-        logger.info(
-            f"Attempting to insert {len(article_ids)} article IDs into reader-db...")
 
         successful_inserts = 0
         failed_inserts = 0
@@ -439,9 +419,6 @@ class ReaderDBClient:
                     f"Cannot connect to reader-db: {test_result['error']}")
                 return 0
 
-            logger.info(
-                f"Successfully connected to reader-db, available tables: {', '.join(test_result.get('tables', []))}")
-
             # Process and insert IDs in batches
             batch_size = 100
             total_batches = (len(article_ids) + batch_size - 1) // batch_size
@@ -450,9 +427,6 @@ class ReaderDBClient:
                 start_idx = batch_num * batch_size
                 end_idx = min(start_idx + batch_size, len(article_ids))
                 current_batch = article_ids[start_idx:end_idx]
-
-                logger.info(
-                    f"Processing batch {batch_num+1}/{total_batches} ({len(current_batch)} articles)")
 
                 for article_id in current_batch:
                     # Create minimal article object with required fields
@@ -469,9 +443,6 @@ class ReaderDBClient:
 
                     if new_id:
                         successful_inserts += 1
-                        if successful_inserts % 100 == 0:
-                            logger.info(
-                                f"Inserted {successful_inserts} articles so far")
                     else:
                         failed_inserts += 1
 
@@ -919,7 +890,6 @@ class ReaderDBClient:
         """Close the connection pool."""
         if hasattr(self, 'connection_pool') and self.connection_pool:
             self.connection_pool.closeall()
-            logger.info("Closed all Reader DB connections")
 
     def batch_insert_articles(self, articles: List[Dict[str, Any]]) -> int:
         """
@@ -933,11 +903,7 @@ class ReaderDBClient:
             int: Number of successfully inserted records
         """
         if not articles:
-            logger.info("No articles to insert")
             return 0
-
-        logger.info(
-            f"Preparing to insert {len(articles)} articles into reader-db in batches...")
 
         successful_inserts = 0
         failed_inserts = 0
@@ -950,9 +916,6 @@ class ReaderDBClient:
             start_idx = batch_num * batch_size
             end_idx = min(start_idx + batch_size, len(articles))
             current_batch = articles[start_idx:end_idx]
-
-            logger.info(
-                f"Processing batch {batch_num+1}/{total_batches} ({len(current_batch)} articles)")
 
             conn = None
             try:
@@ -1001,9 +964,6 @@ class ReaderDBClient:
                         failed_inserts += 1
 
                 conn.commit()
-                if successful_inserts % 100 == 0 and successful_inserts > 0:
-                    logger.info(
-                        f"Inserted {successful_inserts} articles so far")
 
             except Exception as e:
                 logger.error(f"Error processing batch {batch_num+1}: {e}")
@@ -1042,8 +1002,6 @@ class ReaderDBClient:
             for row in cursor.fetchall():
                 error_articles.append(dict(zip(columns, row)))
 
-            logger.info(
-                f"Found {len(error_articles)} articles with null/error content")
             return error_articles
 
         except Exception as e:
@@ -1107,8 +1065,8 @@ class ReaderDBClient:
                     skipped_articles += 1
 
             # More detailed logging to track skipped articles
-            logger.info(f"Found {len(filtered_articles)} articles suitable for embedding "
-                        f"(skipped {skipped_articles} articles exceeding {max_char_count} characters)")
+            logger.info(
+                f"Found {len(filtered_articles)} articles suitable for embedding (skipped {skipped_articles} long articles)")
             return filtered_articles
 
         except Exception as e:

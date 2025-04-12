@@ -1,58 +1,10 @@
 version: "3.8"
 
 services:
-  # Network connector service - runs before other services to ensure network connectivity
-  network-connector:
-    image: docker
-    container_name: reader-network-connector
-    command: >
-      sh -c "
-        # Create reader_network if it doesn't exist
-        echo 'Checking if reader_network exists...'
-        if docker network inspect reader_network >/dev/null 2>&1; then
-          echo 'Network reader_network already exists'
-        else
-          echo 'Creating reader_network...'
-          docker network create --driver bridge reader_network && echo 'Network reader_network created successfully'
-        fi
-        
-        # Connect essential containers if they exist and aren't already connected
-        echo 'Connecting containers to reader_network...'
-        for container in news-api pgadmin news-db reader-ultimate; do
-          if docker ps -q -f name=$$container; then
-            echo \"Checking if $$container is already connected to reader_network...\"
-            if docker network inspect reader_network | grep -q $$container; then
-              echo \"Container $$container is already connected to reader_network\"
-            else
-              echo \"Connecting container $$container to reader_network...\"
-              if docker network connect reader_network $$container; then
-                echo \"Successfully connected $$container to reader_network\"
-              else
-                echo \"WARNING: Error connecting $$container to reader_network, but continuing\"
-              fi
-            fi
-          else
-            echo \"Container $$container not found, skipping\"
-          fi
-        done
-        
-        # Exit with success to allow other services to start
-        echo 'Network connector service completed successfully'
-        exit 0;
-      "
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    restart: "no"
-    networks:
-      - reader_network
-
   # Reader DB - PostgreSQL database with pgvector for storing transferred articles
   postgres:
     image: ankane/pgvector:latest
     container_name: reader-db
-    depends_on:
-      network-connector:
-        condition: service_completed_successfully
     environment:
       POSTGRES_DB: reader_db
       POSTGRES_USER: postgres
@@ -69,10 +21,6 @@ services:
     networks:
       - reader_network
 
-  # News API - External API providing access to news articles
-  # This is a reference to an external service running elsewhere
-  # In a real setup, we'd use network aliases to connect to it
-
   # Article Transfer Service - Transfers articles from news-api to reader-db
   article-transfer:
     build:
@@ -81,8 +29,6 @@ services:
     container_name: article-transfer
     restart: "no"
     depends_on:
-      network-connector:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     environment:
@@ -92,9 +38,9 @@ services:
       READER_DB_NAME: reader_db
       READER_DB_USER: postgres
       READER_DB_PASSWORD: postgres
-      # News API connection options (will try these in order)
-      NEWS_API_BASE_URL: http://news-api:8000 # Try container name first
-      NEWS_API_FALLBACK_URLS: "http://host.docker.internal:8000,http://172.17.0.1:8000,http://localhost:8000"
+      # News API connection - just use service name, which will be resolved by Docker DNS
+      NEWS_API_BASE_URL: http://news-api:8000
+      # Remove complex fallbacks, they're not needed with proper network setup
       # Processing settings
       MAX_WORKERS: 4 # Number of parallel workers for processing
       DB_UPDATE_BATCH_SIZE: 20 # Batch size for DB inserts in Step 1.4
@@ -110,9 +56,6 @@ services:
       PYTHONPATH: /app
       # Debug flag for imports
       PYTHONDEBUG: "1"
-      # Add any proxy settings if needed
-      # HTTP_PROXY: ${HTTP_PROXY:-}
-      # HTTPS_PROXY: ${HTTPS_PROXY:-}
       # Flash model settings
       GEMINI_FLASH_MODEL: ${GEMINI_FLASH_MODEL:-gemini-2.0-flash}
       GEMINI_INPUT_CONTEXT_WINDOW_TOKEN: ${GEMINI_INPUT_CONTEXT_WINDOW_TOKEN:-1048576}
@@ -122,16 +65,22 @@ services:
       # Local NLP Settings (Step 1.7)
       RUN_STEP_1_7: ${RUN_STEP_1_7:-true}
       LOCAL_NLP_MODEL: ${LOCAL_NLP_MODEL:-"facebook/bart-large-cnn"}
-      MAX_SUMMARY_TOKENS: ${MAX_SUMMARY_TOKENS:-1800}
-      MIN_SUMMARY_TOKENS: ${MIN_SUMMARY_TOKENS:-200}
+      MAX_SUMMARY_TOKENS: ${MAX_SUMMARY_TOKENS:-512}
+      MIN_SUMMARY_TOKENS: ${MIN_SUMMARY_TOKENS:-150}
+      # Chunking parameters for Step 1.7
+      ARTICLE_TOKEN_CHUNK_THRESHOLD: ${ARTICLE_TOKEN_CHUNK_THRESHOLD:-2000}
+      TARGET_CHUNK_TOKEN_SIZE: ${TARGET_CHUNK_TOKEN_SIZE:-1000}
+      CHUNK_MAX_TOKENS: ${CHUNK_MAX_TOKENS:-300}
+      CHUNK_MIN_TOKENS: ${CHUNK_MIN_TOKENS:-75}
       # Debugging options
       LOG_LEVEL: INFO
       # Polling interval
       POLLING_INTERVAL: 300
       WAIT_SECONDS: 10
-      # Force continue flag for network check
-      FORCE_CONTINUE_ON_NETWORK_ERROR: ${FORCE_CONTINUE_ON_NETWORK_ERROR:-false}
-    command: ["python", "src/main.py", "--workers", "4"]
+      # Use skip-network-check to bypass Docker CLI checks
+      FORCE_CONTINUE_ON_NETWORK_ERROR: "true"
+    # Add the skip-network-check flag to avoid Docker introspection
+    command: ["python", "src/main.py", "--workers", "4", "--skip-network-check"]
     volumes:
       - ./src:/app/src # Mount source code for easier development
       - ./logs:/app/logs # Mount logs directory for error reports
@@ -161,8 +110,6 @@ services:
     image: dpage/pgadmin4
     container_name: reader-pgadmin
     depends_on:
-      network-connector:
-        condition: service_completed_successfully
       postgres:
         condition: service_started
     environment:
@@ -181,8 +128,6 @@ services:
       dockerfile: Dockerfile
     container_name: reader-backend
     depends_on:
-      network-connector:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     environment:
@@ -206,34 +151,15 @@ services:
       - reader_network
     command: ["python", "src/database/db_setup.py"]
 
-  # NOTE: If you already have news-db running in another docker-compose setup,
-  # you can comment out this section and just connect the existing container
-  # to the reader_network using:
-  # docker network connect reader_network news-db
-  #
-  # news-db:
-  #   image: postgres:15
-  #   container_name: news-db
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: news_db
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - news_data:/var/lib/postgresql/data
-  #   restart: unless-stopped
-  #   networks:
-  #     - reader_network
-
 # Define Docker networks
 networks:
   reader_network:
+    # This file now manages the creation of reader_network
     driver: bridge
+    # Optionally specify the name if desired, otherwise it defaults based on directory
     name: reader_network
 
 # Define persistent volumes
 volumes:
   postgres_data: # Persistent volume for reader-db data
-  # news_data:
   huggingface_cache: # Persistent volume for Hugging Face models/cache

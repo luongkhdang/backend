@@ -88,50 +88,29 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
     # Get initial wait time from environment or use default
     initial_wait_seconds = int(os.getenv("INITIAL_WAIT_SECONDS", "5"))
     if initial_wait_seconds > 0:
-        logger.info(
-            f"Waiting {initial_wait_seconds} seconds for services to be ready...")
         time.sleep(initial_wait_seconds)
 
     # Run network connectivity check with retries
-    logger.info(
-        f"Running network connectivity check (retries: {retry_count}, delay: {retry_delay}s)...")
     results = check_network_connectivity(
         retry_count=retry_count, retry_delay=retry_delay)
     print_results(results)
 
     if not results["success"]:
         logger.error(
-            "Network connectivity check failed. Please check your Docker network configuration.")
+            "Network connectivity check failed. Some essential services are unreachable.")
 
-        # Check Docker network status
-        if "docker_network" in results and results["docker_network"]:
-            network_results = results["docker_network"]
-            if not network_results["exists"]:
-                logger.error(
-                    "Docker network 'reader_network' does not exist. Network connector service may have failed.")
-                logger.error(
-                    "Try running: docker network create --driver bridge reader_network")
-            elif "connected_containers" in network_results and len(network_results["connected_containers"]) == 0:
-                logger.error(
-                    "Docker network exists but no containers are connected to it.")
-            else:
-                # Check which essential services are missing
-                essential_services = ["reader-db",
-                                      "news-api", "reader-pgadmin"]
-                missing = []
-                for service in essential_services:
-                    if not any(container.startswith(service) for container in network_results.get("connected_containers", [])):
-                        missing.append(service)
+        # Extract unreachable services from results
+        unreachable = []
+        for service_name, service_info in results["services"].items():
+            if service_info["status"] == "disconnected":
+                unreachable.append(service_name)
 
-                if missing:
-                    logger.error(
-                        f"Essential services missing from network: {', '.join(missing)}")
-                    for service in missing:
-                        logger.error(
-                            f"Try running: docker network connect reader_network {service}")
+        if unreachable:
+            logger.error(f"Unreachable services: {', '.join(unreachable)}")
 
-        logger.error(
-            "You may need to restart the network-connector service: docker-compose up -d --force-recreate network-connector")
+        # Log diagnostics from the check
+        for diag in results["diagnostics"]:
+            logger.info(f"Diagnostic: {diag}")
 
         # Check if we should proceed anyway based on environment variable
         force_continue = os.getenv(
@@ -141,6 +120,8 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
                 "FORCE_CONTINUE_ON_NETWORK_ERROR is set to true, continuing despite network errors...")
             return True
         else:
+            logger.error(
+                "To ignore network issues, use --skip-network-check or set FORCE_CONTINUE_ON_NETWORK_ERROR=true")
             return False
 
     logger.info(

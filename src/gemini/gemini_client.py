@@ -74,8 +74,6 @@ class GeminiClient:
             genai.configure(api_key=self.api_key)
             # The Client class doesn't exist - use the top-level genai module directly
             # self.client = genai.Client(api_key=self.api_key)
-            logger.info(
-                f"Initialized Gemini client with model: {self.embedding_model}, default task type: {self.default_task_type}")
         except Exception as e:
             error_msg = f"Failed to initialize Gemini client: {e}"
             logger.critical(error_msg)
@@ -164,9 +162,9 @@ class GeminiClient:
                     return embedding
 
                 # Only log the error format once to avoid cluttering logs
-                if attempt == 0:
-                    logger.warning(
-                        f"Invalid embedding format received from API")
+                # if attempt == 0:
+                #    logger.warning(
+                #        f"Invalid embedding format received from API")
 
             except Exception as e:
                 logger.warning(f"Embedding generation error: {e}")

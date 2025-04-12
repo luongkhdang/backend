@@ -3,6 +3,7 @@ localnlp_client.py - Client for Local NLP Model Inference
 
 This module provides a client class to interact with local NLP models,
 primarily for text summarization using the Hugging Face transformers library.
+It supports chunk-based summarization for very long articles.
 
 Exported Classes:
 - LocalNLPClient:
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class LocalNLPClient:
-    """Client to handle local NLP model operations like summarization."""
+    """Client to handle local NLP model operations like summarization of text chunks."""
 
     # Define model limits - BART models typically have a 1024 token input limit
     MODEL_MAX_INPUT_TOKENS = 1024  # Set to match model's true limit
@@ -58,8 +59,6 @@ class LocalNLPClient:
         try:
             # Load the tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            logger.info(
-                f"Successfully loaded tokenizer for '{self.model_name}'")
 
             # Load the summarization pipeline
             self.pipeline = pipeline(
@@ -68,8 +67,6 @@ class LocalNLPClient:
                 tokenizer=self.tokenizer,
                 device=self.device  # Specify the device
             )
-            logger.info(
-                f"Successfully loaded summarization pipeline for '{self.model_name}'")
 
         except Exception as e:
             logger.error(
@@ -80,14 +77,19 @@ class LocalNLPClient:
 
     def summarize_text(self, text: str, max_summary_tokens: int, min_summary_tokens: int) -> Optional[str]:
         """
-        Summarize the input text using the loaded model.
-        Truncates the input text to the model's maximum input length (1024 tokens).
-        Uses a lock to ensure thread safety when accessing the tokenizer and pipeline.
+        Summarize the input text chunk using the loaded model.
+
+        This method is designed to work with text chunks of approximately 1000 tokens,
+        which is suitable for the BART model's capacity. No explicit truncation is 
+        needed for properly sized chunks, as the pipeline handles truncation internally.
+
+        For very long articles, use this method on each chunk separately, then concatenate
+        the summaries to create a comprehensive summary.
 
         Args:
-            text: The text content to summarize.
-            max_summary_tokens: The maximum number of tokens for the generated summary.
-            min_summary_tokens: The minimum number of tokens for the generated summary.
+            text: The text chunk to summarize.
+            max_summary_tokens: The maximum number of tokens for the chunk's summary.
+            min_summary_tokens: The minimum number of tokens for the chunk's summary.
 
         Returns:
             The summarized text as a string, or None if summarization failed or the client is not initialized.
@@ -98,62 +100,68 @@ class LocalNLPClient:
             return None
 
         original_char_len = len(text)
-        logger.debug(
-            f"Attempting to summarize text with original length: {original_char_len} chars.")
 
-        # Adjust max_summary_tokens based on input length to avoid the warning
-        input_token_estimate = len(text) // 4  # Rough estimate of token count
-        adjusted_max_tokens = min(max_summary_tokens, input_token_estimate)
+        # Manually truncate the input text based on the model's max input tokens
+        # Use the lock for tokenizer safety if called from multiple threads
+        with self.lock:
+            try:
+                # Tokenize the input text, truncating to the model's max input length
+                inputs = self.tokenizer(
+                    text,
+                    max_length=self.MODEL_MAX_INPUT_TOKENS,
+                    truncation=True,
+                    return_tensors="pt"  # Return PyTorch tensors
+                )
+                truncated_text = self.tokenizer.decode(
+                    inputs["input_ids"][0], skip_special_tokens=True
+                )
+                truncated_token_count = len(inputs["input_ids"][0])
+                if truncated_token_count >= self.MODEL_MAX_INPUT_TOKENS:
+                    logger.warning(
+                        f"Input text chunk was truncated from {original_char_len} chars "
+                        f"to {truncated_token_count} tokens (max: {self.MODEL_MAX_INPUT_TOKENS}) "
+                        f"before summarization.")
+            except Exception as e:
+                logger.error(
+                    f"Error during input tokenization/truncation: {e}", exc_info=True)
+                return None  # Cannot proceed if truncation fails
+
+        # Adjust max_summary_tokens based on the *truncated* input length
+        # Use the truncated token count directly
+        input_token_count = truncated_token_count
+        adjusted_max_tokens = min(
+            # Keep the heuristic, but base it on actual tokens
+            max_summary_tokens, input_token_count // 2)
 
         # Ensure we don't go below min_summary_tokens
         if adjusted_max_tokens < min_summary_tokens:
             adjusted_max_tokens = min_summary_tokens
 
         if adjusted_max_tokens != max_summary_tokens:
-            logger.debug(
-                f"Adjusted max_tokens from {max_summary_tokens} to {adjusted_max_tokens} based on input length")
+            pass
 
         try:
-            # Use the lock to ensure thread safety
+            # Use the lock to ensure thread safety for the pipeline call
             with self.lock:
-                # --- Truncation ---
-                # Encode, truncate, and decode to get text truncated to model's max input length
-                inputs = self.tokenizer(
-                    text, max_length=self.MODEL_MAX_INPUT_TOKENS, truncation=True, return_tensors="pt")
-                truncated_text = self.tokenizer.decode(
-                    inputs["input_ids"][0], skip_special_tokens=True)
-                truncated_char_len = len(truncated_text)
-                truncated_token_len = len(inputs["input_ids"][0])
-
-                if truncated_char_len < original_char_len:
-                    logger.debug(
-                        f"Input text truncated from {original_char_len} chars to {truncated_char_len} chars ({truncated_token_len} tokens) for model limit.")
-                else:
-                    logger.debug(
-                        f"Input text length ({truncated_char_len} chars, {truncated_token_len} tokens) within model limit.")
-
-                # --- Summarization ---
-                # Generate summary using the pipeline with the adjusted token limit
+                # Generate summary using the pipeline with the truncated text
+                # No need for truncation=True here as we already truncated manually
                 summary_output = self.pipeline(
-                    truncated_text,
+                    truncated_text,  # Use the truncated text
                     max_length=adjusted_max_tokens,
                     min_length=min_summary_tokens,
-                    do_sample=False,
-                    truncation=True  # Ensure truncation is enabled
+                    do_sample=False
+                    # truncation=True # Removed, handled manually above
                 )
 
                 # Extract the summary text
                 summary = summary_output[0]['summary_text']
                 summary_char_len = len(summary)
-                # Estimate summary token length (optional, less precise than encoding)
+                # Estimate summary token length
                 summary_token_len = len(self.tokenizer.encode(summary))
 
-            # Log outside the lock
-            logger.debug(
-                f"Successfully summarized text. Summary length: {summary_char_len} chars (~{summary_token_len} tokens). Target range: {min_summary_tokens}-{adjusted_max_tokens} tokens.")
             return summary
 
         except Exception as e:
             logger.error(
-                f"Error during text summarization: {e}", exc_info=True)
+                f"Error during text chunk summarization: {e}", exc_info=True)
             return None

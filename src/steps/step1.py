@@ -41,6 +41,9 @@ from src.steps.rate_limit import RateLimiter
 # from src.localnlp.localnlp_client import LocalNLPClient
 from typing import Optional  # Add Optional type hint
 
+# Import for Step 1.7: Chunking and Summarization
+import spacy
+
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -80,7 +83,6 @@ def fetch_articles_for_processing() -> List[Dict[str, Any]]:
         "NEWS_API_BASE_URL", "http://host.docker.internal:8000")
 
     # Connect to the News API
-    logger.info(f"Connecting to News API at {news_api_url}")
     news_client = NewsAPIClient(api_base_url=news_api_url)
 
     try:
@@ -198,7 +200,6 @@ def insert_processed_articles(processed_articles: list) -> int:
     try:
         # Insert articles into the database
         count = reader_client.batch_insert_articles(processed_articles)
-        logger.info(f"Inserted {count} articles into the database")
         return count
     except Exception as e:
         logger.error(f"Error inserting articles into the database: {e}")
@@ -221,7 +222,6 @@ def output_error_articles_json(reader_client: ReaderDBClient) -> None:
         error_articles = reader_client.get_error_articles()
 
         if not error_articles:
-            logger.info("No articles with null/error content found")
             return
 
         # Convert datetime objects to strings for JSON serialization
@@ -245,8 +245,6 @@ def output_error_articles_json(reader_client: ReaderDBClient) -> None:
         with open(output_file, 'w') as f:
             json.dump({"error_articles": error_articles,
                       "count": len(error_articles)}, f, indent=2)
-
-        logger.info(f"Error articles debug info written to {output_file}")
 
     except Exception as e:
         logger.error(f"Error creating error articles debug file: {e}")
@@ -343,19 +341,18 @@ def run(max_workers: int = None) -> int:
     max_summary_tokens = int(os.getenv("MAX_SUMMARY_TOKENS", "512"))
     min_summary_tokens = int(os.getenv("MIN_SUMMARY_TOKENS", "150"))
 
+    # Configure chunking parameters for Step 1.7
+    article_token_chunk_threshold = int(
+        os.getenv("ARTICLE_TOKEN_CHUNK_THRESHOLD", "2000"))
+    target_chunk_token_size = int(os.getenv("TARGET_CHUNK_TOKEN_SIZE", "1000"))
+    chunk_max_tokens = int(os.getenv("CHUNK_MAX_TOKENS", "300"))
+    chunk_min_tokens = int(os.getenv("CHUNK_MIN_TOKENS", "75"))
+
     logger.info(
         f"========= STARTING STEP 1: DATA COLLECTION, PROCESSING AND STORAGE (USING {max_workers} WORKERS) =========")
-    logger.info(
-        f"Will update database every {batch_size} articles or {checkpoint_interval} seconds, whichever comes first")
-    if run_step_1_7:
-        logger.info(
-            f"Step 1.7 (Summarization for long articles) is ENABLED using model '{local_nlp_model}'")
-    else:
-        logger.info("Step 1.7 (Summarization for long articles) is DISABLED")
 
     # Wait for services to be ready
     wait_seconds = int(os.getenv("WAIT_SECONDS", "5"))
-    logger.info(f"Waiting {wait_seconds} seconds for services to be ready...")
     time.sleep(wait_seconds)
 
     # STEP 1.1: Fetch articles from news-db
@@ -378,7 +375,6 @@ def run(max_workers: int = None) -> int:
             a for a in raw_articles if a.get('id') not in processed_ids]
 
         skipped_count = len(raw_articles) - len(articles_to_process)
-        logger.info(f"Filtered out {skipped_count} already processed articles")
         logger.info(
             f"Remaining articles to process: {len(articles_to_process)}")
 
@@ -392,8 +388,6 @@ def run(max_workers: int = None) -> int:
                     logger.error(
                         f"Cannot connect to reader-db: {test_result['error']}")
                     return 0
-                logger.info(
-                    f"DB Connection verified, available tables: {', '.join(test_result.get('tables', []))}")
 
                 # STEP 1.2 & 1.3: Process articles and prepare for storage in parallel
                 logger.info(
@@ -416,8 +410,6 @@ def run(max_workers: int = None) -> int:
                         articles_to_insert = pending_articles[:]  # Copy
                         pending_articles = []
                     if articles_to_insert:
-                        logger.info(
-                            f"Performing incremental database update (Step 1.4) with {len(articles_to_insert)} articles...")
                         count = reader_db.batch_insert_articles(
                             articles_to_insert)
                         inserted_count += count
@@ -440,11 +432,6 @@ def run(max_workers: int = None) -> int:
                             time_since_last_update = current_time - last_db_update_time
                             if len(pending_articles) >= batch_size or time_since_last_update >= checkpoint_interval:
                                 update_database_step1_4()
-                            if processed_count % 50 == 0 or processed_count == total_articles:
-                                elapsed = current_time - start_time
-                                rate = processed_count / elapsed if elapsed > 0 else 0
-                                logger.info(f"Processed (Steps 1.2/1.3) {processed_count}/{total_articles} articles "
-                                            f"({processed_count/total_articles*100:.1f}%, {rate:.2f} articles/sec)")
                         except Exception as e:
                             logger.error(
                                 f"Exception processing article {article.get('id')} (Steps 1.2/1.3): {e}")
@@ -452,8 +439,6 @@ def run(max_workers: int = None) -> int:
                 # Final database update for Step 1.4
                 if pending_articles:
                     final_count = update_database_step1_4()
-                    logger.info(
-                        f"Final database update (Step 1.4): inserted {final_count} articles")
 
                 elapsed_time = time.time() - start_time
                 logger.info(f"STEP 1.2 & 1.3 COMPLETE: Processed {processed_count} articles "
@@ -470,8 +455,6 @@ def run(max_workers: int = None) -> int:
                 # Ensure DB connection is closed even if steps 1.2-1.5 fail
                 if reader_db:
                     reader_db.close()
-                    logger.info(
-                        "Database connection closed due to error in steps 1.2-1.5")
                 return inserted_count  # Return count so far
 
             finally:
@@ -479,8 +462,6 @@ def run(max_workers: int = None) -> int:
                 # Check if reader_db is still initialized and has a pool (not None)
                 if 'reader_db' in locals() and reader_db and reader_db.connection_pool:
                     reader_db.close()
-                    logger.info(
-                        "Database connection closed after steps 1.2-1.5")
         else:  # No new articles to process
             logger.info(
                 "All articles have already been processed in previous runs (Steps 1.2-1.5).")
@@ -492,8 +473,6 @@ def run(max_workers: int = None) -> int:
     # Initialize RateLimiter and GeminiClient (these are needed for both 1.6 and 1.7)
     rate_limiter = RateLimiter()
     gemini_client = GeminiClient(rate_limiter=rate_limiter)
-    logger.info(
-        "Initialized Gemini client for embedding generation (Steps 1.6 & 1.7)")
 
     # Create a new database connection specifically for embedding steps
     reader_db_embed = initialize_reader_db_client()
@@ -546,9 +525,6 @@ def run(max_workers: int = None) -> int:
 
                 # Perform the insertion outside the lock
                 if embeddings_to_insert:
-                    logger.info(
-                        f"Performing database update (Step 1.6) with {len(embeddings_to_insert)} embeddings..."
-                    )
                     success_count_in_batch = 0
                     try:
                         # Loop through articles in the copied list
@@ -561,9 +537,6 @@ def run(max_workers: int = None) -> int:
                         # Update total count and timestamp after processing the batch
                         embedding_success_1_6 += success_count_in_batch
                         last_db_update_time_1_6 = time.time()
-                        logger.info(
-                            f"Database update (Step 1.6): inserted {success_count_in_batch} embeddings"
-                        )
                         return success_count_in_batch  # Return count for this batch
                     except Exception as e:
                         logger.error(
@@ -571,9 +544,6 @@ def run(max_workers: int = None) -> int:
                         # Even if there's an error, update the total count with successes so far
                         embedding_success_1_6 += success_count_in_batch
                         last_db_update_time_1_6 = time.time()  # Update time anyway
-                        logger.info(
-                            f"Database update (Step 1.6) partially completed: inserted {success_count_in_batch} embeddings before error"
-                        )
                         return success_count_in_batch  # Return partial count
                 else:
                     # This case should ideally not be reached if the check at the start works,
@@ -620,15 +590,10 @@ def run(max_workers: int = None) -> int:
                         embedding_failure_1_6 += 1
                     total = len(articles_for_embedding)
                     processed = i + 1
-                    if processed % 50 == 0 or processed == total:
-                        logger.info(
-                            f"Embedding progress (Step 1.6): {processed}/{total} ({processed/total*100:.1f}%)")
 
             # Final database update for Step 1.6
             if pending_embeddings_1_6:
                 final_count = update_embedding_database_1_6()
-                logger.info(
-                    f"Final database update (Step 1.6): inserted {final_count} embeddings")
 
             embedding_elapsed_time_1_6 = time.time() - embedding_start_time_1_6
             logger.info(
@@ -701,8 +666,6 @@ def run(max_workers: int = None) -> int:
                                     pending_embeddings_1_7 = []
 
                                 if embeddings_to_insert:
-                                    logger.info(
-                                        f"Performing database update (Step 1.7) with {len(embeddings_to_insert)} summarized embeddings...")
                                     for article_id, embedding in embeddings_to_insert:
                                         result = reader_db_embed.insert_embedding(
                                             article_id, embedding)
@@ -710,9 +673,7 @@ def run(max_workers: int = None) -> int:
                                             success_count += 1
                                     embedding_success_1_7 += success_count  # Update total count
                                     last_db_update_time_1_7 = time.time()
-                                    logger.info(
-                                        f"Database update (Step 1.7): inserted {success_count} embeddings")
-                                return success_count
+                                    return success_count
 
                             def process_summarization_embedding_task(article_data: Dict[str, Any]) -> Tuple[int, bool, bool]:
                                 nonlocal summarization_success, summarization_failure, last_db_update_time_1_7
@@ -722,41 +683,111 @@ def run(max_workers: int = None) -> int:
                                 embedding_success_flag = False
 
                                 try:
-                                    # Summarize (with internal truncation)
-                                    summary = localnlp_client.summarize_text(
-                                        content, max_summary_tokens, min_summary_tokens)
+                                    # Load spaCy model if not already loaded (can be moved outside for efficiency)
+                                    nlp = spacy.load("en_core_web_lg")
 
-                                    if summary is not None:
-                                        summarization_success += 1
-                                        summary_success_flag = True
+                                    # Process with spaCy to get token count and break into sentences
+                                    # Divide text into chunks based on sentences
+                                    # Step 1: Process with spaCy to get sentence boundaries
+                                    doc = nlp(content)
 
-                                        # Generate embedding for the summary
-                                        embedding = gemini_client.generate_embedding(
-                                            summary)
+                                    # Step 2: Initialize chunking variables
+                                    chunks = []
+                                    current_chunk_tokens = 0
+                                    current_chunk_sentences = []
 
-                                        if embedding is not None and isinstance(embedding, list) and len(embedding) > 0:
-                                            with pending_embeddings_lock_1_7:
-                                                pending_embeddings_1_7.append(
-                                                    (article_id, embedding))
-                                                # Check DB update timing
-                                                current_time = time.time()
-                                                time_since_last_update = current_time - last_db_update_time_1_7
-                                                should_update = (len(pending_embeddings_1_7) >= embedding_batch_size or
-                                                                 time_since_last_update >= embedding_checkpoint_interval)
-                                            if should_update:
-                                                update_embedding_database_1_7()
-                                            embedding_success_flag = True
+                                    # Step 3: Build chunks based on sentences
+                                    for sent in doc.sents:
+                                        sent_token_count = len(sent)
+                                        # If adding this sentence doesn't exceed chunk size limit
+                                        if current_chunk_tokens + sent_token_count <= target_chunk_token_size:
+                                            current_chunk_sentences.append(
+                                                sent.text)
+                                            current_chunk_tokens += sent_token_count
                                         else:
-                                            logger.error(
-                                                f"Failed to generate embedding for summarized article {article_id}")
-                                    else:
+                                            # This chunk is full, save it and start a new one
+                                            if current_chunk_sentences:  # Ensure chunk isn't empty
+                                                chunks.append(
+                                                    " ".join(current_chunk_sentences))
+                                            # Start a new chunk with this sentence
+                                            current_chunk_sentences = [
+                                                sent.text]
+                                            current_chunk_tokens = sent_token_count
+
+                                    # Add the final chunk if it's not empty
+                                    if current_chunk_sentences:
+                                        chunks.append(
+                                            " ".join(current_chunk_sentences))
+
+                                    chunk_count = len(chunks)
+
+                                    # If no chunks were created (unusual case), handle gracefully
+                                    if not chunks:
+                                        logger.warning(
+                                            f"No chunks created for article {article_id}, content might be empty")
                                         summarization_failure += 1
+                                        return (article_id, False, False)
+
+                                    # Step 4: Summarize each chunk
+                                    chunk_summaries = []
+
+                                    for i, chunk in enumerate(chunks):
+                                        try:
+                                            chunk_summary = localnlp_client.summarize_text(
+                                                chunk,
+                                                max_summary_tokens=chunk_max_tokens,
+                                                min_summary_tokens=chunk_min_tokens
+                                            )
+
+                                            if chunk_summary:
+                                                chunk_summaries.append(
+                                                    chunk_summary)
+                                            else:
+                                                logger.warning(
+                                                    f"Failed to summarize chunk {i+1} for article {article_id}")
+                                        except Exception as chunk_e:
+                                            logger.error(
+                                                f"Error summarizing chunk {i+1} for article {article_id}: {chunk_e}")
+                                            # Continue with other chunks even if one fails
+
+                                    # Step 5: Concatenate summaries
+                                    if not chunk_summaries:
                                         logger.error(
-                                            f"Failed to summarize long article {article_id}")
+                                            f"All chunk summarizations failed for article {article_id}")
+                                        summarization_failure += 1
+                                        return (article_id, False, False)
+
+                                    # Join chunk summaries with spaces
+                                    concatenated_summary = " ".join(
+                                        chunk_summaries)
+
+                                    # Successfully created summary
+                                    summarization_success += 1
+                                    summary_success_flag = True
+
+                                    # Step 6: Generate embedding for the concatenated summary
+                                    embedding = gemini_client.generate_embedding(
+                                        concatenated_summary)
+
+                                    if embedding is not None and isinstance(embedding, list) and len(embedding) > 0:
+                                        with pending_embeddings_lock_1_7:
+                                            pending_embeddings_1_7.append(
+                                                (article_id, embedding))
+                                            # Check DB update timing
+                                            current_time = time.time()
+                                            time_since_last_update = current_time - last_db_update_time_1_7
+                                            should_update = (len(pending_embeddings_1_7) >= embedding_batch_size or
+                                                             time_since_last_update >= embedding_checkpoint_interval)
+                                        if should_update:
+                                            update_embedding_database_1_7()
+                                        embedding_success_flag = True
+                                    else:
+                                        logger.error(
+                                            f"Failed to generate embedding for summarized article {article_id}")
 
                                 except Exception as e:
                                     logger.error(
-                                        f"Error in summarization/embedding task for long article {article_id}: {e}")
+                                        f"Error in chunking/summarization/embedding task for article {article_id}: {e}")
                                     if summary_success_flag:  # Summarization worked, embedding failed
                                         embedding_success_flag = False
                                     else:  # Summarization failed
@@ -781,18 +812,9 @@ def run(max_workers: int = None) -> int:
                                             f"Exception processing summarization task future (Step 1.7): {e}")
                                         embedding_failure_1_7 += 1  # Assume embedding failed if exception here
 
-                                    # Log progress
-                                    total = len(articles_to_summarize)
-                                    processed = i + 1
-                                    if processed % 20 == 0 or processed == total:
-                                        logger.info(
-                                            f"Summarization/Embedding progress (Step 1.7): {processed}/{total} ({processed/total*100:.1f}%)")
-
                             # Final database update for Step 1.7
                             if pending_embeddings_1_7:
                                 final_count = update_embedding_database_1_7()
-                                logger.info(
-                                    f"Final database update (Step 1.7): inserted {final_count} embeddings")
 
                             summarization_elapsed_time = time.time() - summarization_start_time
                             total_processed_1_7 = summarization_success + summarization_failure
@@ -816,7 +838,6 @@ def run(max_workers: int = None) -> int:
         # Always close the embedding DB connection
         if 'reader_db_embed' in locals() and reader_db_embed and reader_db_embed.connection_pool:
             reader_db_embed.close()
-            logger.info("Embedding database connection closed")
 
     logger.info(
         f"========= STEP 1 COMPLETE (Final article insertion count from 1.4: {inserted_count}) =========")

@@ -20,8 +20,7 @@ class NewsAPIClient:
     """
     Client for interactions with the news-db API.
 
-    This client uses the REST API instead of direct database access.
-    It handles Docker networking connectivity issues automatically.
+    This client uses the REST API to access the news-api service on the shared Docker network.
 
     Exported functions:
     - test_connection(): Tests connection to News API, returns connection details
@@ -36,13 +35,13 @@ class NewsAPIClient:
 
     def __init__(self,
                  api_base_url=os.getenv(
-                     "NEWS_API_BASE_URL", "http://host.docker.internal:8000"),
+                     "NEWS_API_BASE_URL", "http://news-api:8000"),
                  max_retries=5,
                  retry_delay=10):
         """Initialize the News API client.
 
         Args:
-            api_base_url: Base URL for the News API
+            api_base_url: Base URL for the News API, defaults to Docker service name
             max_retries: Maximum number of connection retry attempts
             retry_delay: Base delay between retries in seconds
         """
@@ -50,95 +49,24 @@ class NewsAPIClient:
             '/')  # Remove trailing slash if present
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self.status_path = "/status"  # Default status path
-        self.api_path_found = False   # Flag to track if we found a working API path
 
-        # Define fallback URLs for different network scenarios
-        # First check for environment variable with comma-separated URLs
-        fallback_env = os.getenv("NEWS_API_FALLBACK_URLS")
-        if fallback_env:
-            # Split by comma and clean up each URL
-            custom_fallbacks = [url.strip() for url in fallback_env.split(",")]
-            logger.info(
-                f"Using fallback URLs from environment: {custom_fallbacks}")
-            self.fallback_urls = custom_fallbacks
-        else:
-            # Default fallbacks if not provided in environment
-            self.fallback_urls = [
-                # Container name (try first in Docker environment)
-                "http://news-api:8000",
-                "http://172.23.0.5:8000",            # Docker network IP
-                "http://host.docker.internal:8000",  # Windows/Mac Docker
-                "http://localhost:8000",             # Direct local
-                "http://172.17.0.1:8000",            # Default Docker bridge
-            ]
-
-        # Add the base URL to the fallbacks if it's not already there
-        if self.api_base_url not in self.fallback_urls:
-            self.fallback_urls.append(self.api_base_url)
-
-        logger.info(f"Fallback URLs (in order): {self.fallback_urls}")
-
-        # Different possible API path structures to try
-        self.api_path_variants = [
-            "/status",                 # Standard path
-            "/api/status",             # Common REST pattern
-            "/v1/status",              # Versioned API
-            "/health",                 # Health check endpoint
-            "/",                       # Root path
-            "/api",                    # Alternative API root
-        ]
+        # Common API endpoints
+        self.api_endpoints = {
+            "status": "/status",
+            "articles": "/articles"
+        }
 
         logger.info(f"Initializing connection to News API at {api_base_url}")
 
-        # Test connection on init and try fallbacks if needed
-        self._test_and_set_working_url()
-
-    def _test_and_set_working_url(self):
-        """Test connections to potential URLs and set working one as primary"""
-        # First try the configured URL with different API paths
-        for path in self.api_path_variants:
-            test_url = f"{self.api_base_url}{path}"
-            logger.debug(f"Testing primary URL with path: {test_url}")
-            try:
-                response = requests.get(test_url, timeout=5)
-                if response.status_code < 400:  # Accept any non-error status code
-                    logger.info(f"Successfully connected to: {test_url}")
-                    self.status_path = path
-                    self.api_path_found = True
-                    return
-            except requests.exceptions.RequestException as e:
-                logger.debug(f"Path {path} on primary URL failed: {e}")
-
-        # If we get here, the primary URL failed with all path variants
-        logger.warning(
-            f"Primary URL {self.api_base_url} failed with all API path variants")
-
-        # Try fallback URLs with all path variants
-        for url in self.fallback_urls:
-            if url == self.api_base_url:
-                continue  # Skip if same as primary
-
-            for path in self.api_path_variants:
-                test_url = f"{url}{path}"
-                logger.debug(f"Testing fallback URL: {test_url}")
-                try:
-                    response = requests.get(test_url, timeout=5)
-                    if response.status_code < 400:  # Accept any non-error status code
-                        logger.info(f"Found working API at: {test_url}")
-                        self.api_base_url = url
-                        self.status_path = path
-                        self.api_path_found = True
-                        return
-                except requests.exceptions.RequestException:
-                    pass
-
-        # If we reach here, we couldn't find any working URL + path combination
-        logger.warning(
-            "No working URL and API path combination found. Will try base endpoints on API calls.")
+        # Test the connection at initialization
+        test_result = self.test_connection()
+        if "error" in test_result:
+            pass
+        else:
+            pass
 
     def _make_request(self, endpoint, params=None):
-        """Helper method to make requests with automatic fallback for network errors
+        """Helper method to make requests with retry support for temporary failures
 
         Args:
             endpoint: API endpoint (should start with /)
@@ -151,102 +79,118 @@ class NewsAPIClient:
         if not endpoint.startswith('/'):
             endpoint = '/' + endpoint
 
-        # For status endpoint, use the discovered path if we found one
-        if endpoint == '/status' and self.api_path_found:
-            endpoint = self.status_path
-
-        # Try the requested URL first
         url = f"{self.api_base_url}{endpoint}"
-        try:
-            logger.debug(f"Making request to: {url} with params: {params}")
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            return response
-        except (requests.exceptions.ConnectionError,
-                requests.exceptions.Timeout,
-                requests.exceptions.HTTPError) as e:
+        retries = 0
+        last_error = None
 
-            logger.warning(f"Request to {url} failed: {e}")
+        # Try with retries only for connection/timeout errors
+        while retries < self.max_retries:
+            try:
+                response = requests.get(url, params=params, timeout=10)
+                # Raise HTTPError for bad responses (4xx or 5xx)
+                response.raise_for_status()
+                return response
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.Timeout) as e:
+                # Only retry on potentially transient network errors
+                retries += 1
+                last_error = e
 
-            # If connection error with primary URL, try fallbacks
-            for fallback_url in self.fallback_urls:
-                if fallback_url == self.api_base_url:
-                    continue
+                if retries >= self.max_retries:
+                    break
 
-                # Use the fallback URL with the endpoint
-                fallback_full_url = f"{fallback_url}{endpoint}"
-                logger.info(f"Trying fallback URL: {fallback_full_url}")
+                # Add jitter to retry delay
+                wait_time = self.retry_delay * (1 + random.random() * 0.5)
+                time.sleep(wait_time)
+            except requests.exceptions.HTTPError as e:
+                # Do not retry on HTTP errors (like 404 Not Found), raise immediately
+                raise e
 
-                try:
-                    response = requests.get(
-                        fallback_full_url, params=params, timeout=10)
-                    response.raise_for_status()
-                    # If successful, update primary URL for future requests
-                    self.api_base_url = fallback_url
-                    logger.info(f"Switched to working URL: {fallback_url}")
-                    return response
-                except requests.exceptions.RequestException as nested_e:
-                    logger.debug(
-                        f"Fallback URL {fallback_full_url} failed: {nested_e}")
-
-            # Re-raise the original exception if all fallbacks fail
-            raise
+        # If we exit the loop due to max retries
+        if last_error:
+            raise last_error
+        # Should not be reached if HTTPError is raised correctly
+        raise Exception(
+            f"Failed to make request to {url} after {self.max_retries} attempts")
 
     def test_connection(self):
         """Test the API connection and return connection details."""
+        api_status = {}
+        status_data = {"counts": {}, "total": 0}
+        root_path_checked = False
+
         try:
-            # Test the API connection - use the status path we discovered
-            status_endpoint = self.status_path if self.api_path_found else "/status"
+            # 1. Try the primary status endpoint
             try:
-                response = self._make_request(status_endpoint)
+                response = self._make_request(self.api_endpoints["status"])
                 api_status = response.json()
+            except requests.exceptions.HTTPError as http_err:
+                if http_err.response.status_code == 404:
+                    logger.info(
+                        f"Status endpoint {self.api_endpoints['status']} not found (404). Will check root path.")
+                    # Fallback handled below if status is still empty
+                else:
+                    # Re-raise other HTTP errors to be caught by the outer handler
+                    raise http_err
             except Exception as e:
+                # Log other specific errors from _make_request if needed, but often it handles retries
                 logger.warning(
-                    f"Status endpoint failed: {e}, trying root path")
-                # If status endpoint fails, try the root path
-                response = self._make_request("/")
-                api_status = {"status": "unknown",
-                              "message": "Connected to API root"}
+                    f"Could not connect to {self.api_endpoints['status']}: {e}. Will check root path.")
 
-            # Try to get database info through various possible status endpoints
-            status_count_endpoints = [
-                "/status/counts",
-                "/api/status/counts",
-                "/v1/status/counts",
-                "/counts",
-                "/stats"
-            ]
-
-            status_data = {"counts": {}, "total": 0}
-            for endpoint in status_count_endpoints:
+            # 2. If status endpoint failed (e.g., 404 or other connection issue), try root path
+            if not api_status:  # Check if api_status dict is still empty
                 try:
-                    count_response = self._make_request(endpoint)
-                    status_data = count_response.json()
-                    break  # Stop if we found a working endpoint
-                except Exception:
-                    continue  # Try the next endpoint
+                    response = self._make_request("/")
+                    # We don't expect JSON from root, just success (2xx)
+                    api_status = {"status": "ok",
+                                  "message": "Connected to API root"}
+                    logger.info("Successfully connected to API root path.")
+                    root_path_checked = True
+                except Exception as root_e:
+                    # If both status and root fail, log error and return
+                    logger.error(
+                        f"API connection test failed on both /status and root path: {root_e}")
+                    return {
+                        "error": f"Connection failed: {root_e}",
+                        "api_base_url": self.api_base_url
+                    }
 
+            # 3. Try to get article counts (optional)
+            try:
+                count_response = self._make_request("/status/counts")
+                status_data = count_response.json()
+            except requests.exceptions.HTTPError as http_err:
+                if http_err.response.status_code == 404:
+                    logger.info(
+                        "Optional endpoint /status/counts not found (404). Proceeding without counts.")
+                    # Keep default status_data
+                else:
+                    logger.warning(
+                        f"HTTP error retrieving article counts from /status/counts: {http_err}")
+                    # Keep default status_data, but log warning for non-404 HTTP errors
+            except Exception as count_e:
+                logger.warning(
+                    f"Could not retrieve article counts from /status/counts: {count_e}")
+                # Keep default status_data
+
+            # 4. Construct final result
             return {
                 "version": "API",
                 "database": "news-db",
-                "user": "api-user",
-                "tables": ["articles"],
                 "connection_string": self.api_base_url,
                 "api_status": api_status.get("status", "unknown"),
                 "api_message": api_status.get("message", ""),
-                "api_path_found": self.api_path_found,
-                "status_path_used": self.status_path,
                 "article_counts": status_data.get("counts", {}),
                 "total_articles": status_data.get("total", 0)
             }
 
         except Exception as e:
-            logger.error(f"API connection test failed: {e}")
+            # Catch unexpected errors during the process
+            logger.error(
+                f"Unexpected error during API connection test: {e}", exc_info=True)
             return {
                 "error": str(e),
-                "api_base_url": self.api_base_url,
-                "status_path_tried": self.status_path,
-                "fallback_urls_tried": self.fallback_urls
+                "api_base_url": self.api_base_url
             }
 
     def get_articles_ready_for_review(self) -> List[Dict[str, Any]]:
@@ -256,37 +200,10 @@ class NewsAPIClient:
         page = 1
         limit = 100  # Fetch articles in batches of 100
 
-        # Different possible endpoints to try for articles
-        article_endpoints = [
-            "/articles",
-            "/api/articles",
-            "/v1/articles",
-            "/news/articles"
-        ]
-
-        # Find a working articles endpoint first
-        working_endpoint = None
-        for endpoint in article_endpoints:
-            try:
-                logger.info(f"Testing articles endpoint: {endpoint}")
-                self._make_request(endpoint, params={"limit": 1})
-                working_endpoint = endpoint
-                logger.info(f"Found working articles endpoint: {endpoint}")
-                break
-            except Exception as e:
-                logger.debug(f"Articles endpoint {endpoint} failed: {e}")
-
-        if not working_endpoint:
-            logger.error("Could not find a working articles endpoint")
-            return []
-
         while retries < self.max_retries:
             try:
-                logger.info(
-                    f"Fetching articles with status 'ReadyForReview' (page {page}, limit {limit})")
-
                 response = self._make_request(
-                    working_endpoint,
+                    self.api_endpoints["articles"],
                     params={"status": "ReadyForReview",
                             "page": page, "limit": limit}
                 )
@@ -299,9 +216,6 @@ class NewsAPIClient:
                 total_articles = data.get("total", 0)
                 retrieved_articles = len(articles)
 
-                logger.info(
-                    f"Retrieved {retrieved_articles} of {total_articles} total articles")
-
                 # If we've fetched all articles, break out of the loop
                 if retrieved_articles >= total_articles:
                     break
@@ -312,8 +226,6 @@ class NewsAPIClient:
             except requests.exceptions.RequestException as e:
                 retries += 1
                 wait_time = self.retry_delay * (1 + random.random())
-                logger.warning(
-                    f"API request failed (attempt {retries}/{self.max_retries}): {e}")
 
                 if retries >= self.max_retries:
                     logger.error("Maximum retry attempts reached")
@@ -344,8 +256,6 @@ class NewsAPIClient:
             # Extract only the IDs
             article_ids = [article['id'] for article in articles]
 
-            logger.info(
-                f"Retrieved {len(article_ids)} article IDs with 'ReadyForReview' status")
             return article_ids
 
         except Exception as e:
@@ -354,4 +264,4 @@ class NewsAPIClient:
 
     def close(self):
         """Close the client - no-op for API client."""
-        logger.info("Closed News API client (no-op)")
+        pass
