@@ -699,6 +699,37 @@ def run(max_workers: int = None) -> int:
                                     # Step 3: Build chunks based on sentences
                                     for sent in doc.sents:
                                         sent_token_count = len(sent)
+
+                                        # Check if individual sentence exceeds target chunk size
+                                        if sent_token_count > target_chunk_token_size:
+                                            logger.warning(
+                                                f"Article {article_id}: Skipping sentence longer than target chunk size "
+                                                f"({sent_token_count} > {target_chunk_token_size} tokens). "
+                                                f"Sentence start: '{sent.text[:100]}...'"
+                                            )
+
+                                            # Option: Skip very long sentences completely
+                                            # continue
+
+                                            # Alternative option: Force-add very long sentences as separate chunks
+                                            # with reduced length to avoid overwhelming the model
+                                            # Limit chars to avoid huge chunks
+                                            max_chars = min(
+                                                1000, len(sent.text))
+                                            truncated_sent = sent.text[:max_chars] + (
+                                                "..." if len(sent.text) > max_chars else "")
+
+                                            # If we have a current chunk in progress, save it first
+                                            if current_chunk_sentences:
+                                                chunks.append(
+                                                    " ".join(current_chunk_sentences))
+                                                current_chunk_sentences = []
+                                                current_chunk_tokens = 0
+
+                                            # Add truncated sentence as its own chunk
+                                            chunks.append(truncated_sent)
+                                            continue
+
                                         # If adding this sentence doesn't exceed chunk size limit
                                         if current_chunk_tokens + sent_token_count <= target_chunk_token_size:
                                             current_chunk_sentences.append(
@@ -720,6 +751,8 @@ def run(max_workers: int = None) -> int:
                                             " ".join(current_chunk_sentences))
 
                                     chunk_count = len(chunks)
+                                    logger.info(
+                                        f"Article {article_id}: Split into {chunk_count} chunks for summarization")
 
                                     # If no chunks were created (unusual case), handle gracefully
                                     if not chunks:
@@ -730,9 +763,21 @@ def run(max_workers: int = None) -> int:
 
                                     # Step 4: Summarize each chunk
                                     chunk_summaries = []
+                                    successful_chunks = 0
+                                    failed_chunks = 0
 
                                     for i, chunk in enumerate(chunks):
                                         try:
+                                            # Skip empty chunks
+                                            if not chunk or not chunk.strip():
+                                                logger.warning(
+                                                    f"Skipping empty chunk {i+1} for article {article_id}")
+                                                continue
+
+                                            # Add chunk number for better logging
+                                            logger.info(
+                                                f"Summarizing chunk {i+1}/{chunk_count} for article {article_id} ({len(chunk)} chars)")
+
                                             chunk_summary = localnlp_client.summarize_text(
                                                 chunk,
                                                 max_summary_tokens=chunk_max_tokens,
@@ -742,20 +787,29 @@ def run(max_workers: int = None) -> int:
                                             if chunk_summary:
                                                 chunk_summaries.append(
                                                     chunk_summary)
+                                                successful_chunks += 1
+                                                logger.info(
+                                                    f"Successfully summarized chunk {i+1}/{chunk_count} for article {article_id}")
                                             else:
                                                 logger.warning(
-                                                    f"Failed to summarize chunk {i+1} for article {article_id}")
+                                                    f"Failed to summarize chunk {i+1}/{chunk_count} for article {article_id}")
+                                                failed_chunks += 1
                                         except Exception as chunk_e:
                                             logger.error(
-                                                f"Error summarizing chunk {i+1} for article {article_id}: {chunk_e}")
+                                                f"Error summarizing chunk {i+1}/{chunk_count} for article {article_id}: {chunk_e}")
+                                            failed_chunks += 1
                                             # Continue with other chunks even if one fails
 
                                     # Step 5: Concatenate summaries
                                     if not chunk_summaries:
                                         logger.error(
-                                            f"All chunk summarizations failed for article {article_id}")
+                                            f"All chunk summarizations failed for article {article_id} ({failed_chunks} failures)")
                                         summarization_failure += 1
                                         return (article_id, False, False)
+
+                                    # Log success/failure stats
+                                    logger.info(
+                                        f"Article {article_id}: {successful_chunks} chunks summarized successfully, {failed_chunks} failed")
 
                                     # Join chunk summaries with spaces
                                     concatenated_summary = " ".join(

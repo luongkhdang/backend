@@ -35,7 +35,8 @@ class LocalNLPClient:
     """Client to handle local NLP model operations like summarization of text chunks."""
 
     # Define model limits - BART models typically have a 1024 token input limit
-    MODEL_MAX_INPUT_TOKENS = 1024  # Set to match model's true limit
+    # Use a safety margin to avoid edge cases with position embeddings
+    MODEL_MAX_INPUT_TOKENS = 1000  # Slightly less than 1024 for safety margin
 
     def __init__(self, model_name: str = "facebook/bart-large-cnn"):
         """
@@ -80,8 +81,8 @@ class LocalNLPClient:
         Summarize the input text chunk using the loaded model.
 
         This method is designed to work with text chunks of approximately 1000 tokens,
-        which is suitable for the BART model's capacity. No explicit truncation is 
-        needed for properly sized chunks, as the pipeline handles truncation internally.
+        which is suitable for the BART model's capacity. The method handles truncation
+        to ensure the input doesn't exceed the model's position embedding limits.
 
         For very long articles, use this method on each chunk separately, then concatenate
         the summaries to create a comprehensive summary.
@@ -99,6 +100,10 @@ class LocalNLPClient:
                 "Summarization pipeline or tokenizer not initialized. Cannot summarize.")
             return None
 
+        if not text or len(text.strip()) == 0:
+            logger.warning("Empty text provided for summarization.")
+            return None
+
         original_char_len = len(text)
 
         # Manually truncate the input text based on the model's max input tokens
@@ -112,54 +117,89 @@ class LocalNLPClient:
                     truncation=True,
                     return_tensors="pt"  # Return PyTorch tensors
                 )
-                truncated_text = self.tokenizer.decode(
-                    inputs["input_ids"][0], skip_special_tokens=True
-                )
                 truncated_token_count = len(inputs["input_ids"][0])
-                if truncated_token_count >= self.MODEL_MAX_INPUT_TOKENS:
+
+                # Only log if actual truncation happened
+                if truncated_token_count >= self.MODEL_MAX_INPUT_TOKENS or original_char_len > 3000:
                     logger.warning(
                         f"Input text chunk was truncated from {original_char_len} chars "
                         f"to {truncated_token_count} tokens (max: {self.MODEL_MAX_INPUT_TOKENS}) "
                         f"before summarization.")
+
+                # Decode back to text to ensure we have valid truncated text
+                truncated_text = self.tokenizer.decode(
+                    inputs["input_ids"][0], skip_special_tokens=True
+                )
+
             except Exception as e:
                 logger.error(
                     f"Error during input tokenization/truncation: {e}", exc_info=True)
                 return None  # Cannot proceed if truncation fails
 
-        # Adjust max_summary_tokens based on the *truncated* input length
-        # Use the truncated token count directly
-        input_token_count = truncated_token_count
-        adjusted_max_tokens = min(
-            # Keep the heuristic, but base it on actual tokens
-            max_summary_tokens, input_token_count // 2)
+        # Set summary length parameters
+        # Use a direct approach without complex adjustments
+        summary_max_length = max_summary_tokens
+        summary_min_length = min_summary_tokens
 
-        # Ensure we don't go below min_summary_tokens
-        if adjusted_max_tokens < min_summary_tokens:
-            adjusted_max_tokens = min_summary_tokens
-
-        if adjusted_max_tokens != max_summary_tokens:
-            pass
+        # Ensure min length is not greater than max length
+        if summary_min_length > summary_max_length:
+            summary_min_length = summary_max_length // 2
 
         try:
             # Use the lock to ensure thread safety for the pipeline call
             with self.lock:
                 # Generate summary using the pipeline with the truncated text
-                # No need for truncation=True here as we already truncated manually
                 summary_output = self.pipeline(
                     truncated_text,  # Use the truncated text
-                    max_length=adjusted_max_tokens,
-                    min_length=min_summary_tokens,
-                    do_sample=False
-                    # truncation=True # Removed, handled manually above
+                    max_length=summary_max_length,
+                    min_length=summary_min_length,
+                    do_sample=False,
+                    # Explicitly set num_beams for more deterministic results
+                    num_beams=4
                 )
 
                 # Extract the summary text
                 summary = summary_output[0]['summary_text']
-                summary_char_len = len(summary)
-                # Estimate summary token length
-                summary_token_len = len(self.tokenizer.encode(summary))
+
+                # Log summary stats for debugging if needed
+                # logger.debug(f"Summary generated: {len(summary)} chars")
 
             return summary
+
+        except IndexError as e:
+            # This specific error is often related to positional embedding limits
+            logger.error(
+                f"IndexError during summarization (likely position embedding limit): {e}")
+
+            # Attempt a more aggressive truncation as a fallback
+            try:
+                with self.lock:
+                    # Even more conservative token limit
+                    safer_token_limit = self.MODEL_MAX_INPUT_TOKENS - 50
+                    safer_inputs = self.tokenizer(
+                        text,
+                        max_length=safer_token_limit,
+                        truncation=True,
+                        return_tensors="pt"
+                    )
+                    safer_text = self.tokenizer.decode(
+                        safer_inputs["input_ids"][0], skip_special_tokens=True
+                    )
+                    logger.info(
+                        f"Attempting summarization with more conservative truncation: {len(safer_text)} chars")
+
+                    safer_output = self.pipeline(
+                        safer_text,
+                        max_length=summary_max_length,
+                        min_length=summary_min_length,
+                        do_sample=False,
+                        num_beams=4
+                    )
+                    return safer_output[0]['summary_text']
+            except Exception as fallback_e:
+                logger.error(
+                    f"Fallback summarization also failed: {fallback_e}")
+                return None
 
         except Exception as e:
             logger.error(
