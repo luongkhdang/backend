@@ -7,7 +7,7 @@ Step 1: Data Collection, Processing and Storage
 - Processes article content (noise removal, standardization)
 - Validates content and flags invalid articles
 - Inserts data into reader-db with complete metadata
-- Leaves additional processing for embedding and clustering to future steps
+- Leaves additional processing for clustering to future steps
 
 Related files:
 - src/main.py: Orchestrates all pipeline steps
@@ -41,13 +41,19 @@ from src.steps.rate_limit import RateLimiter
 # from src.localnlp.localnlp_client import LocalNLPClient
 from typing import Optional  # Add Optional type hint
 
-# Import for Step 1.7: Chunking and Summarization
-import spacy
-
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Import for Step 1.7: Chunking and Summarization
+# Check if spaCy is installed
+SPACY_AVAILABLE = importlib.util.find_spec("spacy") is not None
+if not SPACY_AVAILABLE:
+    logger.warning(
+        "spaCy package not installed. Step 1.7 (summarization) requires spaCy for chunking.")
+else:
+    import spacy
 
 # Check if transformers is installed
 TRANSFORMERS_AVAILABLE = importlib.util.find_spec("transformers") is not None
@@ -616,6 +622,16 @@ def run(max_workers: int = None) -> int:
                     "2. Rebuild the Docker image with: docker-compose build --no-cache article-transfer")
                 logger.error(
                     "3. Or install inside running container: docker exec -it article-transfer pip install transformers torch sentencepiece")
+            elif not SPACY_AVAILABLE:
+                logger.error(
+                    "Cannot run Step 1.7: 'spacy' package is not installed.")
+                logger.error(
+                    "To enable Step 1.7, please ensure spacy is installed in the Docker container:")
+                logger.error("1. Verify spacy is in requirements.txt")
+                logger.error(
+                    "2. Rebuild the Docker image with: docker-compose build --no-cache article-transfer")
+                logger.error(
+                    "3. Or install inside running container: docker exec -it article-transfer pip install spacy && python -m spacy download en_core_web_lg")
             else:
                 # Import LocalNLPClient here after we've confirmed transformers is available
                 try:
@@ -676,6 +692,21 @@ def run(max_workers: int = None) -> int:
                                     return success_count
 
                             def process_summarization_embedding_task(article_data: Dict[str, Any]) -> Tuple[int, bool, bool]:
+                                """
+                                Process a long article by chunking, summarizing chunks, and generating embeddings.
+
+                                The process follows these steps:
+                                1. Use spaCy to tokenize and split the article into sentence-based chunks of ~1000 tokens
+                                2. Summarize each chunk to ~200-300 tokens using facebook/bart-large-cnn
+                                3. Concatenate summaries into a single text
+                                4. Generate embeddings for the concatenated summaries
+
+                                Args:
+                                    article_data: Dictionary containing article data including 'id' and 'content'
+
+                                Returns:
+                                    Tuple of (article_id, summary_success, embedding_success)
+                                """
                                 nonlocal summarization_success, summarization_failure, last_db_update_time_1_7
                                 article_id = article_data['id']
                                 content = article_data['content']
@@ -683,42 +714,29 @@ def run(max_workers: int = None) -> int:
                                 embedding_success_flag = False
 
                                 try:
-                                    # Load spaCy model if not already loaded (can be moved outside for efficiency)
+                                    # Load spaCy model if not already loaded
                                     nlp = spacy.load("en_core_web_lg")
+                                    logger.info(
+                                        f"Processing article {article_id} for chunking and summarization")
 
-                                    # Process with spaCy to get token count and break into sentences
-                                    # Divide text into chunks based on sentences
-                                    # Step 1: Process with spaCy to get sentence boundaries
+                                    # Process with spaCy to get sentence boundaries
                                     doc = nlp(content)
 
-                                    # Step 2: Initialize chunking variables
+                                    # Initialize chunking variables
                                     chunks = []
                                     current_chunk_tokens = 0
                                     current_chunk_sentences = []
 
-                                    # Step 3: Build chunks based on sentences
+                                    # Build chunks based on sentences
                                     for sent in doc.sents:
                                         sent_token_count = len(sent)
 
                                         # Check if individual sentence exceeds target chunk size
                                         if sent_token_count > target_chunk_token_size:
                                             logger.warning(
-                                                f"Article {article_id}: Skipping sentence longer than target chunk size "
-                                                f"({sent_token_count} > {target_chunk_token_size} tokens). "
-                                                f"Sentence start: '{sent.text[:100]}...'"
+                                                f"Article {article_id}: Long sentence found ({sent_token_count} tokens). "
+                                                f"Truncating to fit in chunk."
                                             )
-
-                                            # Option: Skip very long sentences completely
-                                            # continue
-
-                                            # Alternative option: Force-add very long sentences as separate chunks
-                                            # with reduced length to avoid overwhelming the model
-                                            # Limit chars to avoid huge chunks
-                                            max_chars = min(
-                                                1000, len(sent.text))
-                                            truncated_sent = sent.text[:max_chars] + (
-                                                "..." if len(sent.text) > max_chars else "")
-
                                             # If we have a current chunk in progress, save it first
                                             if current_chunk_sentences:
                                                 chunks.append(
@@ -726,11 +744,15 @@ def run(max_workers: int = None) -> int:
                                                 current_chunk_sentences = []
                                                 current_chunk_tokens = 0
 
-                                            # Add truncated sentence as its own chunk
+                                            # Truncate very long sentence to avoid token limits
+                                            max_chars = min(
+                                                1000, len(sent.text))
+                                            truncated_sent = sent.text[:max_chars] + (
+                                                "..." if len(sent.text) > max_chars else "")
                                             chunks.append(truncated_sent)
                                             continue
 
-                                        # If adding this sentence doesn't exceed chunk size limit
+                                        # If adding this sentence doesn't exceed chunk size limit, add it
                                         if current_chunk_tokens + sent_token_count <= target_chunk_token_size:
                                             current_chunk_sentences.append(
                                                 sent.text)
@@ -754,14 +776,14 @@ def run(max_workers: int = None) -> int:
                                     logger.info(
                                         f"Article {article_id}: Split into {chunk_count} chunks for summarization")
 
-                                    # If no chunks were created (unusual case), handle gracefully
+                                    # If no chunks were created, handle gracefully
                                     if not chunks:
                                         logger.warning(
                                             f"No chunks created for article {article_id}, content might be empty")
                                         summarization_failure += 1
                                         return (article_id, False, False)
 
-                                    # Step 4: Summarize each chunk
+                                    # Summarize each chunk
                                     chunk_summaries = []
                                     successful_chunks = 0
                                     failed_chunks = 0
@@ -770,14 +792,13 @@ def run(max_workers: int = None) -> int:
                                         try:
                                             # Skip empty chunks
                                             if not chunk or not chunk.strip():
-                                                logger.warning(
-                                                    f"Skipping empty chunk {i+1} for article {article_id}")
                                                 continue
 
-                                            # Add chunk number for better logging
+                                            # Log progress
                                             logger.info(
                                                 f"Summarizing chunk {i+1}/{chunk_count} for article {article_id} ({len(chunk)} chars)")
 
+                                            # Generate summary for this chunk
                                             chunk_summary = localnlp_client.summarize_text(
                                                 chunk,
                                                 max_summary_tokens=chunk_max_tokens,
@@ -789,37 +810,39 @@ def run(max_workers: int = None) -> int:
                                                     chunk_summary)
                                                 successful_chunks += 1
                                                 logger.info(
-                                                    f"Successfully summarized chunk {i+1}/{chunk_count} for article {article_id}")
+                                                    f"Successfully summarized chunk {i+1}/{chunk_count}")
                                             else:
                                                 logger.warning(
-                                                    f"Failed to summarize chunk {i+1}/{chunk_count} for article {article_id}")
+                                                    f"Failed to summarize chunk {i+1}/{chunk_count}")
                                                 failed_chunks += 1
                                         except Exception as chunk_e:
                                             logger.error(
-                                                f"Error summarizing chunk {i+1}/{chunk_count} for article {article_id}: {chunk_e}")
+                                                f"Error summarizing chunk {i+1}/{chunk_count}: {chunk_e}")
                                             failed_chunks += 1
                                             # Continue with other chunks even if one fails
 
-                                    # Step 5: Concatenate summaries
+                                    # Handle the case where we have no successful summaries
                                     if not chunk_summaries:
                                         logger.error(
-                                            f"All chunk summarizations failed for article {article_id} ({failed_chunks} failures)")
+                                            f"All chunk summarizations failed for article {article_id}")
                                         summarization_failure += 1
                                         return (article_id, False, False)
 
-                                    # Log success/failure stats
+                                    # Log results
                                     logger.info(
-                                        f"Article {article_id}: {successful_chunks} chunks summarized successfully, {failed_chunks} failed")
+                                        f"Article {article_id}: {successful_chunks}/{chunk_count} chunks summarized successfully")
 
-                                    # Join chunk summaries with spaces
+                                    # Concatenate summaries with spaces
                                     concatenated_summary = " ".join(
                                         chunk_summaries)
+                                    logger.info(
+                                        f"Created concatenated summary for article {article_id} ({len(concatenated_summary)} chars)")
 
                                     # Successfully created summary
                                     summarization_success += 1
                                     summary_success_flag = True
 
-                                    # Step 6: Generate embedding for the concatenated summary
+                                    # Generate embedding for the concatenated summary
                                     embedding = gemini_client.generate_embedding(
                                         concatenated_summary)
 
@@ -835,18 +858,17 @@ def run(max_workers: int = None) -> int:
                                         if should_update:
                                             update_embedding_database_1_7()
                                         embedding_success_flag = True
+                                        logger.info(
+                                            f"Successfully generated embedding for article {article_id}")
                                     else:
                                         logger.error(
-                                            f"Failed to generate embedding for summarized article {article_id}")
+                                            f"Failed to generate embedding for article {article_id}")
 
                                 except Exception as e:
                                     logger.error(
-                                        f"Error in chunking/summarization/embedding task for article {article_id}: {e}")
-                                    if summary_success_flag:  # Summarization worked, embedding failed
-                                        embedding_success_flag = False
-                                    else:  # Summarization failed
+                                        f"Error processing article {article_id} for summarization: {e}")
+                                    if not summary_success_flag:
                                         summarization_failure += 1
-                                        summary_success_flag = False
 
                                 return (article_id, summary_success_flag, embedding_success_flag)
 

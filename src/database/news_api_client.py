@@ -1,3 +1,21 @@
+"""
+news_api_client.py - Client for interacting with the News API service
+
+This module provides a client class for interacting with the News API service to fetch articles with their
+content and metadata for further processing in the data refinery pipeline.
+
+Exports:
+- NewsAPIClient: Client class for fetching articles via News API with status filtering
+  - test_connection(): Dict[str, Any] - Tests connection to News API, returns connection details
+  - get_articles_ready_for_review(): List[Dict[str, Any]] - Returns list of articles with 'ReadyForReview' status
+  - fetch_article_ids(): List[int] - Returns list of article IDs with 'ReadyForReview' status
+  - close(): None - Closes the client connection (no-op for API client)
+
+Related files:
+- src/main.py: Uses this client to fetch articles for processing
+- src/database/reader_db_client.py: Stores processed articles
+- src/steps/step1.py: Uses this client in Step 1.1 (Data Collection)
+"""
 import requests
 import logging
 import os
