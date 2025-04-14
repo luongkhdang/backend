@@ -20,9 +20,13 @@ COPY requirements.txt .
 # This ensures pip actually installs everything and fails if there are issues
 RUN pip install -r requirements.txt \
     && pip install torch transformers sentencepiece docker \
+    && pip install hdbscan scikit-learn pandas numpy~=1.26.4 \
     && python -c "import transformers; print(f'Successfully installed transformers {transformers.__version__}')" \
     && python -c "import torch; print(f'Successfully installed torch {torch.__version__}')" \
-    && python -c "import google.generativeai; print('Successfully installed google.generativeai')"
+    && python -c "import google.generativeai; print('Successfully installed google.generativeai')" \
+    && python -c "import hdbscan; print(f'Successfully installed hdbscan {hdbscan.__version__}')" \
+    && python -c "import sklearn; print(f'Successfully installed scikit-learn {sklearn.__version__}')" \
+    && python -c "import pandas; print(f'Successfully installed pandas {pandas.__version__}')"
 
 # Download spaCy model
 RUN python -m spacy download en_core_web_lg
@@ -60,13 +64,23 @@ ENV GEMINI_FLASH_OUTPUT_WINDOW_TOKEN=8192
 ENV GEMINI_FLASH_RATE_LIMIT_PER_MINUTE=15
 ENV GEMINI_FLASH_RATE_LIMIT_PER_DAY=1500
 
+# Step 2: Clustering settings (default values, will be overridden by docker-compose)
+ENV RUN_CLUSTERING_STEP=false
+ENV MIN_CLUSTER_SIZE=10
+ENV HOT_CLUSTER_THRESHOLD=20
+ENV INTERPRET_CLUSTERS=true
+ENV MAX_CLUSTERS_TO_INTERPRET=10
+ENV CLUSTER_SAMPLE_SIZE=10
+
 # Verify module imports work - This will cause build failure if imports don't work!
 RUN python -c "import sys; print(sys.path)" && \
-    python -c "import google.generativeai; print('Verified google.generativeai')" && \
-    python -c "import transformers; print('Verified transformers')" && \
-    python -c "import src.gemini.gemini_client; print('Verified gemini_client')" && \
-    python -c "from src.steps.step1 import run; print('Verified step1')" && \
-    echo "ALL IMPORTS VERIFIED SUCCESSFULLY"
+    python -c "import google.generativeai; print('Verified google.generativeai')" \
+    && python -c "import transformers; print('Verified transformers')" \
+    && python -c "import src.gemini.gemini_client; print('Verified gemini_client')" \
+    && python -c "from src.steps.step1 import run; print('Verified step1')" \
+    && python -c "import hdbscan; print('Verified hdbscan')" \
+    && python -c "import sklearn; print('Verified scikit-learn')" \
+    && echo "ALL IMPORTS VERIFIED SUCCESSFULLY"
 
 # Command to run the application
 CMD ["python", "src/database/db_setup.py"] 

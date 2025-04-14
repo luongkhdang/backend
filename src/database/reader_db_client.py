@@ -5,7 +5,7 @@ import os
 import time
 import random
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -120,173 +120,142 @@ class ReaderDBClient:
                 time.sleep(wait_time)
 
     def initialize_tables(self):
-        """Initialize all required database tables if they don't exist."""
-        conn = None
+        """Initialize database tables if they don't exist."""
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
 
-            # Check if any tables exist already
+            # Create articles table
             cursor.execute("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public';
-            """)
-            existing_tables = [row[0] for row in cursor.fetchall()]
-
-            # Check if we need to migrate an existing articles table
-            migrate_articles = 'articles' in existing_tables
-
-            # Install pgvector extension if not already installed
-            cursor.execute("""
-                CREATE EXTENSION IF NOT EXISTS vector;
-            """)
-
-            # 1. Create or update articles table
-            if migrate_articles:
-                # Check if it has the new schema
-                cursor.execute("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'articles' 
-                    AND table_schema = 'public';
-                """)
-                columns = [row[0] for row in cursor.fetchall()]
-
-                # If missing required columns, rename old table and create new one
-                if 'scraper_id' not in columns or 'is_hot' not in columns:
-                    logger.info("Migrating articles table to new schema")
-
-                    # Rename old table
-                    cursor.execute("""
-                        ALTER TABLE articles RENAME TO articles_old;
-                    """)
-
-                    # Create new table
-                    cursor.execute("""
-                        CREATE TABLE articles (
-                            id SERIAL PRIMARY KEY,
-                            scraper_id INTEGER UNIQUE,
-                            title TEXT NOT NULL,
-                            content TEXT NOT NULL,
-                            pub_date TIMESTAMP,
-                            domain TEXT,
-                            processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            is_hot BOOLEAN DEFAULT FALSE,
-                            cluster_id INTEGER
-                        );
-                    """)
-
-                    # Migrate data
-                    try:
-                        cursor.execute("""
-                            INSERT INTO articles (
-                                scraper_id, title, content, pub_date, domain
-                            )
-                            SELECT 
-                                original_id as scraper_id,
-                                title,
-                                content,
-                                pub_date,
-                                domain
-                            FROM articles_old
-                            WHERE title IS NOT NULL AND content IS NOT NULL;
-                        """)
-                    except Exception as e:
-                        logger.error(f"Error migrating article data: {e}")
-
-                    conn.commit()
-            else:
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS articles (
-                        id SERIAL PRIMARY KEY,
-                        scraper_id INTEGER UNIQUE,
-                        title TEXT NOT NULL,
-                        content TEXT NOT NULL,
-                        pub_date TIMESTAMP,
-                        domain TEXT,
-                        processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        is_hot BOOLEAN DEFAULT FALSE,
-                        cluster_id INTEGER
-                    );
-                """)
-
-            # 2. Create entities table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS entities (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    type TEXT NOT NULL,
-                    influence_score FLOAT DEFAULT 0.0,
-                    mentions INTEGER DEFAULT 0,
-                    first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    last_seen TIMESTAMP,
-                    UNIQUE (name, type)
-                );
+            CREATE TABLE IF NOT EXISTS articles (
+                id SERIAL PRIMARY KEY,
+                scraper_id INTEGER UNIQUE,
+                title TEXT,
+                url TEXT,
+                content TEXT,
+                published_at TIMESTAMP,
+                source TEXT,
+                author TEXT,
+                is_valid BOOLEAN DEFAULT TRUE,
+                is_processed BOOLEAN DEFAULT FALSE,
+                cluster_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                error TEXT
+            );
             """)
 
-            # 3. Create article_entities junction table
+            # Create entities table
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS article_entities (
-                    article_id INTEGER REFERENCES articles(id),
-                    entity_id INTEGER REFERENCES entities(id),
-                    mention_count INTEGER DEFAULT 1,
-                    PRIMARY KEY (article_id, entity_id)
-                );
+            CREATE TABLE IF NOT EXISTS entities (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE,
+                entity_type TEXT,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             """)
 
-            # 4. Create embeddings table
+            # Create article_entities junction table
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS embeddings (
-                    id SERIAL PRIMARY KEY,
-                    article_id INTEGER UNIQUE REFERENCES articles(id),
-                    embedding VECTOR(768),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
+            CREATE TABLE IF NOT EXISTS article_entities (
+                article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+                entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
+                mention_count INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (article_id, entity_id)
+            );
             """)
 
-            # 5. Create clusters table
+            # Create embeddings table with pgvector extension
+            cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS clusters (
-                    id SERIAL PRIMARY KEY,
-                    centroid VECTOR(768),
-                    article_count INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_hot BOOLEAN DEFAULT FALSE
-                );
+            CREATE TABLE IF NOT EXISTS embeddings (
+                id SERIAL PRIMARY KEY,
+                article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+                embedding VECTOR(768),
+                embedding_model TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(article_id)
+            );
             """)
 
-            # 6. Create essays table
+            # Create clusters table with pgvector and additional metadata field
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS essays (
-                    id SERIAL PRIMARY KEY,
-                    type TEXT NOT NULL,
-                    article_id INTEGER REFERENCES articles(id),
-                    content TEXT NOT NULL,
-                    layer_depth INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    tags TEXT[]
-                );
+            CREATE TABLE IF NOT EXISTS clusters (
+                id SERIAL PRIMARY KEY,
+                centroid VECTOR(768),
+                is_hot BOOLEAN DEFAULT FALSE,
+                article_count INTEGER,
+                metadata JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             """)
 
-            # 7. Create essay_entities junction table
+            # Create essays table
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS essay_entities (
-                    essay_id INTEGER REFERENCES essays(id),
-                    entity_id INTEGER REFERENCES entities(id),
-                    PRIMARY KEY (essay_id, entity_id)
-                );
+            CREATE TABLE IF NOT EXISTS essays (
+                id SERIAL PRIMARY KEY,
+                title TEXT,
+                content TEXT,
+                summary TEXT,
+                cluster_id INTEGER REFERENCES clusters(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Create essay_entities junction table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS essay_entities (
+                essay_id INTEGER REFERENCES essays(id) ON DELETE CASCADE,
+                entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (essay_id, entity_id)
+            );
+            """)
+
+            # Create indexes to improve query performance
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_articles_scraper_id ON articles(scraper_id);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_articles_cluster_id ON articles(cluster_id);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_articles_source ON articles(source);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_article_entities_article_id ON article_entities(article_id);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_article_entities_entity_id ON article_entities(entity_id);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_embeddings_article_id ON embeddings(article_id);")
+
+            # Create HNSW indexes for fast vector similarity search (used in clustering)
+            cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_embeddings_hnsw ON embeddings 
+            USING hnsw (embedding vector_cosine_ops);
+            """)
+
+            cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_clusters_hnsw ON clusters 
+            USING hnsw (centroid vector_cosine_ops);
             """)
 
             conn.commit()
-
+            cursor.close()
+            self.release_connection(conn)
+            logger.info("Database tables initialized successfully.")
         except Exception as e:
             logger.error(f"Error initializing database tables: {e}")
-            if conn:
-                conn.rollback()
-        finally:
-            if conn:
-                self.release_connection(conn)
+            raise
 
     def get_connection(self):
         """Get a connection from the pool."""
@@ -617,39 +586,41 @@ class ReaderDBClient:
 
     # Cluster methods
     def insert_cluster(self, centroid: List[float], is_hot: bool = False) -> Optional[int]:
-        """Insert a new cluster.
+        """
+        Insert a new cluster with the given centroid vector.
 
         Args:
-            centroid: Vector representing the cluster centroid (768 dimensions)
-            is_hot: Whether this is a "hot" cluster
+            centroid: The centroid vector of the cluster
+            is_hot: Whether this is a "hot" cluster (trending)
 
         Returns:
-            The new cluster ID if successful, None otherwise
+            int or None: The ID of the newly inserted cluster, or None if insertion failed
         """
-        conn = None
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
 
-            cursor.execute("""
-                INSERT INTO clusters (centroid, is_hot)
-                VALUES (%s, %s)
-                RETURNING id;
-            """, (centroid, is_hot))
+            # Calculate article count initially as 0, will be updated later
+            # when article assignments are made
+            article_count = 0
 
-            new_id = cursor.fetchone()[0]
+            query = """
+            INSERT INTO clusters (centroid, is_hot, article_count)
+            VALUES (%s, %s, %s)
+            RETURNING id;
+            """
+
+            cursor.execute(query, (centroid, is_hot, article_count))
+            cluster_id = cursor.fetchone()[0]
+
             conn.commit()
-            return new_id
+            cursor.close()
+            self.release_connection(conn)
 
+            return cluster_id
         except Exception as e:
             logger.error(f"Error inserting cluster: {e}")
-            if conn:
-                conn.rollback()
             return None
-
-        finally:
-            if conn:
-                self.release_connection(conn)
 
     def update_article_cluster(self, article_id: int, cluster_id: int) -> bool:
         """Update an article's cluster assignment.
@@ -1123,3 +1094,106 @@ class ReaderDBClient:
         finally:
             if conn:
                 self.release_connection(conn)
+
+    # Add new methods for clustering operations
+
+    def get_all_embeddings(self) -> List[Tuple[int, List[float]]]:
+        """
+        Retrieve all article embeddings from the database.
+
+        Returns:
+            List of tuples (article_id, embedding)
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Query to fetch all embeddings
+            query = """
+            SELECT e.article_id, e.embedding
+            FROM embeddings e
+            WHERE e.embedding IS NOT NULL
+            """
+
+            cursor.execute(query)
+            results = cursor.fetchall()
+
+            # Process results
+            embeddings_data = []
+            for article_id, embedding in results:
+                embeddings_data.append((article_id, embedding))
+
+            cursor.close()
+            self.release_connection(conn)
+
+            logger.info(
+                f"Retrieved {len(embeddings_data)} embeddings from the database")
+            return embeddings_data
+        except Exception as e:
+            logger.error(f"Error fetching embeddings: {e}", exc_info=True)
+            return []
+
+    def update_cluster_metadata(self, cluster_id: int, metadata: Dict[str, Any]) -> bool:
+        """
+        Update the metadata for a cluster.
+
+        Args:
+            cluster_id: The ID of the cluster to update
+            metadata: The metadata to store (will be converted to JSON)
+
+        Returns:
+            bool: True if update was successful, False otherwise
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            import json
+            query = """
+            UPDATE clusters
+            SET metadata = %s
+            WHERE id = %s
+            """
+
+            cursor.execute(query, (json.dumps(metadata), cluster_id))
+            conn.commit()
+            cursor.close()
+            self.release_connection(conn)
+
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error updating cluster metadata: {e}", exc_info=True)
+            return False
+
+    def update_cluster_article_count(self, cluster_id: int, article_count: int) -> bool:
+        """
+        Update the article count for a cluster.
+
+        Args:
+            cluster_id: The ID of the cluster to update
+            article_count: The number of articles in the cluster
+
+        Returns:
+            bool: True if update was successful, False otherwise
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            query = """
+            UPDATE clusters
+            SET article_count = %s
+            WHERE id = %s
+            """
+
+            cursor.execute(query, (article_count, cluster_id))
+            conn.commit()
+            cursor.close()
+            self.release_connection(conn)
+
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error updating cluster article count: {e}", exc_info=True)
+            return False

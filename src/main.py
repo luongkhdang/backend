@@ -11,7 +11,7 @@ This script orchestrates the entire data refinery pipeline by executing each ste
   - Step 1.4: Incremental Database Storage
   - Step 1.5: Error Reporting
   - Step 1.6: Embedding Generation
-- Step 2: Embedding Generation (future)
+- Step 2: Clustering (Article clustering based on embeddings)
 - Step 3: Clustering (future)
 - Step 4: Summary Generation (future)
 
@@ -32,9 +32,11 @@ import os
 import time
 import argparse
 from dotenv import load_dotenv
+import json  # Import json for pretty printing
 
 # Import step modules
 from src.steps.step1 import run as run_step1
+from src.steps.step2 import run as run_step2
 
 # Import network checker
 from src.utils.network_checker import check_network_connectivity, print_results
@@ -79,11 +81,10 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
         bool: True if network check passed or was skipped, False if check failed
     """
     if skip_check:
-        logger.info("Network connectivity check skipped.")
+        logger.info("Network check skipped")
         return True
 
-    logger.info(
-        "========= STARTING STEP 0: NETWORK CONNECTIVITY CHECK =========")
+    logger.info("STEP 0: NETWORK CHECK")
 
     # Get initial wait time from environment or use default
     initial_wait_seconds = int(os.getenv("INITIAL_WAIT_SECONDS", "5"))
@@ -97,7 +98,7 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
 
     if not results["success"]:
         logger.error(
-            "Network connectivity check failed. Some essential services are unreachable.")
+            "Network check failed: Some essential services are unreachable")
 
         # Extract unreachable services from results
         unreachable = []
@@ -106,26 +107,25 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
                 unreachable.append(service_name)
 
         if unreachable:
-            logger.error(f"Unreachable services: {', '.join(unreachable)}")
+            logger.error(f"Unreachable: {', '.join(unreachable)}")
 
-        # Log diagnostics from the check
-        for diag in results["diagnostics"]:
-            logger.info(f"Diagnostic: {diag}")
+        # Log diagnostics from the check - only if there are any
+        if results["diagnostics"]:
+            logger.info(f"Diagnostics: {'; '.join(results['diagnostics'])}")
 
         # Check if we should proceed anyway based on environment variable
         force_continue = os.getenv(
             "FORCE_CONTINUE_ON_NETWORK_ERROR", "false").lower() == "true"
         if force_continue:
             logger.warning(
-                "FORCE_CONTINUE_ON_NETWORK_ERROR is set to true, continuing despite network errors...")
+                "Continuing despite network errors (FORCE_CONTINUE_ON_NETWORK_ERROR=true)")
             return True
         else:
             logger.error(
                 "To ignore network issues, use --skip-network-check or set FORCE_CONTINUE_ON_NETWORK_ERROR=true")
             return False
 
-    logger.info(
-        "Network connectivity check passed. All required services are reachable.")
+    logger.info("Network check passed")
     return True
 
 
@@ -136,7 +136,7 @@ def main():
     # Parse command line arguments
     args = parse_arguments()
 
-    logger.info("========= STARTING DATA REFINERY PIPELINE =========")
+    logger.info("STARTING DATA REFINERY PIPELINE")
 
     # Step 0: Check network connectivity
     if not check_network(
@@ -144,23 +144,58 @@ def main():
         retry_count=args.network_retries,
         retry_delay=args.retry_delay
     ):
-        logger.error("Aborting pipeline due to network connectivity issues.")
+        logger.error("Aborting pipeline due to network issues")
         return 1
 
     # Execute Step 1: Data Collection, Processing and Storage
     step1_result = run_step1(max_workers=args.workers)
 
-    if step1_result == 0:
-        logger.warning("Step 1 did not process any articles.")
+    # Handle both possible return types from step1 (dict or int)
+    if isinstance(step1_result, dict):
+        # New version returns status dictionary
+        logger.info("Step 1 Summary:")
+        logger.info(json.dumps(step1_result, indent=2))
+
+        inserted_count = step1_result.get("step1.4_inserted", 0)
+        if inserted_count == 0:
+            logger.warning("No new articles inserted")
+        else:
+            logger.info(f"Inserted {inserted_count} articles")
     else:
-        logger.info(f"Step 1 successfully processed {step1_result} articles.")
+        # Old version returns integer count of processed articles
+        if step1_result == 0:
+            logger.warning("Step 1 did not process any articles")
+        else:
+            logger.info(
+                f"Step 1 successfully processed {step1_result} articles")
+
+    # Execute Step 2: Clustering (only if enabled via environment variable)
+    if os.getenv("RUN_CLUSTERING_STEP", "false").lower() == "true":
+        logger.info("========= STARTING STEP 2: CLUSTERING =========")
+        try:
+            step2_status = run_step2()
+            logger.info("Step 2 Summary:")
+            logger.info(json.dumps(step2_status, indent=2))
+
+            if step2_status.get("success", False):
+                logger.info(
+                    f"Clustering successful: {step2_status.get('clusters_found', 0)} clusters created")
+            else:
+                logger.warning(
+                    f"Clustering completed with issues: {step2_status.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.error(f"Step 2 failed with error: {e}", exc_info=True)
+        finally:
+            logger.info("========= STEP 2 COMPLETE =========")
+    else:
+        logger.info(
+            "Skipping Step 2: Clustering (RUN_CLUSTERING_STEP not true)")
 
     # Future steps would be executed here
-    # step2_result = run_step2()
     # step3_result = run_step3()
     # step4_result = run_step4()
 
-    logger.info("========= DATA REFINERY PIPELINE COMPLETE =========")
+    logger.info("DATA REFINERY PIPELINE COMPLETE")
     # Make sure to explicitly exit with status code 0 to avoid container restart
     return 0
 

@@ -40,7 +40,6 @@ services:
       READER_DB_PASSWORD: postgres
       # News API connection - just use service name, which will be resolved by Docker DNS
       NEWS_API_BASE_URL: http://news-api:8000
-      # Remove complex fallbacks, they're not needed with proper network setup
       # Processing settings
       MAX_WORKERS: 4 # Number of parallel workers for processing
       DB_UPDATE_BATCH_SIZE: 20 # Batch size for DB inserts in Step 1.4
@@ -72,6 +71,13 @@ services:
       TARGET_CHUNK_TOKEN_SIZE: ${TARGET_CHUNK_TOKEN_SIZE:-1000}
       CHUNK_MAX_TOKENS: ${CHUNK_MAX_TOKENS:-300}
       CHUNK_MIN_TOKENS: ${CHUNK_MIN_TOKENS:-75}
+      # Step 2: Clustering settings
+      RUN_CLUSTERING_STEP: ${RUN_CLUSTERING_STEP:-true}
+      MIN_CLUSTER_SIZE: ${MIN_CLUSTER_SIZE:-10}
+      HOT_CLUSTER_THRESHOLD: ${HOT_CLUSTER_THRESHOLD:-20}
+      INTERPRET_CLUSTERS: ${INTERPRET_CLUSTERS:-true}
+      MAX_CLUSTERS_TO_INTERPRET: ${MAX_CLUSTERS_TO_INTERPRET:-10}
+      CLUSTER_SAMPLE_SIZE: ${CLUSTER_SAMPLE_SIZE:-10}
       # Debugging options
       LOG_LEVEL: INFO
       # Polling interval
