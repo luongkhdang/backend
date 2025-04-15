@@ -84,7 +84,6 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
         bool: True if network check passed or was skipped, False if check failed
     """
     if skip_check:
-        logger.info("Network check skipped")
         return True
 
     logger.info("STEP 0: NETWORK CHECK")
@@ -114,7 +113,7 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
 
         # Log diagnostics from the check - only if there are any
         if results["diagnostics"]:
-            logger.info(f"Diagnostics: {'; '.join(results['diagnostics'])}")
+            logger.debug(f"Diagnostics: {'; '.join(results['diagnostics'])}")
 
         # Check if we should proceed anyway based on environment variable
         force_continue = os.getenv(
@@ -128,7 +127,6 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
                 "To ignore network issues, use --skip-network-check or set FORCE_CONTINUE_ON_NETWORK_ERROR=true")
             return False
 
-    logger.info("Network check passed")
     return True
 
 
@@ -161,7 +159,7 @@ def main():
     if isinstance(step1_result, dict):
         # New version returns status dictionary
         logger.info("Step 1 Summary:")
-        logger.info(json.dumps(step1_result, indent=2))
+        logger.debug(json.dumps(step1_result, indent=2))
 
         inserted_count = step1_result.get("step1.4_inserted", 0)
         if inserted_count == 0:
@@ -182,7 +180,7 @@ def main():
         try:
             step2_status = run_step2()
             logger.info("Step 2 Summary:")
-            logger.info(json.dumps(step2_status, indent=2))
+            logger.debug(json.dumps(step2_status, indent=2))
 
             if step2_status.get("success", False):
                 logger.info(

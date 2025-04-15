@@ -132,8 +132,8 @@ def initialize_reader_db_client() -> ReaderDBClient:
     reader_db_password = os.getenv("READER_DB_PASSWORD", "postgres")
 
     # Log connection details (without password)
-    logger.info(
-        f"Connecting to Reader DB at {reader_db_host}:{reader_db_port}/{reader_db_name} as {reader_db_user}")
+    # logger.info( # Removed DB connection log
+    #     f"Connecting to Reader DB at {reader_db_host}:{reader_db_port}/{reader_db_name} as {reader_db_user}")
 
     # Connect to reader-db
     return ReaderDBClient(
@@ -172,7 +172,9 @@ def get_processed_scraper_ids(reader_client: ReaderDBClient) -> Set[int]:
         # Extract scraper_ids and convert to set for fast lookups
         processed_ids = {row[0] for row in result if row[0] is not None}
 
-        logger.info(
+        # logger.info( # Changed to DEBUG
+        #     f"Found {len(processed_ids)} already processed or problematic articles")
+        logger.debug(
             f"Found {len(processed_ids)} already processed or problematic articles")
         return processed_ids
 
@@ -225,7 +227,8 @@ def output_error_articles_json(reader_client: ReaderDBClient) -> None:
     Args:
         reader_client: An initialized ReaderDBClient instance
     """
-    logger.info("Checking for articles with null/error content...")
+    # logger.info("Checking for articles with null/error content...") # Changed to DEBUG
+    logger.debug("Checking for articles with null/error content...")
 
     try:
         # Get articles with errors using the client method
@@ -400,7 +403,9 @@ def run(max_workers: int = None) -> int:
                     return 0
 
                 # STEP 1.2 & 1.3: Process articles and prepare for storage in parallel
-                logger.info(
+                # logger.info( # Changed to DEBUG
+                #     f"Processing {len(articles_to_process)} articles with {max_workers} parallel workers...")
+                logger.debug(
                     f"Processing {len(articles_to_process)} articles with {max_workers} parallel workers...")
                 start_time = time.time()
                 last_db_update_time = start_time
@@ -475,7 +480,9 @@ def run(max_workers: int = None) -> int:
                 if 'reader_db' in locals() and reader_db and reader_db.connection_pool:
                     reader_db.close()
         else:  # No new articles to process
-            logger.info(
+            # logger.info( # Changed to DEBUG
+            #     "All articles have already been processed in previous runs (Steps 1.2-1.5).")
+            logger.debug(
                 "All articles have already been processed in previous runs (Steps 1.2-1.5).")
     else:  # No raw articles fetched
         logger.warning("No articles retrieved from news-db for processing.")
@@ -641,281 +648,342 @@ def run(max_workers: int = None) -> int:
                 logger.error(
                     "3. Or install inside running container: docker exec -it article-transfer pip install spacy && python -m spacy download en_core_web_lg")
             else:
-                # Import LocalNLPClient here after we've confirmed transformers is available
-                try:
-                    from src.localnlp.localnlp_client import LocalNLPClient
+                # Initialize the local NLP client once at the module level for Step 1.7
+                # For thread safety, we only do this within the actual run function
+                localnlp_client = None  # Initialize with default value
 
-                    # Initialize Local NLP Client
-                    localnlp_client = LocalNLPClient(
-                        model_name=local_nlp_model)
+                if SPACY_AVAILABLE and TRANSFORMERS_AVAILABLE:
+                    # Get model name from environment, or use default
+                    # This model is good for summarization of news articles
+                    model_name = os.getenv(
+                        "LOCAL_NLP_MODEL", "facebook/bart-large-cnn")
 
-                    # Check if NLP client initialized correctly
-                    if not localnlp_client.pipeline or not localnlp_client.tokenizer:
+                    try:
+                        # Import the LocalNLPClient here to ensure we only try
+                        # if we know the dependencies are available
+                        from src.localnlp.localnlp_client import LocalNLPClient
+
+                        # Create client instance
+                        localnlp_client = LocalNLPClient(model_name=model_name)
+                        # logger.info( # Removed client initialization log
+                        #     f"Successfully initialized LocalNLPClient with model '{model_name}'")
+                    except Exception as e:
                         logger.error(
-                            "LocalNLPClient failed to initialize. Skipping Step 1.7.")
-                    else:
-                        # Get articles needing summarization (use same max_char_limit as min_char_count)
-                        articles_to_summarize = reader_db_embed.get_articles_needing_summarization(
-                            min_char_count=max_char_limit)
+                            f"Error initializing LocalNLPClient: {e}", exc_info=True)
+                        # localnlp_client remains None
+                else:
+                    logger.warning(
+                        "Step 1.7 dependencies (spaCy, transformers) not available. Summarization will be skipped.")
 
-                        if not articles_to_summarize:
-                            logger.info(
-                                "No long articles need summarization/embedding. Step 1.7 complete.")
-                        else:
-                            logger.info(
-                                f"Found {len(articles_to_summarize)} long articles for summarization and embedding")
+                # Get articles needing summarization (use same max_char_limit as min_char_count)
+                articles_to_summarize = reader_db_embed.get_articles_needing_summarization(
+                    min_char_count=max_char_limit)
 
-                            # Track stats for Step 1.7
-                            summarization_success = 0
-                            summarization_failure = 0
-                            embedding_success_1_7 = 0
-                            embedding_failure_1_7 = 0
-                            pending_embeddings_1_7 = []
-                            pending_embeddings_lock_1_7 = Lock()
-                            # Define batch size and checkpoint interval for Step 1.7
-                            embedding_checkpoint_interval = 60  # Same as in Step 1.6
-                            embedding_batch_size = 20  # Same as in Step 1.6
+                if not articles_to_summarize:
+                    logger.info(
+                        "No long articles need summarization/embedding. Step 1.7 complete.")
+                else:
+                    logger.info(
+                        f"Found {len(articles_to_summarize)} long articles for summarization and embedding")
 
-                            summarization_start_time = time.time()
-                            last_db_update_time_1_7 = summarization_start_time
+                    # Track stats for Step 1.7
+                    summarization_success = 0
+                    summarization_failure = 0
+                    embedding_success_1_7 = 0
+                    embedding_failure_1_7 = 0
+                    pending_embeddings_1_7 = []
+                    pending_embeddings_lock_1_7 = Lock()
+                    # Define batch size and checkpoint interval for Step 1.7
+                    embedding_checkpoint_interval = 60  # Same as in Step 1.6
+                    embedding_batch_size = 20  # Same as in Step 1.6
 
-                            def update_embedding_database_1_7():
-                                nonlocal pending_embeddings_1_7, last_db_update_time_1_7, embedding_success_1_7
-                                success_count = 0
-                                with pending_embeddings_lock_1_7:
-                                    if not pending_embeddings_1_7:
-                                        return 0
-                                    # Copy
-                                    embeddings_to_insert = pending_embeddings_1_7[:]
-                                    pending_embeddings_1_7 = []
+                    summarization_start_time = time.time()
+                    last_db_update_time_1_7 = summarization_start_time
 
-                                if embeddings_to_insert:
-                                    for article_id, embedding in embeddings_to_insert:
-                                        # Convert embedding list to a dictionary expected by insert_embedding
-                                        embedding_dict = {
-                                            'embedding': embedding}
-                                        result = reader_db_embed.insert_embedding(
-                                            article_id, embedding_dict)
-                                        if result:
-                                            success_count += 1
-                                    embedding_success_1_7 += success_count  # Update total count
-                                    last_db_update_time_1_7 = time.time()
-                                    return success_count
+                    def update_embedding_database_1_7():
+                        nonlocal pending_embeddings_1_7, last_db_update_time_1_7, embedding_success_1_7
+                        success_count = 0
+                        with pending_embeddings_lock_1_7:
+                            if not pending_embeddings_1_7:
                                 return 0
+                            # Copy
+                            embeddings_to_insert = pending_embeddings_1_7[:]
+                            pending_embeddings_1_7 = []
 
-                            def process_summarization_embedding_task(article_data: Dict[str, Any]) -> Tuple[int, bool, bool]:
-                                """
-                                Process a long article by chunking, summarizing chunks, and generating embeddings.
+                        if embeddings_to_insert:
+                            for article_id, embedding in embeddings_to_insert:
+                                # Convert embedding list to a dictionary expected by insert_embedding
+                                embedding_dict = {
+                                    'embedding': embedding}
+                                result = reader_db_embed.insert_embedding(
+                                    article_id, embedding_dict)
+                                if result:
+                                    success_count += 1
+                            embedding_success_1_7 += success_count  # Update total count
+                            last_db_update_time_1_7 = time.time()
+                            return success_count
+                        return 0
 
-                                The process follows these steps:
-                                1. Use spaCy to tokenize and split the article into sentence-based chunks of ~1000 tokens
-                                2. Summarize each chunk to ~200-300 tokens using facebook/bart-large-cnn
-                                3. Concatenate summaries into a single text
-                                4. Generate embeddings for the concatenated summaries
+                    def process_summarization_embedding_task(article_data: Dict[str, Any]) -> Tuple[int, bool, bool]:
+                        """
+                        Process a long article by chunking, summarizing chunks, and generating embeddings.
 
-                                Args:
-                                    article_data: Dictionary containing article data including 'id' and 'content'
+                        The process follows these steps:
+                        1. Use spaCy to tokenize and split the article into sentence-based chunks of ~1000 tokens
+                        2. Summarize each chunk to ~200-300 tokens using facebook/bart-large-cnn
+                        3. Concatenate summaries into a single text
+                        4. Generate embeddings for the concatenated summaries
 
-                                Returns:
-                                    Tuple of (article_id, summary_success, embedding_success)
-                                """
-                                nonlocal summarization_success, summarization_failure, last_db_update_time_1_7
-                                article_id = article_data['id']
-                                content = article_data['content']
-                                summary_success_flag = False
-                                embedding_success_flag = False
+                        Args:
+                            article_data: Dictionary containing article data including 'id' and 'content'
 
-                                try:
-                                    # Load spaCy model if not already loaded
-                                    nlp = spacy.load("en_core_web_lg")
-                                    logger.info(
-                                        f"Processing article {article_id} for chunking and summarization")
+                        Returns:
+                            Tuple of (article_id, summary_success, embedding_success)
+                        """
+                        nonlocal summarization_success, summarization_failure, last_db_update_time_1_7
+                        article_id = article_data['id']
+                        content = article_data['content']
+                        summary_success_flag = False
+                        embedding_success_flag = False
 
-                                    # Process with spaCy to get sentence boundaries
-                                    doc = nlp(content)
+                        try:
+                            # Load spaCy model if not already loaded
+                            nlp = spacy.load("en_core_web_lg")
+                            # logger.info( # Changed to DEBUG
+                            #     f"Processing article {article_id} for chunking and summarization")
+                            logger.debug(
+                                f"Processing article {article_id} for chunking and summarization")
 
-                                    # Initialize chunking variables
-                                    chunks = []
-                                    current_chunk_tokens = 0
-                                    current_chunk_sentences = []
+                            # Process with spaCy to get sentence boundaries
+                            doc = nlp(content)
 
-                                    # Build chunks based on sentences
-                                    for sent in doc.sents:
-                                        sent_token_count = len(sent)
+                            # Initialize chunking variables
+                            chunks = []
+                            current_chunk_tokens = 0
+                            current_chunk_sentences = []
 
-                                        # Check if individual sentence exceeds target chunk size
-                                        if sent_token_count > target_chunk_token_size:
-                                            logger.warning(
-                                                f"Article {article_id}: Long sentence found ({sent_token_count} tokens). "
-                                                f"Truncating to fit in chunk."
-                                            )
-                                            # If we have a current chunk in progress, save it first
-                                            if current_chunk_sentences:
-                                                chunks.append(
-                                                    " ".join(current_chunk_sentences))
-                                                current_chunk_sentences = []
-                                                current_chunk_tokens = 0
+                            # Build chunks based on sentences
+                            for sent in doc.sents:
+                                sent_token_count = len(sent)
 
-                                            # Truncate very long sentence to avoid token limits
-                                            max_chars = min(
-                                                1000, len(sent.text))
-                                            truncated_sent = sent.text[:max_chars] + (
-                                                "..." if len(sent.text) > max_chars else "")
-                                            chunks.append(truncated_sent)
-                                            continue
-
-                                        # If adding this sentence doesn't exceed chunk size limit, add it
-                                        if current_chunk_tokens + sent_token_count <= target_chunk_token_size:
-                                            current_chunk_sentences.append(
-                                                sent.text)
-                                            current_chunk_tokens += sent_token_count
-                                        else:
-                                            # This chunk is full, save it and start a new one
-                                            if current_chunk_sentences:  # Ensure chunk isn't empty
-                                                chunks.append(
-                                                    " ".join(current_chunk_sentences))
-                                            # Start a new chunk with this sentence
-                                            current_chunk_sentences = [
-                                                sent.text]
-                                            current_chunk_tokens = sent_token_count
-
-                                    # Add the final chunk if it's not empty
+                                # Check if individual sentence exceeds target chunk size
+                                if sent_token_count > target_chunk_token_size:
+                                    logger.warning(
+                                        f"Article {article_id}: Long sentence found ({sent_token_count} tokens). "
+                                        f"Truncating to fit in chunk."
+                                    )
+                                    # If we have a current chunk in progress, save it first
                                     if current_chunk_sentences:
                                         chunks.append(
                                             " ".join(current_chunk_sentences))
+                                        current_chunk_sentences = []
+                                        current_chunk_tokens = 0
 
-                                    chunk_count = len(chunks)
-                                    logger.info(
-                                        f"Article {article_id}: Split into {chunk_count} chunks for summarization")
+                                    # Truncate very long sentence to avoid token limits
+                                    max_chars = min(
+                                        1000, len(sent.text))
+                                    truncated_sent = sent.text[:max_chars] + (
+                                        "..." if len(sent.text) > max_chars else "")
+                                    chunks.append(truncated_sent)
+                                    continue
 
-                                    # If no chunks were created, handle gracefully
-                                    if not chunks:
-                                        logger.warning(
-                                            f"No chunks created for article {article_id}, content might be empty")
-                                        summarization_failure += 1
-                                        return (article_id, False, False)
+                                # If adding this sentence doesn't exceed chunk size limit, add it
+                                if current_chunk_tokens + sent_token_count <= target_chunk_token_size:
+                                    current_chunk_sentences.append(
+                                        sent.text)
+                                    current_chunk_tokens += sent_token_count
+                                else:
+                                    # This chunk is full, save it and start a new one
+                                    if current_chunk_sentences:  # Ensure chunk isn't empty
+                                        chunks.append(
+                                            " ".join(current_chunk_sentences))
+                                    # Start a new chunk with this sentence
+                                    current_chunk_sentences = [
+                                        sent.text]
+                                    current_chunk_tokens = sent_token_count
 
-                                    # Summarize each chunk
-                                    chunk_summaries = []
-                                    successful_chunks = 0
-                                    failed_chunks = 0
+                            # Add the final chunk if it's not empty
+                            if current_chunk_sentences:
+                                chunks.append(
+                                    " ".join(current_chunk_sentences))
 
-                                    for i, chunk in enumerate(chunks):
-                                        try:
-                                            # Skip empty chunks
-                                            if not chunk or not chunk.strip():
-                                                continue
+                            chunk_count = len(chunks)
+                            # logger.info( # Changed to DEBUG
+                            #     f"Article {article_id}: Split into {chunk_count} chunks for summarization")
+                            logger.debug(
+                                f"Article {article_id}: Split into {chunk_count} chunks for summarization")
 
-                                            # Log progress
-                                            logger.info(
-                                                f"Summarizing chunk {i+1}/{chunk_count} for article {article_id} ({len(chunk)} chars)")
+                            # If no chunks were created, handle gracefully
+                            if not chunks:
+                                logger.warning(
+                                    f"No chunks created for article {article_id}, content might be empty")
+                                summarization_failure += 1
+                                return (article_id, False, False)
 
-                                            # Generate summary for this chunk
-                                            chunk_summary = localnlp_client.summarize_text(
-                                                chunk,
-                                                max_summary_tokens=chunk_max_tokens,
-                                                min_summary_tokens=chunk_min_tokens
-                                            )
+                            # Summarize each chunk
+                            chunk_summaries = []
+                            successful_chunks = 0
+                            failed_chunks = 0
 
-                                            if chunk_summary:
-                                                chunk_summaries.append(
-                                                    chunk_summary)
-                                                successful_chunks += 1
-                                                logger.info(
-                                                    f"Successfully summarized chunk {i+1}/{chunk_count}")
-                                            else:
-                                                logger.warning(
-                                                    f"Failed to summarize chunk {i+1}/{chunk_count}")
-                                                failed_chunks += 1
-                                        except Exception as chunk_e:
-                                            logger.error(
-                                                f"Error summarizing chunk {i+1}/{chunk_count}: {chunk_e}")
-                                            failed_chunks += 1
-                                            # Continue with other chunks even if one fails
+                            # Use batch processing for all chunks instead of individual processing
+                            try:
+                                # Log that we're using batch processing
+                                # logger.info( # Changed to DEBUG
+                                #     f"Using batch processing for {chunk_count} chunks from article {article_id}")
+                                logger.debug(
+                                    f"Using batch processing for {chunk_count} chunks from article {article_id}")
 
-                                    # Handle the case where we have no successful summaries
-                                    if not chunk_summaries:
-                                        logger.error(
-                                            f"All chunk summarizations failed for article {article_id}")
-                                        summarization_failure += 1
-                                        return (article_id, False, False)
+                                # Process all chunks in a single batch
+                                batch_summaries = localnlp_client.summarize_batch(
+                                    chunks,
+                                    max_summary_tokens=chunk_max_tokens,
+                                    min_summary_tokens=chunk_min_tokens
+                                )
 
-                                    # Log results
-                                    logger.info(
-                                        f"Article {article_id}: {successful_chunks}/{chunk_count} chunks summarized successfully")
-
-                                    # Concatenate summaries with spaces
-                                    concatenated_summary = " ".join(
-                                        chunk_summaries)
-                                    logger.info(
-                                        f"Created concatenated summary for article {article_id} ({len(concatenated_summary)} chars)")
-
-                                    # Successfully created summary
-                                    summarization_success += 1
-                                    summary_success_flag = True
-
-                                    # Generate embedding for the concatenated summary
-                                    embedding = gemini_client.generate_embedding(
-                                        concatenated_summary)
-
-                                    if embedding is not None and isinstance(embedding, list) and len(embedding) > 0:
-                                        with pending_embeddings_lock_1_7:
-                                            pending_embeddings_1_7.append(
-                                                (article_id, embedding))
-                                            # Check DB update timing
-                                            current_time = time.time()
-                                            time_since_last_update = current_time - last_db_update_time_1_7
-                                            should_update = (len(pending_embeddings_1_7) >= embedding_batch_size or
-                                                             time_since_last_update >= embedding_checkpoint_interval)
-                                        if should_update:
-                                            update_embedding_database_1_7()
-                                        embedding_success_flag = True
-                                        logger.info(
-                                            f"Successfully generated embedding for article {article_id}")
+                                # Process results
+                                for i, summary in enumerate(batch_summaries):
+                                    if summary:
+                                        chunk_summaries.append(summary)
+                                        successful_chunks += 1
                                     else:
-                                        logger.error(
-                                            f"Failed to generate embedding for article {article_id}")
+                                        logger.warning(
+                                            f"Failed to summarize chunk {i+1}/{chunk_count} in batch mode")
+                                        failed_chunks += 1
 
-                                except Exception as e:
-                                    logger.error(
-                                        f"Error processing article {article_id} for summarization: {e}")
-                                    if not summary_success_flag:
-                                        summarization_failure += 1
+                                # logger.info( # Changed to DEBUG
+                                #     f"Batch processing complete: {successful_chunks}/{chunk_count} chunks successful")
+                                logger.debug(
+                                    f"Batch processing complete: {successful_chunks}/{chunk_count} chunks successful")
 
-                                return (article_id, summary_success_flag, embedding_success_flag)
+                            except Exception as batch_e:
+                                # Fall back to sequential processing if batch fails
+                                logger.warning(
+                                    f"Batch processing failed, falling back to sequential: {batch_e}")
 
-                            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                                future_to_article_1_7 = {executor.submit(process_summarization_embedding_task, article): article
-                                                         for article in articles_to_summarize}
-
-                                for i, future in enumerate(concurrent.futures.as_completed(future_to_article_1_7)):
-                                    # Update failure count for embedding here if needed
+                                # Original sequential processing
+                                for i, chunk in enumerate(chunks):
                                     try:
-                                        _, summary_ok, embedding_ok = future.result()
-                                        if summary_ok and not embedding_ok:
-                                            embedding_failure_1_7 += 1
-                                        # Note: summarization counts updated inside worker
-                                    except Exception as e:
+                                        # Skip empty chunks
+                                        if not chunk or not chunk.strip():
+                                            continue
+
+                                        # Log progress
+                                        # logger.info( # Changed to DEBUG
+                                        #     f"Summarizing chunk {i+1}/{chunk_count} for article {article_id} ({len(chunk)} chars)")
+                                        logger.debug(
+                                            f"Summarizing chunk {i+1}/{chunk_count} for article {article_id} ({len(chunk)} chars)")
+
+                                        # Generate summary for this chunk
+                                        chunk_summary = localnlp_client.summarize_text(
+                                            chunk,
+                                            max_summary_tokens=chunk_max_tokens,
+                                            min_summary_tokens=chunk_min_tokens
+                                        )
+
+                                        if chunk_summary:
+                                            chunk_summaries.append(
+                                                chunk_summary)
+                                            successful_chunks += 1
+                                            # logger.info( # Changed to DEBUG
+                                            #     f"Successfully summarized chunk {i+1}/{chunk_count}")
+                                            logger.debug(
+                                                f"Successfully summarized chunk {i+1}/{chunk_count}")
+                                        else:
+                                            logger.warning(
+                                                f"Failed to summarize chunk {i+1}/{chunk_count}")
+                                            failed_chunks += 1
+                                    except Exception as chunk_e:
                                         logger.error(
-                                            f"Exception processing summarization task future (Step 1.7): {e}")
-                                        embedding_failure_1_7 += 1  # Assume embedding failed if exception here
+                                            f"Error summarizing chunk {i+1}/{chunk_count}: {chunk_e}")
+                                        failed_chunks += 1
+                                        # Continue with other chunks even if one fails
 
-                            # Final database update for Step 1.7
-                            if pending_embeddings_1_7:
-                                final_count = update_embedding_database_1_7()
+                            # Handle the case where we have no successful summaries
+                            if not chunk_summaries:
+                                logger.error(
+                                    f"All chunk summarizations failed for article {article_id}")
+                                summarization_failure += 1
+                                return (article_id, False, False)
 
-                            summarization_elapsed_time = time.time() - summarization_start_time
-                            total_processed_1_7 = summarization_success + summarization_failure
-                            logger.info(
-                                f"STEP 1.7 COMPLETE: Processed {total_processed_1_7} long articles in {summarization_elapsed_time:.2f} seconds")
-                            logger.info(
-                                f"Summarization Results: {summarization_success} successful, {summarization_failure} failed")
-                            # Note: embedding_success_1_7 is updated incrementally in DB update function
-                            logger.info(
-                                f"Embedding Results (Step 1.7): {embedding_success_1_7} successful, {embedding_failure_1_7} failed")
-                except ImportError as e:
-                    logger.error(f"Failed to import LocalNLPClient: {e}")
-                    logger.error("Step 1.7 will be skipped.")
+                            # Log results
+                            # logger.info( # Changed to DEBUG
+                            #     f"Article {article_id}: {successful_chunks}/{chunk_count} chunks summarized successfully")
+                            logger.debug(
+                                f"Article {article_id}: {successful_chunks}/{chunk_count} chunks summarized successfully")
+
+                            # Concatenate summaries with spaces
+                            concatenated_summary = " ".join(
+                                chunk_summaries)
+                            # logger.info( # Changed to DEBUG
+                            #     f"Created concatenated summary for article {article_id} ({len(concatenated_summary)} chars)")
+                            logger.debug(
+                                f"Created concatenated summary for article {article_id} ({len(concatenated_summary)} chars)")
+
+                            # Successfully created summary
+                            summarization_success += 1
+                            summary_success_flag = True
+
+                            # Generate embedding for the concatenated summary
+                            embedding = gemini_client.generate_embedding(
+                                concatenated_summary)
+
+                            if embedding is not None and isinstance(embedding, list) and len(embedding) > 0:
+                                with pending_embeddings_lock_1_7:
+                                    pending_embeddings_1_7.append(
+                                        (article_id, embedding))
+                                    # Check DB update timing
+                                    current_time = time.time()
+                                    time_since_last_update = current_time - last_db_update_time_1_7
+                                    should_update = (len(pending_embeddings_1_7) >= embedding_batch_size or
+                                                     time_since_last_update >= embedding_checkpoint_interval)
+                                if should_update:
+                                    update_embedding_database_1_7()
+                                embedding_success_flag = True
+                                # logger.info( # Changed to DEBUG
+                                #     f"Successfully generated embedding for article {article_id}")
+                                logger.debug(
+                                    f"Successfully generated embedding for article {article_id}")
+                            else:
+                                logger.error(
+                                    f"Failed to generate embedding for article {article_id}")
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing article {article_id} for summarization: {e}")
+                            if not summary_success_flag:
+                                summarization_failure += 1
+
+                        return (article_id, summary_success_flag, embedding_success_flag)
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        future_to_article_1_7 = {executor.submit(process_summarization_embedding_task, article): article
+                                                 for article in articles_to_summarize}
+
+                        for i, future in enumerate(concurrent.futures.as_completed(future_to_article_1_7)):
+                            # Update failure count for embedding here if needed
+                            try:
+                                _, summary_ok, embedding_ok = future.result()
+                                if summary_ok and not embedding_ok:
+                                    embedding_failure_1_7 += 1
+                                # Note: summarization counts updated inside worker
+                            except Exception as e:
+                                logger.error(
+                                    f"Exception processing summarization task future (Step 1.7): {e}")
+                                embedding_failure_1_7 += 1  # Assume embedding failed if exception here
+
+                    # Final database update for Step 1.7
+                    if pending_embeddings_1_7:
+                        final_count = update_embedding_database_1_7()
+
+                    summarization_elapsed_time = time.time() - summarization_start_time
+                    total_processed_1_7 = summarization_success + summarization_failure
+                    logger.info(
+                        f"STEP 1.7 COMPLETE: Processed {total_processed_1_7} long articles in {summarization_elapsed_time:.2f} seconds")
+                    logger.info(
+                        f"Summarization Results: {summarization_success} successful, {summarization_failure} failed")
+                    # Note: embedding_success_1_7 is updated incrementally in DB update function
+                    logger.info(
+                        f"Embedding Results (Step 1.7): {embedding_success_1_7} successful, {embedding_failure_1_7} failed")
         else:
             logger.info("Skipping Step 1.7 as RUN_STEP_1_7 is not 'true'")
 

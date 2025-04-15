@@ -46,7 +46,8 @@ def run() -> Dict[str, Any]:
         Dict[str, Any]: Status report containing metrics about the clustering process
     """
     # Simply delegate to the modularized implementation
-    logger.info("Redirecting to modularized implementation in src/steps/step2/")
+    logger.debug(
+        "Redirecting to modularized implementation in src/steps/step2/")
     return modular_run()
 
 
