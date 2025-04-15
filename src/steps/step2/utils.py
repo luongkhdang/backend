@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 SPACY_AVAILABLE = importlib.util.find_spec("spacy") is not None
 
 
-def initialize_nlp(model_name: str = "en_core_web_sm") -> Optional[Any]:
+def initialize_nlp(model_name: str = "en_core_web_lg") -> Optional[Any]:
     """
     Initialize and return a spaCy NLP model.
 

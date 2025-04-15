@@ -1,0 +1,18 @@
+Reworking Hotness Determination
+
+The logs clearly show the main issue: "hot_clusters": 0. Despite having 40 clusters, none met the hotness_threshold of 0.6. Looking at the top scores (0.345, 0.329, 0.161, etc.), the calculated scores are significantly below the threshold.
+
+Reasons & Solutions:
+
+Low Factor Scores: The influence and relevance factors are consistently 0.0 for the top clusters shown in the log snippet.
+Investigate: Why are these factors zero?
+Influence: Is entity extraction/linking or the influence_score calculation in Step 1 not working as expected? Are there truly no influential entities in these specific clusters according to your definition? You may need to check the results of get_entity_influence_for_articles.
+Relevance: Is the CORE_TOPIC_KEYWORDS list too restrictive? Is the get_cluster_keywords function failing to extract matching terms? Review the extracted keywords and the predefined list.
+Normalization Effects: Min-max normalization (used to get scores between 0-1) can be sensitive to outliers. For instance, cluster 38 has a very high article_count (1356), resulting in a normalized size score of 1.0. This might compress the size scores of other, smaller clusters towards 0, potentially lowering their overall hotness score.
+Solution: Consider alternative normalization methods (like scaling based on standard deviation) or applying normalization after weighting, or perhaps capping extreme raw values before normalization. Logging the raw factor scores alongside the normalized ones would help diagnose this.
+Weights & Threshold: The current weights (W_SIZE, W_RECENCY, W_INFLUENCE, W_RELEVANCE) and the HOTNESS_THRESHOLD (0.6) might not be calibrated correctly for the actual distribution of scores.
+Solution (Pragmatic First Step):
+Lower the Threshold: Based on the observed max score of ~0.35, try lowering HOTNESS_THRESHOLD substantially (e.g., to 0.3 or 0.35) to see if any clusters get marked as hot.
+Adjust Weights: If Influence and Relevance are currently unreliable (scores are 0), temporarily increase the weights for factors that are producing varied scores (like Recency and Size). For example: W_RECENCY=0.5, W_SIZE=0.3, W_INFLUENCE=0.1, W_RELEVANCE=0.1.
+Log More Detail: Enhance logging within calculate_hotness_factors to show the raw scores, min/max values used for normalization, and the final weighted score for all clusters, not just the top few. This will make tuning much easier.
+Recommendation: Start with the pragmatic tuning (lower threshold, adjust weights based on observed factor values, add detailed logging). Then, investigate and fix the underlying reasons why Influence and Relevance scores are zero.

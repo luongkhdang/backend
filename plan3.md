@@ -57,5 +57,5 @@ Update insert_clusters: Modify the insert_clusters function (or add a function b
 
 is_hot in the articles Table:
 Current Status: The step2.py script, specifically the batch_update_article_cluster_assignments function, only updates the cluster_id in the articles table. It does not currently set the articles.is_hot flag based on the cluster assignment.
-Database Schema: The articles table schema does have an is_hot BOOLEAN DEFAULT FALSE column, meaning it's ready to be used.
+Database Schema: The articles table schema in @read does have an is_hot BOOLEAN DEFAULT FALSE column, meaning it's ready to be used.
 Best Way to Identify/Set articles.is_hot: The most logical approach, consistent with the platform's structure, is to derive the article's hotness from the cluster it belongs to. If an article is assigned to a cluster marked as is_hot, the article itself should also be marked is_hot.

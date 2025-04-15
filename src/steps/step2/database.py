@@ -5,11 +5,11 @@ This module contains functions for interacting with the database
 to store clustering results and update article cluster assignments.
 
 Exported functions:
-- insert_clusters(reader_client: ReaderDBClient, cluster_data: Dict[int, Dict[str, Any]], 
+- insert_clusters(reader_client: ReaderDBClient, centroids: Dict[int, List[float]], 
                  cluster_hotness_map: Dict[int, bool]) -> Dict[int, int]
   Inserts clusters into the database with hotness values
 - batch_update_article_cluster_assignments(reader_client: ReaderDBClient, 
-                                          assignments: List[Tuple[int, Optional[int]]]) -> Tuple[int, int]
+                                          article_ids: List[int], labels: List[int], cluster_db_map: Dict[int, int]) -> Dict[str, int]
   Updates cluster assignments for multiple articles in batch
 
 Related files:
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def insert_clusters(
     reader_client: ReaderDBClient,
-    cluster_data: Dict[int, Dict[str, Any]],
+    centroids: Dict[int, List[float]],
     cluster_hotness_map: Dict[int, bool]
 ) -> Dict[int, int]:
     """
@@ -38,110 +38,122 @@ def insert_clusters(
 
     Args:
         reader_client: Initialized ReaderDBClient
-        cluster_data: Dictionary of cluster data from calculate_centroids
-        cluster_hotness_map: Dictionary mapping HDBSCAN label to is_hot status
+        centroids: Dictionary mapping cluster labels to centroid vectors
+        cluster_hotness_map: Dictionary mapping cluster labels to is_hot status
 
     Returns:
-        Dictionary mapping HDBSCAN labels to database cluster IDs
+        Dictionary mapping cluster labels to database cluster IDs
     """
-    hdbscan_to_db_id_map = {}
+    cluster_db_map = {}
 
-    for label, data in cluster_data.items():
-        centroid = data["centroid"]
-        article_count = data["count"]
+    for label, centroid in centroids.items():
+        # Convert numpy types to native Python types if needed
+        label_key = int(label) if hasattr(label, 'item') else label
 
         # Get the is_hot value for this cluster from the hotness map
-        # or use default based on article count if not in map
-        is_hot = cluster_hotness_map.get(
-            label,
-            article_count >= int(os.getenv("HOT_CLUSTER_THRESHOLD", "20"))
-        )
+        # or default to False if not in map
+        is_hot = cluster_hotness_map.get(label_key, False)
 
-        # Use existing insert_cluster function, which returns cluster ID
+        # Insert cluster into database
         cluster_id = reader_client.insert_cluster(
             centroid=centroid,
             is_hot=is_hot
         )
 
         if cluster_id:
-            hdbscan_to_db_id_map[label] = cluster_id
+            cluster_db_map[label_key] = cluster_id
             logger.debug(
-                f"Inserted cluster {label} with {article_count} articles as DB ID {cluster_id} (hot: {is_hot})")
+                f"Inserted cluster {label_key} as DB ID {cluster_id} (hot: {is_hot})")
 
-    logger.info(f"Inserted {len(hdbscan_to_db_id_map)} clusters into database")
+    logger.info(f"Inserted {len(cluster_db_map)} clusters into database")
 
     # Log how many hot clusters
     hot_count = sum(
-        1 for label in hdbscan_to_db_id_map if cluster_hotness_map.get(label, False))
+        1 for label in cluster_db_map if cluster_hotness_map.get(label, False))
     logger.info(f"{hot_count} clusters marked as 'hot'")
 
-    return hdbscan_to_db_id_map
+    return cluster_db_map
 
 
 def batch_update_article_cluster_assignments(
     reader_client: ReaderDBClient,
-    assignments: List[Tuple[int, Optional[int]]]
-) -> Tuple[int, int]:
+    article_ids: List[int],
+    labels: List[int],
+    cluster_db_map: Dict[int, int],
+    cluster_hotness_map: Dict[int, bool] = None
+) -> Dict[str, int]:
     """
-    Update cluster assignments for multiple articles in batch.
+    Update cluster assignments for articles based on cluster labels and set article hotness flags.
 
     Args:
         reader_client: Initialized ReaderDBClient
-        assignments: List of tuples (article_id, cluster_id)
+        article_ids: List of article database IDs
+        labels: List of cluster labels corresponding to article_ids
+        cluster_db_map: Dictionary mapping cluster labels to database cluster IDs
+        cluster_hotness_map: Dictionary mapping cluster labels to hotness status
 
     Returns:
-        Tuple of (success_count, failure_count)
+        Dictionary with success and failure counts
     """
-    if not assignments:
-        return 0, 0
+    # Check if arrays are empty using length instead of boolean evaluation
+    if len(article_ids) == 0 or len(labels) == 0:
+        return {"success": 0, "failure": 0}
 
+    # Default cluster_hotness_map if not provided
+    if cluster_hotness_map is None:
+        cluster_hotness_map = {}
+
+    # Prepare data for update
+    update_data = []
+    for article_id, label in zip(article_ids, labels):
+        label_int = int(label) if hasattr(label, 'item') else label
+
+        if label_int >= 0:
+            cluster_id = cluster_db_map.get(label_int)
+            is_hot = cluster_hotness_map.get(label_int, False)
+        else:
+            cluster_id = None  # Use None for SQL NULL
+            is_hot = False
+
+        update_data.append((article_id, cluster_id, is_hot))
+
+    conn = None
     try:
         conn = reader_client.get_connection()
         cursor = conn.cursor()
 
-        # Split assignments into batches
-        batch_size = 1000
-        success_count = 0
-        failure_count = 0
+        # Prepare lists for parameterized query
+        batch_article_ids = [d[0] for d in update_data]
+        batch_cluster_ids = [d[1] for d in update_data]
+        batch_is_hot = [d[2] for d in update_data]
 
-        for i in range(0, len(assignments), batch_size):
-            batch = assignments[i:i+batch_size]
+        # Use parameterized query with unnest
+        query = """
+        UPDATE articles
+        SET cluster_id = data.cluster_id,
+            is_hot = data.is_hot
+        FROM unnest(%s::int[], %s::int[], %s::boolean[]) AS data(article_id, cluster_id, is_hot)
+        WHERE articles.id = data.article_id;
+        """
 
-            try:
-                # Convert batch to SQL-friendly format and handle NULL properly
-                values = []
-                for article_id, cluster_id in batch:
-                    if cluster_id is None:
-                        values.append(f"({article_id}, NULL)")
-                    else:
-                        values.append(f"({article_id}, {cluster_id})")
-
-                values_str = ", ".join(values)
-
-                # SQL query using temporary table for efficient update
-                query = f"""
-                UPDATE articles
-                SET cluster_id = temp.cluster_id
-                FROM (VALUES {values_str}) AS temp(article_id, cluster_id)
-                WHERE articles.id = temp.article_id
-                """
-
-                cursor.execute(query)
-                success_count += len(batch)
-            except Exception as e:
-                logger.error(f"Error updating batch {i//batch_size}: {e}")
-                failure_count += len(batch)
-                # Continue with next batch rather than failing completely
-
+        cursor.execute(query, (batch_article_ids,
+                       batch_cluster_ids, batch_is_hot))
+        updated_rows = cursor.rowcount  # Get number of rows updated
         conn.commit()
-        cursor.close()
-        reader_client.release_connection(conn)
+
+        success_count = updated_rows
+        failure_count = len(update_data) - updated_rows
 
         logger.info(
             f"Updated {success_count} article cluster assignments (failed: {failure_count})")
-        return success_count, failure_count
+        return {"success": success_count, "failure": failure_count}
 
     except Exception as e:
         logger.error(
             f"Failed to update cluster assignments: {e}", exc_info=True)
-        return 0, len(assignments)
+        if conn:
+            conn.rollback()
+        return {"success": 0, "failure": len(update_data)}
+    finally:
+        if conn:
+            reader_client.release_connection(conn)

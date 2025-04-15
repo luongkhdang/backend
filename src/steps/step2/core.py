@@ -22,21 +22,43 @@ Related files:
 import logging
 import os
 import time
-import numpy as np
-import hdbscan
-from sklearn.metrics.pairwise import cosine_distances
-from sklearn.preprocessing import normalize
-from typing import List, Dict, Any, Tuple, Optional, Set
 import importlib.util
 import random
+from typing import List, Dict, Any, Tuple, Optional, Set
+
+# Handle optional dependencies with try/except blocks
+try:
+    import numpy as np
+except ImportError:
+    logging.error("numpy is required but not available")
+    raise
+
+try:
+    import hdbscan
+    HDBSCAN_AVAILABLE = True
+except ImportError:
+    logging.warning("hdbscan not available; clustering will not be possible")
+    hdbscan = None
+    HDBSCAN_AVAILABLE = False
+
+try:
+    from sklearn.metrics.pairwise import cosine_distances
+    from sklearn.preprocessing import normalize
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    logging.warning(
+        "sklearn not available; some functionality will be limited")
+    cosine_distances = None
+    normalize = None
+    SKLEARN_AVAILABLE = False
 
 # Import database client
 from src.database.reader_db_client import ReaderDBClient
 
 # Import from local modules
 from .data_fetching import get_all_embeddings
-from .clustering import calculate_centroids
-from .hotness import calculate_hotness_factors, get_hotness_threshold, get_weight_params
+from .clustering import calculate_centroids, cluster_articles
+from .hotness import calculate_hotness_factors, get_weight_params
 from .database import insert_clusters, batch_update_article_cluster_assignments
 from .interpretation import interpret_cluster, get_cluster_keywords
 from .utils import initialize_nlp, SPACY_AVAILABLE
@@ -196,8 +218,6 @@ def run() -> Dict[str, Any]:
         min_cluster_size = int(os.getenv("MIN_CLUSTER_SIZE", "10"))
         logger.info(f"Using min_cluster_size={min_cluster_size}")
 
-        # Compute cosine distance matrix explicitly
-        logger.info("Computing cosine distance matrix for clustering")
         try:
             # Normalize the vectors to unit length for cosine distance calculation
             X_normalized = normalize(X, norm='l2', axis=1)
@@ -222,16 +242,14 @@ def run() -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"Error computing distances or clustering: {e}")
 
-            # Fallback to euclidean metric which is always supported
-            # With direct vector inputs, we can use prediction_data
-            logger.info("Falling back to euclidean metric")
-            clusterer = hdbscan.HDBSCAN(
-                metric='euclidean',
+            # Fallback to using the cluster_articles function with euclidean metric
+            logger.info(
+                "Falling back to euclidean metric using cluster_articles function")
+            labels, _ = cluster_articles(
+                embeddings=X,
                 min_cluster_size=min_cluster_size,
-                prediction_data=True,
-                core_dist_n_jobs=-1  # Use all available cores
+                metric='euclidean'
             )
-            labels = clusterer.fit_predict(X)
 
         # Analyze clustering results
         unique_labels = set(labels)
@@ -250,48 +268,62 @@ def run() -> Dict[str, Any]:
             status["error"] = "No clusters found"
             return status
 
-        # Step 5: Calculate centroids
-        logger.info("Step 2.5: Calculating cluster centroids")
-        cluster_data = calculate_centroids(X, labels)
+        # Step 5: Calculate cluster centroids
+        logger.info(
+            "Step 2.5: Calculating cluster centroids and organizing cluster data")
+        cluster_data, centroids = calculate_centroids(labels, X)
+        logger.info(f"Calculated centroids for {len(centroids)} clusters")
 
-        # Step 5.5: Calculate hotness factors
-        logger.info("Step 2.5.5: Calculating cluster hotness factors")
+        # Step 6: Determine hotness of clusters
+        logger.info(
+            "Step 2.6: Determining cluster hotness using weighted factors")
+        try:
+            cluster_hotness_map = calculate_hotness_factors(
+                cluster_data=cluster_data,
+                article_ids=article_ids,
+                pub_dates=pub_dates,
+                reader_client=reader_client,
+                nlp=nlp
+            )
+            hot_clusters = sum(
+                1 for is_hot in cluster_hotness_map.values() if is_hot)
+            logger.info(
+                f"Determined {hot_clusters} hot clusters based on weighted factor analysis")
+        except Exception as e:
+            logger.error(
+                f"Error calculating hotness factors: {e}", exc_info=True)
+            if "numpy.int64" in str(e):
+                logger.info(
+                    "Attempting to convert numpy types to native Python types")
+                # If we got a numpy.int64 error, we can try again with converted types
+                # This is a fallback in case our fixes in other modules didn't catch all cases
+                status["error"] = f"Error in hotness calculation: {e}"
+                return status
+            raise
 
-        # Create list of article data in the expected format (article_id, embedding)
-        article_data_for_hotness = [(article_ids[i], X[i])
-                                    for i in range(len(article_ids))]
+        # Step 7: Store clusters in the database
+        logger.info("Step 2.7: Storing clusters in database")
+        cluster_db_map = insert_clusters(
+            reader_client, centroids, cluster_hotness_map)
+        logger.info(f"Inserted {len(cluster_db_map)} clusters into database")
 
-        # Call with the correct number of arguments
-        cluster_hotness_map = calculate_hotness_factors(
-            article_data_for_hotness,
-            labels,
-            pub_dates
-        )
+        # Step 8: Update article cluster assignments
+        logger.info("Step 2.8: Updating article cluster assignments")
+        update_stats = batch_update_article_cluster_assignments(
+            reader_client, article_ids, labels, cluster_db_map, cluster_hotness_map)
 
-        # Step 6: Update database with clusters
-        logger.info("Step 2.6: Inserting clusters into database")
-        hdbscan_to_db_id_map = insert_clusters(
-            reader_client, cluster_data, cluster_hotness_map)
-
-        if not hdbscan_to_db_id_map:
-            logger.error("Failed to insert any clusters into database")
-            status["error"] = "Cluster insertion failed"
-            return status
-
-        # Step 7: Update article cluster assignments
-        logger.info("Step 2.7: Updating article cluster assignments")
-        assignments = []
-        for i, (article_id, label) in enumerate(zip(article_ids, labels)):
-            # Map HDBSCAN label to database cluster_id
-            # If label is -1 (noise) or not in map, cluster_id will be None
-            cluster_id = hdbscan_to_db_id_map.get(label)
-            assignments.append((article_id, cluster_id))
-
-        status["articles_assigned"] = len(assignments)
-        success_count, fail_count = batch_update_article_cluster_assignments(
-            reader_client, assignments)
-        status["db_update_success"] = success_count
-        status["db_update_failure"] = fail_count
+        # Access the dictionary values correctly
+        if isinstance(update_stats, dict):
+            status["articles_assigned"] = update_stats.get("success", 0)
+            status["db_update_success"] = update_stats.get("success", 0)
+            status["db_update_failure"] = update_stats.get("failure", 0)
+        else:
+            # Fallback in case update_stats is not a dict (backward compatibility)
+            logger.warning("update_stats is not a dictionary as expected")
+            if isinstance(update_stats, tuple) and len(update_stats) == 2:
+                status["articles_assigned"] = update_stats[0]
+                status["db_update_success"] = update_stats[0]
+                status["db_update_failure"] = update_stats[1]
 
         # Step 8 (Optional): Basic cluster interpretation with spaCy
         if SPACY_AVAILABLE and os.getenv("INTERPRET_CLUSTERS", "false").lower() == "true" and nlp is not None:
@@ -303,14 +335,14 @@ def run() -> Dict[str, Any]:
 
                 # Get the largest clusters by article count
                 largest_clusters = sorted(
-                    [(label, data["count"])
+                    [(label, len(data))  # Use len(data) to get the count
                      for label, data in cluster_data.items()],
                     key=lambda x: x[1],
                     reverse=True
                 )[:max_clusters_to_interpret]
 
                 for label, count in largest_clusters:
-                    db_cluster_id = hdbscan_to_db_id_map.get(label)
+                    db_cluster_id = cluster_db_map.get(label)
                     if db_cluster_id:
                         interpret_cluster(reader_client, db_cluster_id, nlp)
             except Exception as e:

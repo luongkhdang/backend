@@ -79,6 +79,15 @@ services:
       INTERPRET_CLUSTERS: ${INTERPRET_CLUSTERS:-true}
       MAX_CLUSTERS_TO_INTERPRET: ${MAX_CLUSTERS_TO_INTERPRET:-10}
       CLUSTER_SAMPLE_SIZE: ${CLUSTER_SAMPLE_SIZE:-10}
+      # Hotness calculation factors
+      RECENCY_DAYS: ${RECENCY_DAYS:-3}
+      CALCULATE_TOPIC_RELEVANCE: ${CALCULATE_TOPIC_RELEVANCE:-true}
+      CORE_TOPIC_KEYWORDS: ${CORE_TOPIC_KEYWORDS:-"china,us,united states,vietnam,europe,germany,war,trade,exports,tariffs,geopolitics,geopolitical,political economy,influence,lobbying,narrative,framing,disinformation,misinformation,ai,artificial intelligence,election,campaign,pentagon,defense,state department,diplomacy,itc,international trade commission"}
+      W_SIZE: ${W_SIZE:-0.15}
+      W_RECENCY: ${W_RECENCY:-0.30}
+      W_INFLUENCE: ${W_INFLUENCE:-0.30}
+      W_RELEVANCE: ${W_RELEVANCE:-0.25}
+      TARGET_HOT_CLUSTERS: ${TARGET_HOT_CLUSTERS:-8}
       # Debugging options
       LOG_LEVEL: INFO
       # Polling interval

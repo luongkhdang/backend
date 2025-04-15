@@ -7,12 +7,10 @@ using the HDBSCAN algorithm.
 Exported functions:
 - cluster_articles(embeddings: np.ndarray, min_cluster_size: int = 5, min_samples: int = 3) -> Tuple[np.ndarray, List[int]]
   Performs HDBSCAN clustering on article embeddings
-- preprocess_embeddings(embeddings: np.ndarray, n_components: int = 50) -> np.ndarray
-  Reduces dimensionality of embeddings using UMAP
 - evaluate_clustering(labels: np.ndarray) -> Dict[str, Any]
   Evaluates clustering quality
-- calculate_centroids(X: np.ndarray, labels: np.ndarray) -> Dict[int, Dict[str, Any]]
-  Calculates centroids for each cluster and returns cluster data
+- calculate_centroids(labels: np.ndarray, X: np.ndarray) -> Tuple[Dict[int, List[int]], Dict[int, List[float]]]
+  Calculates centroids for each cluster and organizes data
 - assign_articles_to_clusters(labels: np.ndarray, article_ids: List[int]) -> Dict[int, List[int]]
   Creates a mapping of cluster IDs to article IDs
 
@@ -22,72 +20,37 @@ Related files:
 - src/steps/step2/interpretation.py: Interprets clusters based on clustering results
 """
 
-from sklearn.decomposition import PCA
 import logging
-import numpy as np
 from typing import Dict, List, Tuple, Any, Optional
-import hdbscan
 from collections import defaultdict, Counter
 import time
 
-# Import dimensionality reduction libraries
-UMAP_AVAILABLE = False
+# Handle optional dependencies with try/except blocks
 try:
-    import umap
-    UMAP_AVAILABLE = True
+    import numpy as np
+except ImportError:
+    logging.error("numpy is required but not available")
+    raise
+
+try:
+    from sklearn.preprocessing import normalize
+    SKLEARN_AVAILABLE = True
 except ImportError:
     logging.warning(
-        "UMAP not available; will use PCA for dimensionality reduction")
+        "sklearn not available; some functionality will be limited")
+    normalize = None
+    SKLEARN_AVAILABLE = False
 
+try:
+    import hdbscan
+    HDBSCAN_AVAILABLE = True
+except ImportError:
+    logging.warning("hdbscan not available; clustering will not be possible")
+    hdbscan = None
+    HDBSCAN_AVAILABLE = False
 
 # Configure logging
 logger = logging.getLogger(__name__)
-
-
-def preprocess_embeddings(
-    embeddings: np.ndarray,
-    n_components: int = 50,
-    random_state: int = 42
-) -> np.ndarray:
-    """
-    Reduce dimensionality of embeddings for faster clustering.
-
-    Args:
-        embeddings: Article embedding vectors
-        n_components: Number of dimensions to reduce to
-        random_state: Random seed for reproducibility
-
-    Returns:
-        Reduced dimensionality embeddings
-    """
-    start_time = time.time()
-
-    # Ensure embeddings are numpy array with appropriate dtype
-    embeddings = np.array(embeddings, dtype=np.float32)
-
-    # Cap n_components at embedding dimension - 1
-    n_components = min(n_components, embeddings.shape[1] - 1)
-
-    # Use UMAP if available (better quality)
-    if UMAP_AVAILABLE:
-        reducer = umap.UMAP(
-            n_components=n_components,
-            metric='cosine',
-            n_neighbors=30,
-            min_dist=0.1,
-            random_state=random_state
-        )
-        reduced_embeddings = reducer.fit_transform(embeddings)
-        logger.info(
-            f"UMAP dimensionality reduction completed in {time.time() - start_time:.2f}s")
-    else:
-        # Fall back to PCA
-        reducer = PCA(n_components=n_components, random_state=random_state)
-        reduced_embeddings = reducer.fit_transform(embeddings)
-        logger.info(
-            f"PCA dimensionality reduction completed in {time.time() - start_time:.2f}s")
-
-    return reduced_embeddings
 
 
 def cluster_articles(
@@ -96,8 +59,7 @@ def cluster_articles(
     min_samples: int = 3,
     metric: str = 'euclidean',
     cluster_selection_epsilon: float = 0.5,
-    alpha: float = 1.0,
-    use_dimensionality_reduction: bool = True
+    alpha: float = 1.0
 ) -> Tuple[np.ndarray, List[int]]:
     """
     Cluster articles using HDBSCAN based on their embeddings.
@@ -109,16 +71,14 @@ def cluster_articles(
         metric: Distance metric to use
         cluster_selection_epsilon: Controls whether points are assigned to clusters
         alpha: Affects cluster boundary expansion
-        use_dimensionality_reduction: Whether to reduce dimensions before clustering
 
     Returns:
         Tuple containing (cluster labels, cluster IDs)
     """
     start_time = time.time()
 
-    # Preprocess embeddings if needed
-    if use_dimensionality_reduction and embeddings.shape[1] > 50:
-        embeddings = preprocess_embeddings(embeddings)
+    logger.info(
+        f"Clustering {embeddings.shape[0]} articles with {embeddings.shape[1]} dimensions")
 
     # Run HDBSCAN clustering
     clusterer = hdbscan.HDBSCAN(
@@ -127,7 +87,8 @@ def cluster_articles(
         metric=metric,
         cluster_selection_epsilon=cluster_selection_epsilon,
         alpha=alpha,
-        prediction_data=True
+        prediction_data=True,
+        core_dist_n_jobs=-1  # Use all available cores
     )
 
     cluster_labels = clusterer.fit_predict(embeddings)
@@ -193,36 +154,35 @@ def evaluate_clustering(labels: np.ndarray) -> Dict[str, Any]:
     return stats
 
 
-def calculate_centroids(X: np.ndarray, labels: np.ndarray) -> Dict[int, Dict[str, Any]]:
+def calculate_centroids(labels: np.ndarray, X: np.ndarray) -> Tuple[Dict[int, List[int]], Dict[int, List[float]]]:
     """
-    Calculate centroids for each cluster.
+    Calculate centroids for each cluster and organize data.
 
     Args:
+        labels: Cluster labels from clustering algorithm 
         X: Array of embeddings
-        labels: Cluster labels from HDBSCAN
 
     Returns:
-        Dictionary mapping cluster labels to cluster data (centroid, count, indices)
+        Tuple containing:
+        - Dictionary mapping cluster labels to lists of indices
+        - Dictionary mapping cluster labels to centroid vectors
     """
-    from sklearn.preprocessing import normalize
-
-    # Initialize dictionary to store cluster data
-    cluster_data = {}
+    # Initialize dictionaries to store cluster data and centroids
+    cluster_data = {}  # Maps labels to indices
+    centroids = {}     # Maps labels to centroid vectors
 
     # Group indices by cluster label
     for i, label in enumerate(labels):
         if label >= 0:  # Skip noise points (-1)
-            if label not in cluster_data:
-                cluster_data[label] = {
-                    "indices": [],
-                    "centroid": None,
-                    "count": 0
-                }
-            cluster_data[label]["indices"].append(i)
+            # Convert numpy.int64 to regular Python int for dictionary key
+            label_key = int(label)
+            if label_key not in cluster_data:
+                cluster_data[label_key] = []
+            cluster_data[label_key].append(i)
 
     # Calculate centroid for each cluster
-    for label, data in cluster_data.items():
-        indices = data["indices"]
+    for label, indices in cluster_data.items():
+        # Get embeddings for this cluster
         cluster_embeddings = X[indices]
 
         # Calculate mean embedding vector
@@ -231,11 +191,10 @@ def calculate_centroids(X: np.ndarray, labels: np.ndarray) -> Dict[int, Dict[str
         # Normalize centroid to unit length
         normalized_centroid = normalize(centroid.reshape(1, -1), norm='l2')[0]
 
-        # Store data
-        data["centroid"] = normalized_centroid.tolist()
-        data["count"] = len(indices)
+        # Store normalized centroid as list
+        centroids[label] = normalized_centroid.tolist()
 
-    return cluster_data
+    return cluster_data, centroids
 
 
 def assign_articles_to_clusters(

@@ -6,6 +6,8 @@ alwaysApply: true
 
 # Your rule content
 
+use [reader_db_client.py](mdc:src/database/reader_db_client.py) to handle data (query, filter, .. )
+
 DO NOT EVER USE DUMMY/FALLBACK DATA. IN THIS PROJECT, IT IS IMPORTANT TO RAISE ERROR AND NEVER TO USE DYMMY NOR FALLBACK DATA. I MIGHT GO TO JAIL IF WE DO.
 
 At the top of each file, include a concise, informative header comment summarizing the file's purpose and key details. The header must include:

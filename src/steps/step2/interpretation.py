@@ -23,13 +23,58 @@ Related files:
 import logging
 import os
 from typing import Dict, List, Tuple, Any, Optional, Set
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import defaultdict, Counter
-import spacy
 import re
-from tqdm import tqdm
 import json
+
+# Handle optional imports gracefully
+try:
+    import numpy as np
+except ImportError:
+    logging.warning("numpy not available; some functionality may be limited")
+    # Create a minimal substitute for np.mean if needed
+
+    class NumpySubstitute:
+        @staticmethod
+        def mean(arr, axis=0):
+            if axis == 0 and isinstance(arr, list) and all(isinstance(x, list) for x in arr):
+                # Simple column-wise mean for 2D arrays
+                result = [sum(col)/len(col) for col in zip(*arr)]
+                return result
+            # Simple mean for 1D arrays
+            return sum(arr) / len(arr)
+    np = NumpySubstitute()
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+except ImportError:
+    logging.warning(
+        "sklearn not available; keyword extraction will be limited")
+    TfidfVectorizer = None
+
+try:
+    import spacy
+    SPACY_AVAILABLE = True
+except ImportError:
+    logging.warning("spaCy not available; keyword extraction will be limited")
+    spacy = None
+    SPACY_AVAILABLE = False
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    logging.warning("tqdm not available; using simple progress reporting")
+    # Simple substitute for tqdm
+
+    def tqdm(iterable, **kwargs):
+        return iterable
+
+try:
+    from psycopg2.extras import RealDictCursor
+except ImportError:
+    RealDictCursor = None
+    logger = logging.getLogger(__name__)
+    logger.warning("psycopg2.extras not available. Cannot use RealDictCursor.")
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -78,7 +123,7 @@ def extract_cluster_keywords(
     # Load spaCy model if not provided
     if model is None:
         try:
-            model = spacy.load("en_core_web_sm")
+            model = spacy.load("en_core_web_lg")
         except Exception as e:
             logger.warning(f"Could not load spaCy model: {e}")
             model = None
@@ -183,7 +228,7 @@ def interpret_clusters(
     # Load spaCy model once if not provided
     if not model and any(cluster_article_map.values()):
         try:
-            model = spacy.load("en_core_web_sm")
+            model = spacy.load("en_core_web_lg")
             logger.info("Loaded spaCy model for entity recognition")
         except Exception as e:
             logger.warning(f"Could not load spaCy model: {e}")
@@ -226,38 +271,64 @@ def interpret_clusters(
     return interpretations
 
 
-def get_cluster_keywords(db_client: Any, cluster_id: int, model: Optional[Any] = None) -> Dict[str, float]:
+def get_cluster_keywords(
+    reader_client: Any,
+    article_db_ids: List[int],
+    nlp: Any,
+    sample_size: int = 10
+) -> List[str]:
     """
-    Get keywords for a specific cluster by ID.
+    Extract keywords from article titles for a specific cluster.
+    This function is focused on extracting only the most relevant keywords
+    for topic relevance calculation.
 
     Args:
-        db_client: Database client for fetching article data
-        cluster_id: Database ID of the cluster
-        model: Optional spaCy model for text processing
+        reader_client: Database client to fetch article titles
+        article_db_ids: List of article IDs in the cluster
+        nlp: Loaded spaCy model for NLP processing
+        sample_size: Maximum number of titles to analyze
 
     Returns:
-        Dictionary mapping keywords to their importance scores
+        List[str]: List of extracted keywords as strings
     """
-    # Get article IDs for this cluster
-    try:
-        query = """
-        SELECT id FROM articles
-        WHERE cluster_id = %s
-        LIMIT 50
-        """
-        results = db_client.fetch_all(query, (cluster_id,))
-        article_ids = [r.get('id') for r in results if r.get('id')]
+    if not article_db_ids or not nlp:
+        return []
 
-        if not article_ids:
-            logger.warning(f"No articles found for cluster {cluster_id}")
-            return {}
+    # Get sample of article titles
+    titles = reader_client.get_sample_titles_for_articles(
+        article_db_ids, sample_size)
+    if not titles:
+        return []
 
-        # Extract keywords using the existing function
-        return extract_cluster_keywords(db_client, article_ids, model)
+    # Combine titles into a single text for processing
+    combined_text = " ".join(titles)
 
-    except Exception as e:
-        logger.error(f"Error getting keywords for cluster {cluster_id}: {e}")
-        return {}
+    # Process text with spaCy
+    doc = nlp(combined_text)
+
+    # Extract noun chunks as they often represent topics better than single entities
+    noun_chunks = [chunk.text.lower() for chunk in doc.noun_chunks]
+
+    # Count frequency of noun chunks
+    from collections import Counter
+    chunk_counter = Counter(noun_chunks)
+
+    # Get the top keywords (most frequent noun chunks)
+    top_n = 5  # Return top 5 keywords
+    top_keywords = [keyword for keyword, _ in chunk_counter.most_common(top_n)]
+
+    # If we don't have enough noun chunks, supplement with named entities
+    if len(top_keywords) < top_n:
+        entities = [ent.text.lower() for ent in doc.ents
+                    if ent.label_ in ["ORG", "PERSON", "GPE", "LOC", "PRODUCT"]]
+        entity_counter = Counter(entities)
+
+        # Add top entities not already in keywords
+        for entity, _ in entity_counter.most_common(top_n - len(top_keywords)):
+            if entity not in top_keywords:
+                top_keywords.append(entity)
+
+    return top_keywords
 
 
 def interpret_cluster(reader_client: Any, cluster_id: int, nlp: Any) -> None:
@@ -269,10 +340,16 @@ def interpret_cluster(reader_client: Any, cluster_id: int, nlp: Any) -> None:
         cluster_id: Database ID of the cluster
         nlp: Loaded spaCy model
     """
+    conn = None
     try:
-        # Get a sample of articles from this cluster
         conn = reader_client.get_connection()
-        cursor = conn.cursor()
+        if not conn:
+            logger.error("Could not get DB connection for interpretation")
+            return
+
+        # Use RealDictCursor to ensure results are dictionaries
+        cursor_factory = RealDictCursor if RealDictCursor else None
+        cursor = conn.cursor(cursor_factory=cursor_factory)
 
         sample_size = int(os.getenv("CLUSTER_SAMPLE_SIZE", "10"))
         query = """
@@ -284,14 +361,19 @@ def interpret_cluster(reader_client: Any, cluster_id: int, nlp: Any) -> None:
         """
 
         cursor.execute(query, (cluster_id, sample_size))
+        # fetchall() will now return a list of dictionaries if RealDictCursor is used
         articles = cursor.fetchall()
 
         if not articles:
             logger.warning(f"No articles found for cluster {cluster_id}")
+            cursor.close()
+            reader_client.release_connection(conn)
             return
 
-        # Combine titles for text analysis
-        combined_text = " ".join([title for _, title, _ in articles if title])
+        # Now we can reliably access results as dictionaries
+        combined_text = " ".join(
+            [article['title'] for article in articles if article.get('title')])
+        article_ids = [article['id'] for article in articles]
 
         # Process with spaCy
         doc = nlp(combined_text)
@@ -321,7 +403,7 @@ def interpret_cluster(reader_client: Any, cluster_id: int, nlp: Any) -> None:
             "entities": [{"text": e, "count": c} for e, c in top_entities],
             "topics": [{"text": t, "count": c} for t, c in top_chunks],
             "sample_size": len(articles),
-            "sample_ids": [article_id for article_id, _, _ in articles]
+            "sample_ids": article_ids
         }
 
         metadata_json = json.dumps(metadata)
@@ -334,8 +416,11 @@ def interpret_cluster(reader_client: Any, cluster_id: int, nlp: Any) -> None:
                 WHERE table_name = 'clusters' AND column_name = 'metadata'
             )
             """
-            cursor.execute(check_query)
-            column_exists = cursor.fetchone()[0]
+            # Use a standard cursor for schema check if RealDictCursor causes issues
+            schema_cursor = conn.cursor()
+            schema_cursor.execute(check_query)
+            column_exists = schema_cursor.fetchone()[0]
+            schema_cursor.close()
 
             if column_exists:
                 # Update cluster metadata in database
@@ -357,8 +442,10 @@ def interpret_cluster(reader_client: Any, cluster_id: int, nlp: Any) -> None:
                     ALTER TABLE clusters 
                     ADD COLUMN IF NOT EXISTS metadata JSONB;
                     """
-                    cursor.execute(alter_query)
+                    schema_cursor = conn.cursor()
+                    schema_cursor.execute(alter_query)
                     conn.commit()
+                    schema_cursor.close()
 
                     # Now try the update again
                     update_query = """
@@ -384,8 +471,11 @@ def interpret_cluster(reader_client: Any, cluster_id: int, nlp: Any) -> None:
                 f"Cluster {cluster_id} interpretation (not stored): {len(top_entities)} entities, {len(top_chunks)} topics")
 
         cursor.close()
-        reader_client.release_connection(conn)
 
     except Exception as e:
         logger.error(
             f"Error interpreting cluster {cluster_id}: {e}", exc_info=True)
+    finally:
+        # Ensure connection is always released
+        if conn:
+            reader_client.release_connection(conn)
