@@ -388,6 +388,29 @@ class ReaderDBClient:
                 self.release_connection(conn)
         return []
 
+    def get_publication_dates_for_articles(self, article_ids: List[int]) -> Dict[int, Optional[datetime]]:
+        """
+        Get publication dates for a list of article IDs.
+
+        This is the implementation required by the step2 refactoring to delegate 
+        DB operations to the ReaderDBClient.
+
+        Args:
+            article_ids: List of article IDs to fetch publication dates for
+
+        Returns:
+            Dict[int, Optional[datetime]]: Dictionary mapping article IDs to their publication dates
+                                          (None for articles without a date or not found)
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                # Explicitly call the get_publication_dates_for_articles function from the articles module
+                return articles.get_publication_dates_for_articles(conn, article_ids)
+            finally:
+                self.release_connection(conn)
+        return {}
+
     # Entity operations
     def insert_entity(self, entity: Dict[str, Any]) -> Optional[int]:
         """

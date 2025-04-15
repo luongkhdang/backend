@@ -25,6 +25,10 @@ Exported functions:
   Gets articles with errors
 - get_hot_articles(conn, limit: int) -> List[Dict[str, Any]]
   Gets hot articles
+- get_sample_titles_for_articles(conn, article_ids: List[int], sample_size: int) -> List[str]
+  Gets a sample of titles for a list of article IDs
+- get_publication_dates_for_articles(conn, article_ids: List[int]) -> Dict[int, Optional[datetime]]
+  Gets publication dates for a list of article IDs
 
 Related modules:
 - Connection management from connection.py
@@ -543,7 +547,7 @@ def get_hot_articles(conn, limit: int = 20) -> List[Dict[str, Any]]:
 
 def get_sample_titles_for_articles(conn, article_ids: List[int], sample_size: int) -> List[str]:
     """
-    Get a sample of titles for the specified articles.
+    Get a sample of titles for a list of article IDs.
 
     Args:
         conn: Database connection
@@ -551,7 +555,7 @@ def get_sample_titles_for_articles(conn, article_ids: List[int], sample_size: in
         sample_size: Maximum number of titles to return
 
     Returns:
-        List[str]: List of article titles
+        List[str]: Sample list of article titles
     """
     if not article_ids:
         return []
@@ -559,25 +563,73 @@ def get_sample_titles_for_articles(conn, article_ids: List[int], sample_size: in
     try:
         cursor = conn.cursor()
 
-        # Query to get titles for articles, ordered by publication date descending
-        query = """
-        SELECT title 
-        FROM articles
-        WHERE id IN %s
-        AND title IS NOT NULL
-        AND LENGTH(TRIM(title)) > 0
-        ORDER BY pub_date DESC
-        LIMIT %s
-        """
+        # Create a string with the article IDs for the IN clause
+        ids_placeholder = ', '.join(['%s'] * len(article_ids))
 
-        cursor.execute(query, (tuple(article_ids), sample_size))
+        # Get a random sample of articles
+        cursor.execute(f"""
+            SELECT title 
+            FROM articles 
+            WHERE id IN ({ids_placeholder})
+            ORDER BY RANDOM() 
+            LIMIT %s
+        """, article_ids + [sample_size])
 
-        # Extract titles from results
-        titles = [row[0] for row in cursor.fetchall() if row[0]]
-
+        # Extract titles
+        titles = [row[0] for row in cursor.fetchall()]
         cursor.close()
+
         return titles
 
     except Exception as e:
-        logger.error(f"Error retrieving article titles: {e}")
+        logger.error(f"Error getting sample titles: {e}")
         return []
+
+
+def get_publication_dates_for_articles(conn, article_ids: List[int]) -> Dict[int, Optional[datetime]]:
+    """
+    Get publication dates for a list of article IDs.
+
+    Args:
+        conn: Database connection
+        article_ids: List of article IDs
+
+    Returns:
+        Dict[int, Optional[datetime]]: Dictionary mapping article IDs to their publication dates
+    """
+    if not article_ids:
+        return {}
+
+    result = {}
+
+    try:
+        cursor = conn.cursor()
+
+        # Create a placeholder string for the IN clause
+        ids_placeholder = ', '.join(['%s'] * len(article_ids))
+
+        # Query publication dates efficiently
+        cursor.execute(f"""
+            SELECT id, pub_date
+            FROM articles
+            WHERE id IN ({ids_placeholder})
+        """, article_ids)
+
+        # Build the result dictionary
+        for row in cursor.fetchall():
+            article_id, pub_date = row
+            result[article_id] = pub_date
+
+        cursor.close()
+
+        # Initialize missing articles with None
+        for article_id in article_ids:
+            if article_id not in result:
+                result[article_id] = None
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error fetching publication dates: {e}")
+        # Return dict with None values on error
+        return {article_id: None for article_id in article_ids}

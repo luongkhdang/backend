@@ -26,6 +26,7 @@ from typing import Dict, List, Tuple, Any, Optional, Set
 from collections import defaultdict, Counter
 import re
 import json
+from src.database.reader_db_client import ReaderDBClient
 
 # Handle optional imports gracefully
 try:
@@ -100,7 +101,7 @@ def clean_text(text: str) -> str:
 
 
 def extract_cluster_keywords(
-    db_client: Any,
+    reader_client: ReaderDBClient,
     article_ids: List[int],
     model: Optional[Any] = None,
     top_n: int = 15
@@ -109,7 +110,7 @@ def extract_cluster_keywords(
     Extract keywords from articles in a cluster using TF-IDF and named entity recognition.
 
     Args:
-        db_client: Database client to fetch article texts
+        reader_client: ReaderDBClient to fetch article texts
         article_ids: List of article IDs in the cluster
         model: Optional spaCy model for named entity recognition
         top_n: Number of top keywords to return
@@ -132,11 +133,10 @@ def extract_cluster_keywords(
     article_texts = []
     for article_id in article_ids:
         try:
-            # Query should be adjusted based on actual DB schema
-            query = "SELECT content FROM articles WHERE id = %s"
-            result = db_client.fetch_one(query, (article_id,))
-            if result and result.get('content'):
-                article_texts.append(clean_text(result['content']))
+            # Use reader_client to get article by ID
+            article_data = reader_client.get_article_by_id(article_id)
+            if article_data and article_data.get('content'):
+                article_texts.append(clean_text(article_data['content']))
         except Exception as e:
             logger.error(f"Error fetching article {article_id}: {e}")
 
@@ -210,7 +210,7 @@ def extract_cluster_keywords(
 
 
 def interpret_clusters(
-    db_client: Any,
+    reader_client: ReaderDBClient,
     cluster_article_map: Dict[int, List[int]],
     model: Optional[Any] = None
 ) -> Dict[int, Dict[str, Any]]:
@@ -218,7 +218,7 @@ def interpret_clusters(
     Generate interpretations for multiple clusters.
 
     Args:
-        db_client: Database client for fetching article data
+        reader_client: ReaderDBClient for fetching article data
         cluster_article_map: Mapping of cluster IDs to lists of article IDs
         model: Optional spaCy model for NLP processing
 
@@ -242,16 +242,17 @@ def interpret_clusters(
             continue
 
         # Extract keywords for the cluster
-        keywords = extract_cluster_keywords(db_client, article_ids, model)
+        keywords = extract_cluster_keywords(reader_client, article_ids, model)
 
-        # Get publication timeline data
+        # Get publication timeline data using the new efficient method
         pub_dates = []
         try:
-            query = "SELECT published_at FROM articles WHERE id IN %s"
-            results = db_client.fetch_all(query, (tuple(article_ids),))
-            for result in results:
-                if result and result.get('published_at'):
-                    pub_dates.append(result['published_at'])
+            # Use efficient method to get all publication dates at once
+            pub_dates_dict = reader_client.get_publication_dates_for_articles(
+                article_ids)
+            # Extract the dates, filtering out None values
+            pub_dates = [date for date in pub_dates_dict.values()
+                         if date is not None]
         except Exception as e:
             logger.error(
                 f"Error fetching publication dates for cluster {cluster_id}: {e}")
@@ -272,7 +273,7 @@ def interpret_clusters(
 
 
 def get_cluster_keywords(
-    reader_client: Any,
+    reader_client: ReaderDBClient,
     article_db_ids: List[int],
     nlp: Any,
     sample_size: int = 10
@@ -331,7 +332,7 @@ def get_cluster_keywords(
     return top_keywords
 
 
-def interpret_cluster(reader_client: Any, cluster_id: int, nlp: Any) -> None:
+def interpret_cluster(reader_client: ReaderDBClient, cluster_id: int, nlp: Any) -> None:
     """
     Perform basic interpretation of a cluster using spaCy.
 

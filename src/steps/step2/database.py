@@ -103,8 +103,9 @@ def batch_update_article_cluster_assignments(
     if cluster_hotness_map is None:
         cluster_hotness_map = {}
 
-    # Prepare data for update
-    update_data = []
+    # Prepare data in the format required by batch_update_article_clusters
+    # Format: List of tuples (article_id, cluster_id, is_hot)
+    assignments = []
     for article_id, label in zip(article_ids, labels):
         label_int = int(label) if hasattr(label, 'item') else label
 
@@ -115,34 +116,15 @@ def batch_update_article_cluster_assignments(
             cluster_id = None  # Use None for SQL NULL
             is_hot = False
 
-        update_data.append((article_id, cluster_id, is_hot))
+        assignments.append((article_id, cluster_id, is_hot))
 
-    conn = None
     try:
-        conn = reader_client.get_connection()
-        cursor = conn.cursor()
+        # Use the ReaderDBClient's method to handle the update
+        result = reader_client.batch_update_article_clusters(assignments)
 
-        # Prepare lists for parameterized query
-        batch_article_ids = [d[0] for d in update_data]
-        batch_cluster_ids = [d[1] for d in update_data]
-        batch_is_hot = [d[2] for d in update_data]
-
-        # Use parameterized query with unnest
-        query = """
-        UPDATE articles
-        SET cluster_id = data.cluster_id,
-            is_hot = data.is_hot
-        FROM unnest(%s::int[], %s::int[], %s::boolean[]) AS data(article_id, cluster_id, is_hot)
-        WHERE articles.id = data.article_id;
-        """
-
-        cursor.execute(query, (batch_article_ids,
-                       batch_cluster_ids, batch_is_hot))
-        updated_rows = cursor.rowcount  # Get number of rows updated
-        conn.commit()
-
-        success_count = updated_rows
-        failure_count = len(update_data) - updated_rows
+        # Convert the result to the expected format if needed
+        success_count = result.get("success", 0)
+        failure_count = result.get("failure", 0)
 
         logger.info(
             f"Updated {success_count} article cluster assignments (failed: {failure_count})")
@@ -151,9 +133,4 @@ def batch_update_article_cluster_assignments(
     except Exception as e:
         logger.error(
             f"Failed to update cluster assignments: {e}", exc_info=True)
-        if conn:
-            conn.rollback()
-        return {"success": 0, "failure": len(update_data)}
-    finally:
-        if conn:
-            reader_client.release_connection(conn)
+        return {"success": 0, "failure": len(assignments)}

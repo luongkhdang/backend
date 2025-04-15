@@ -87,7 +87,6 @@ def initialize_tables(conn) -> bool:
             id SERIAL PRIMARY KEY,
             article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
             embedding VECTOR(768),
-            embedding_model TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(article_id)

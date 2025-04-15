@@ -37,7 +37,7 @@ def insert_embedding(conn, article_id: int, embedding_data: Dict[str, Any]) -> b
     Args:
         conn: Database connection
         article_id: ID of the article this embedding belongs to
-        embedding_data: Data containing the embedding vector and metadata
+        embedding_data: Data containing the embedding vector
 
     Returns:
         bool: True if successful, False otherwise
@@ -46,25 +46,23 @@ def insert_embedding(conn, article_id: int, embedding_data: Dict[str, Any]) -> b
         cursor = conn.cursor()
 
         # Extract embedding vector and other fields
-        vector = embedding_data.get('vector')
-        model = embedding_data.get('model', 'unknown')
+        embedding = embedding_data.get(
+            'embedding') or embedding_data.get('vector')
         created_at = embedding_data.get('created_at', datetime.now())
 
         # Insert or update the embedding
         cursor.execute("""
             INSERT INTO embeddings (
-                article_id, vector, model, created_at
+                article_id, embedding, created_at
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s)
             ON CONFLICT (article_id) DO UPDATE
-            SET vector = EXCLUDED.vector,
-                model = EXCLUDED.model,
+            SET embedding = EXCLUDED.embedding,
                 created_at = EXCLUDED.created_at
             RETURNING id;
         """, (
             article_id,
-            vector,
-            model,
+            embedding,
             created_at
         ))
 
@@ -113,33 +111,31 @@ def batch_insert_embeddings(conn, embeddings: List[Dict[str, Any]]) -> Dict[str,
             for embedding_data in current_batch:
                 try:
                     article_id = embedding_data.get('article_id')
-                    vector = embedding_data.get('vector')
+                    embedding = embedding_data.get(
+                        'embedding') or embedding_data.get('vector')
 
-                    if not article_id or vector is None:
+                    if not article_id or embedding is None:
                         logger.warning(
-                            f"Missing required fields for embedding: article_id={article_id}, vector present={vector is not None}")
+                            f"Missing required fields for embedding: article_id={article_id}, embedding present={embedding is not None}")
                         failed_inserts += 1
                         continue
 
-                    model = embedding_data.get('model', 'unknown')
                     created_at = embedding_data.get(
                         'created_at', datetime.now())
 
                     # Insert or update the embedding
                     cursor.execute("""
                         INSERT INTO embeddings (
-                            article_id, vector, model, created_at
+                            article_id, embedding, created_at
                         )
-                        VALUES (%s, %s, %s, %s)
+                        VALUES (%s, %s, %s)
                         ON CONFLICT (article_id) DO UPDATE
-                        SET vector = EXCLUDED.vector,
-                            model = EXCLUDED.model,
+                        SET embedding = EXCLUDED.embedding,
                             created_at = EXCLUDED.created_at
                         RETURNING id;
                     """, (
                         article_id,
-                        vector,
-                        model,
+                        embedding,
                         created_at
                     ))
 
@@ -175,20 +171,20 @@ def get_all_embeddings(conn, limit: Optional[int] = None) -> List[Dict[str, Any]
         limit: Optional limit on the number of embeddings to return
 
     Returns:
-        List[Dict[str, Any]]: List of embedding records with article_id and vector
+        List[Dict[str, Any]]: List of embedding records with article_id and embedding
     """
     try:
         cursor = conn.cursor()
 
         if limit:
             cursor.execute("""
-                SELECT e.article_id, e.vector, e.model, e.created_at
+                SELECT e.article_id, e.embedding, e.created_at
                 FROM embeddings e
                 LIMIT %s
             """, (limit,))
         else:
             cursor.execute("""
-                SELECT e.article_id, e.vector, e.model, e.created_at
+                SELECT e.article_id, e.embedding, e.created_at
                 FROM embeddings e
             """)
 
@@ -196,9 +192,8 @@ def get_all_embeddings(conn, limit: Optional[int] = None) -> List[Dict[str, Any]
         for row in cursor.fetchall():
             embeddings.append({
                 'article_id': row[0],
-                'vector': row[1],
-                'model': row[2],
-                'created_at': row[3]
+                'embedding': row[1],
+                'created_at': row[2]
             })
 
         cursor.close()
@@ -218,14 +213,14 @@ def get_all_embeddings_with_pub_date(conn, limit: Optional[int] = None) -> List[
         limit: Optional limit on the number of embeddings to return
 
     Returns:
-        List[Dict[str, Any]]: List of embedding records with article_id, vector, and pub_date
+        List[Dict[str, Any]]: List of embedding records with article_id, embedding, and pub_date
     """
     try:
         cursor = conn.cursor()
 
         if limit:
             cursor.execute("""
-                SELECT e.article_id, e.vector, a.pub_date, e.model
+                SELECT e.article_id, e.embedding, a.pub_date
                 FROM embeddings e
                 JOIN articles a ON e.article_id = a.id
                 WHERE a.pub_date IS NOT NULL
@@ -233,7 +228,7 @@ def get_all_embeddings_with_pub_date(conn, limit: Optional[int] = None) -> List[
             """, (limit,))
         else:
             cursor.execute("""
-                SELECT e.article_id, e.vector, a.pub_date, e.model
+                SELECT e.article_id, e.embedding, a.pub_date
                 FROM embeddings e
                 JOIN articles a ON e.article_id = a.id
                 WHERE a.pub_date IS NOT NULL
@@ -243,15 +238,11 @@ def get_all_embeddings_with_pub_date(conn, limit: Optional[int] = None) -> List[
         for row in cursor.fetchall():
             embeddings.append({
                 'article_id': row[0],
-                'vector': row[1],
+                'embedding': row[1],
                 'pub_date': row[2],
-                'model': row[3]
             })
 
         cursor.close()
-
-        logger.info(
-            f"Retrieved {len(embeddings)} embeddings with publication dates")
         return embeddings
 
     except Exception as e:
@@ -275,7 +266,7 @@ def get_embedding_for_article(conn, article_id: int) -> Optional[Dict[str, Any]]
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT article_id, vector, model, created_at
+            SELECT article_id, embedding, created_at
             FROM embeddings
             WHERE article_id = %s
         """, (article_id,))
@@ -286,9 +277,8 @@ def get_embedding_for_article(conn, article_id: int) -> Optional[Dict[str, Any]]
         if row:
             return {
                 'article_id': row[0],
-                'vector': row[1],
-                'model': row[2],
-                'created_at': row[3]
+                'embedding': row[1],
+                'created_at': row[2]
             }
 
         return None
@@ -318,7 +308,7 @@ def get_embeddings_for_articles(conn, article_ids: List[int]) -> Dict[int, Dict[
 
         placeholders = ", ".join(["%s"] * len(article_ids))
         query = f"""
-            SELECT article_id, vector, model, created_at
+            SELECT article_id, embedding, created_at
             FROM embeddings
             WHERE article_id IN ({placeholders})
         """
@@ -330,9 +320,8 @@ def get_embeddings_for_articles(conn, article_ids: List[int]) -> Dict[int, Dict[
         for row in cursor.fetchall():
             embeddings_map[row[0]] = {
                 'article_id': row[0],
-                'vector': row[1],
-                'model': row[2],
-                'created_at': row[3]
+                'embedding': row[1],
+                'created_at': row[2]
             }
 
         cursor.close()
@@ -378,48 +367,17 @@ def delete_embedding(conn, article_id: int) -> bool:
 def get_embeddings_by_model(conn, model_name: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Get embeddings created using a specific model.
+    NOTE: This function is now obsolete as the embedding_model column is removed.
+          It will return an empty list.
 
     Args:
         conn: Database connection
-        model_name: Name of the embedding model
-        limit: Optional limit on the number of embeddings to return
+        model_name: Name of the embedding model (ignored)
+        limit: Optional limit on the number of embeddings to return (ignored)
 
     Returns:
-        List[Dict[str, Any]]: List of embedding records from the specified model
+        List[Dict[str, Any]]: Always returns an empty list.
     """
-    try:
-        cursor = conn.cursor()
-
-        if limit:
-            cursor.execute("""
-                SELECT article_id, vector, model, created_at
-                FROM embeddings
-                WHERE model = %s
-                LIMIT %s
-            """, (model_name, limit))
-        else:
-            cursor.execute("""
-                SELECT article_id, vector, model, created_at
-                FROM embeddings
-                WHERE model = %s
-            """, (model_name,))
-
-        embeddings = []
-        for row in cursor.fetchall():
-            embeddings.append({
-                'article_id': row[0],
-                'vector': row[1],
-                'model': row[2],
-                'created_at': row[3]
-            })
-
-        cursor.close()
-
-        logger.info(
-            f"Retrieved {len(embeddings)} embeddings for model '{model_name}'")
-        return embeddings
-
-    except Exception as e:
-        logger.error(
-            f"Error retrieving embeddings for model '{model_name}': {e}")
-        return []
+    logger.warning(
+        "get_embeddings_by_model called, but embedding_model column is not used. Returning empty list.")
+    return []  # Return empty list as this functionality is no longer supported

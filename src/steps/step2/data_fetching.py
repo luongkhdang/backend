@@ -34,24 +34,21 @@ def get_all_embeddings(reader_client: ReaderDBClient) -> List[Tuple[int, List[fl
         List of tuples (article_id, embedding, pub_date)
     """
     try:
-        conn = reader_client.get_connection()
-        cursor = conn.cursor()
-
-        # Query to fetch embeddings and publication dates
-        query = """
-        SELECT e.article_id, e.embedding, a.pub_date
-        FROM embeddings e
-        JOIN articles a ON e.article_id = a.id
-        WHERE e.embedding IS NOT NULL
-        """
-
-        cursor.execute(query)
-        results = cursor.fetchall()
+        # Use ReaderDBClient's method to fetch embeddings with publication dates
+        all_embeddings = reader_client.get_all_embeddings_with_pub_date()
 
         # Process results - ensure embeddings are converted to float values
         embeddings_data = []
-        for article_id, embedding, pub_date in results:
-            # Check if embedding is already a list of floats
+        for embedding_data in all_embeddings:
+            article_id = embedding_data.get('article_id')
+            embedding = embedding_data.get('embedding')
+            pub_date = embedding_data.get('pub_date')
+
+            # Skip if missing critical data
+            if article_id is None or embedding is None:
+                continue
+
+            # Process embedding to ensure it's a list of floats
             if isinstance(embedding, list):
                 # Convert each element to float if needed
                 float_embedding = [float(val) if not isinstance(
@@ -73,9 +70,6 @@ def get_all_embeddings(reader_client: ReaderDBClient) -> List[Tuple[int, List[fl
                 logger.warning(
                     f"Unexpected embedding type for article_id {article_id}: {type(embedding)}")
                 # Skip this embedding
-
-        cursor.close()
-        reader_client.release_connection(conn)
 
         # Log some debug info
         if embeddings_data:
