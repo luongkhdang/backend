@@ -110,4 +110,3 @@ This plan outlines the steps to implement the refined hotness calculation logic 
 - Ensure robust handling of potentially missing historical data (e.g., if the pipeline didn't run exactly 7 days ago). The current plan fetches clusters _from_ that specific day, which might return empty lists if no run occurred. The hotness calculation should handle empty lists gracefully (resulting in zero scores for persistence/penalty for that period).
 - Pay attention to data types (e.g., numpy ints vs Python ints) when using dictionary keys. The existing code seems to handle some of this.
 - Use `sklearn.metrics.pairwise.cosine_similarity` for comparing centroids. Remember similarity = `1 - distance`.
-

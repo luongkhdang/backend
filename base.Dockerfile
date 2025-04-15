@@ -44,6 +44,9 @@ RUN python -c "import transformers; print(f'Successfully installed transformers 
 RUN python -m spacy download en_core_web_lg \
     && echo "spaCy model downloaded successfully"
 
+# Verify PyTorch CUDA setup (optional but helpful)
+RUN python -c "import torch; print(f'Torch CUDA available: {torch.cuda.is_available()}'); print(f'Torch version: {torch.__version__}')"
+
 # Create logs directory for error reports
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 

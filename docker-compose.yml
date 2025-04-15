@@ -97,6 +97,14 @@ services:
       FORCE_CONTINUE_ON_NETWORK_ERROR: "true"
     # Add the skip-network-check flag to avoid Docker introspection
     command: ["python", "src/main.py", "--workers", "4"]
+    # Add GPU resource request
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1 # Request access to 1 NVIDIA GPU
+              capabilities: [gpu, compute, utility]
     volumes:
       - ./src:/app/src # Mount source code for easier development
       - ./logs:/app/logs # Mount logs directory for error reports

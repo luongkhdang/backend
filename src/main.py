@@ -41,6 +41,9 @@ from src.steps.step2 import run as run_step2
 # Import network checker
 from src.utils.network_checker import check_network_connectivity, print_results
 
+# Import GPU checker
+from src.utils.gpu_client import check_gpu_availability
+
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -137,6 +140,10 @@ def main():
     args = parse_arguments()
 
     logger.info("STARTING DATA REFINERY PIPELINE")
+
+    # GPU Check (Log availability)
+    gpu_available = check_gpu_availability()
+    logger.info(f"GPU Check: CUDA Available for PyTorch = {gpu_available}")
 
     # Step 0: Check network connectivity
     if not check_network(
