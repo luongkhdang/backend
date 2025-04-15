@@ -133,8 +133,8 @@ class ReaderDBClient:
                 title TEXT,
                 url TEXT,
                 content TEXT,
-                published_at TIMESTAMP,
-                source TEXT,
+                pub_date TIMESTAMP,
+                domain TEXT,
                 author TEXT,
                 is_valid BOOLEAN DEFAULT TRUE,
                 is_processed BOOLEAN DEFAULT FALSE,
@@ -156,6 +156,16 @@ class ReaderDBClient:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
+
+            # Ensure entity_type column exists even if table was created before
+            try:
+                cursor.execute(
+                    "ALTER TABLE entities ADD COLUMN IF NOT EXISTS entity_type TEXT;")
+                logger.info(
+                    "Ensured 'entity_type' column exists in 'entities' table.")
+            except Exception as e:
+                logger.warning(
+                    f"Could not add/verify 'entity_type' column: {e}")
 
             # Create article_entities junction table
             cursor.execute("""
@@ -219,35 +229,82 @@ class ReaderDBClient:
             """)
 
             # Create indexes to improve query performance
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_articles_scraper_id ON articles(scraper_id);")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_articles_cluster_id ON articles(cluster_id);")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_articles_source ON articles(source);")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at);")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_article_entities_article_id ON article_entities(article_id);")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_article_entities_entity_id ON article_entities(entity_id);")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_embeddings_article_id ON embeddings(article_id);")
+            # Add error handling for each index creation
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_articles_scraper_id ON articles(scraper_id);")
+            except Exception as e:
+                logger.warning(f"Error creating idx_articles_scraper_id: {e}")
+
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_articles_cluster_id ON articles(cluster_id);")
+            except Exception as e:
+                logger.warning(f"Error creating idx_articles_cluster_id: {e}")
+
+            # Fix column name: change 'source' to 'domain'
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_articles_domain ON articles(domain);")
+            except Exception as e:
+                logger.warning(f"Error creating idx_articles_domain: {e}")
+
+            # Fix column name: change 'published_at' to 'pub_date'
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_articles_pub_date ON articles(pub_date);")
+            except Exception as e:
+                logger.warning(f"Error creating idx_articles_pub_date: {e}")
+
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);")
+            except Exception as e:
+                logger.warning(f"Error creating idx_entities_name: {e}")
+
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);")
+            except Exception as e:
+                logger.warning(f"Error creating idx_entities_type: {e}")
+
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_article_entities_article_id ON article_entities(article_id);")
+            except Exception as e:
+                logger.warning(
+                    f"Error creating idx_article_entities_article_id: {e}")
+
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_article_entities_entity_id ON article_entities(entity_id);")
+            except Exception as e:
+                logger.warning(
+                    f"Error creating idx_article_entities_entity_id: {e}")
+
+            try:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_embeddings_article_id ON embeddings(article_id);")
+            except Exception as e:
+                logger.warning(
+                    f"Error creating idx_embeddings_article_id: {e}")
 
             # Create HNSW indexes for fast vector similarity search (used in clustering)
-            cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_embeddings_hnsw ON embeddings 
-            USING hnsw (embedding vector_cosine_ops);
-            """)
+            try:
+                cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_embeddings_hnsw ON embeddings 
+                USING hnsw (embedding vector_cosine_ops);
+                """)
+            except Exception as e:
+                logger.warning(f"Error creating idx_embeddings_hnsw: {e}")
 
-            cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_clusters_hnsw ON clusters 
-            USING hnsw (centroid vector_cosine_ops);
-            """)
+            try:
+                cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_clusters_hnsw ON clusters 
+                USING hnsw (centroid vector_cosine_ops);
+                """)
+            except Exception as e:
+                logger.warning(f"Error creating idx_clusters_hnsw: {e}")
 
             conn.commit()
             cursor.close()

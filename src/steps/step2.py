@@ -21,6 +21,7 @@ import time
 import numpy as np
 import hdbscan
 from sklearn.preprocessing import normalize
+from sklearn.metrics.pairwise import cosine_distances
 from typing import List, Dict, Any, Tuple, Optional, Set
 import importlib.util
 from collections import defaultdict
@@ -88,22 +89,123 @@ def run() -> Dict[str, Any]:
 
         # Step 3: Prepare data for clustering
         logger.info("Step 2.3: Preparing data for clustering")
+
+        # Add logging for embeddings list before conversion
+        if embeddings:
+            logger.info(
+                f"Shape of embeddings list before conversion: ({len(embeddings)}, {len(embeddings[0]) if embeddings else 0})")
+            logger.info(
+                f"Type of 'embeddings': {type(embeddings)}, Type of first element: {type(embeddings[0]) if embeddings else 'N/A'}")
+
+            # Log the first few values of the first embedding for debugging
+            if embeddings and len(embeddings) > 0:
+                first_embedding = embeddings[0]
+                sample_values = first_embedding[:5] if len(
+                    first_embedding) >= 5 else first_embedding
+                logger.info(
+                    f"Sample values from first embedding: {sample_values}")
+                logger.info(
+                    f"Types of sample values: {[type(v) for v in sample_values]}")
+        else:
+            logger.warning("Embeddings list is empty before conversion.")
+
         # Convert list of embeddings to numpy array
         X = np.array(embeddings)
+        logger.info(f"Shape of X after np.array conversion: {X.shape}")
+        logger.info(f"Data type of X array: {X.dtype}")
+
+        # Check if we have string or object dtype and convert if needed
+        if X.dtype == 'O' or np.issubdtype(X.dtype, np.string_) or np.issubdtype(X.dtype, np.unicode_):
+            logger.warning(
+                f"Non-numeric dtype detected: {X.dtype}. Attempting to convert to float.")
+            try:
+                # Try to convert to float array
+                X = X.astype(np.float64)
+                logger.info(
+                    f"Successfully converted to float64. New dtype: {X.dtype}")
+            except ValueError as e:
+                logger.error(f"Failed to convert to float: {e}")
+                status["error"] = f"Failed to convert embeddings to float: {e}"
+                return status
+
+        # Try to fix dimension issues if we have a 1D array
+        if X.ndim == 1 and len(X) > 0:
+            logger.warning(
+                f"Got 1D array with length {len(X)}, attempting to reshape...")
+            try:
+                # If each embedding is itself a list/array, X might be an array of arrays
+                # which numpy couldn't properly reshape automatically
+                if isinstance(embeddings[0], (list, np.ndarray)):
+                    # Manually create a 2D array - probably needed if embeddings are different lengths
+                    embedding_length = len(embeddings[0])
+                    logger.info(
+                        f"First embedding has length {embedding_length}, creating uniform 2D array")
+                    # Create a new 2D array with the right dimensions
+                    new_X = np.zeros((len(embeddings), embedding_length))
+                    for i, emb in enumerate(embeddings):
+                        if len(emb) == embedding_length:  # Skip malformed embeddings
+                            new_X[i] = emb
+                    X = new_X
+                    logger.info(f"Successfully reshaped to {X.shape}")
+                else:
+                    # If X is a flat array, reshape it into a 2D array with 1 feature
+                    X = X.reshape(-1, 1)
+                    logger.info(f"Reshaped flat array to {X.shape}")
+            except Exception as reshape_error:
+                logger.error(f"Reshaping failed: {reshape_error}")
+                # Continue with validation which will catch the issue
+
+        # Add validation before HDBSCAN
+        if X.ndim != 2 or X.shape[0] == 0 or X.shape[1] == 0:
+            error_msg = f"Invalid shape for HDBSCAN input: {X.shape}. Expected 2D array."
+            logger.error(error_msg)
+            status["error"] = error_msg
+            if reader_client:
+                reader_client.close()
+            return status
+        logger.info(f"Data shape {X.shape} is valid for HDBSCAN.")
 
         # Step 4: Run HDBSCAN clustering
         logger.info("Step 2.4: Running HDBSCAN clustering algorithm")
         min_cluster_size = int(os.getenv("MIN_CLUSTER_SIZE", "10"))
         logger.info(f"Using min_cluster_size={min_cluster_size}")
 
-        # Initialize and run HDBSCAN
-        clusterer = hdbscan.HDBSCAN(
-            metric='cosine',
-            min_cluster_size=min_cluster_size,
-            prediction_data=True,
-            core_dist_n_jobs=-1  # Use all available cores
-        )
-        labels = clusterer.fit_predict(X)
+        # Compute cosine distance matrix explicitly
+        logger.info("Computing cosine distance matrix for clustering")
+        try:
+            # Normalize the vectors to unit length for cosine distance calculation
+            X_normalized = normalize(X, norm='l2', axis=1)
+
+            # Calculate cosine distances - this returns a matrix where
+            # each entry (i,j) is the cosine distance between vectors i and j
+            distance_matrix = cosine_distances(X_normalized)
+
+            logger.info(f"Distance matrix shape: {distance_matrix.shape}")
+
+            # Initialize HDBSCAN with precomputed distance matrix
+            # Note: prediction_data is not supported with precomputed distances
+            clusterer = hdbscan.HDBSCAN(
+                metric='precomputed',  # Tell HDBSCAN we're giving it precomputed distances
+                min_cluster_size=min_cluster_size,
+                core_dist_n_jobs=-1  # Use all available cores
+            )
+
+            # Fit using the distance matrix
+            labels = clusterer.fit_predict(distance_matrix)
+
+        except Exception as e:
+            logger.error(f"Error computing distances or clustering: {e}")
+
+            # Fallback to euclidean metric which is always supported
+            # With direct vector inputs, we can use prediction_data
+            logger.info("Falling back to euclidean metric")
+            clusterer = hdbscan.HDBSCAN(
+                metric='euclidean',
+                min_cluster_size=min_cluster_size,
+                prediction_data=True,
+                core_dist_n_jobs=-1  # Use all available cores
+            )
+            labels = clusterer.fit_predict(X)
 
         # Analyze clustering results
         unique_labels = set(labels)
@@ -220,13 +322,39 @@ def get_all_embeddings(reader_client: ReaderDBClient) -> List[Tuple[int, List[fl
         cursor.execute(query)
         results = cursor.fetchall()
 
-        # Process results
+        # Process results - ensure embeddings are converted to float values
         embeddings_data = []
         for article_id, embedding in results:
-            embeddings_data.append((article_id, embedding))
+            # Check if embedding is already a list of floats
+            if isinstance(embedding, list):
+                # Convert each element to float if needed
+                float_embedding = [float(val) if not isinstance(
+                    val, float) else val for val in embedding]
+                embeddings_data.append((article_id, float_embedding))
+            elif isinstance(embedding, str):
+                # If embedding is a string (like a JSON array), parse it
+                try:
+                    import json
+                    float_embedding = [float(val)
+                                       for val in json.loads(embedding)]
+                    embeddings_data.append((article_id, float_embedding))
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to parse embedding string for article_id {article_id}: {e}")
+                    # Skip this embedding
+            else:
+                logger.warning(
+                    f"Unexpected embedding type for article_id {article_id}: {type(embedding)}")
+                # Skip this embedding
 
         cursor.close()
         reader_client.release_connection(conn)
+
+        # Log some debug info
+        if embeddings_data:
+            logger.info(f"First embedding type: {type(embeddings_data[0][1])}")
+            logger.info(
+                f"First embedding element type: {type(embeddings_data[0][1][0]) if embeddings_data[0][1] else 'N/A'}")
 
         return embeddings_data
     except Exception as e:
@@ -398,7 +526,7 @@ def interpret_cluster(reader_client: ReaderDBClient, cluster_id: int, nlp):
         SELECT id, title, content
         FROM articles
         WHERE cluster_id = %s
-        ORDER BY published_at DESC
+        ORDER BY pub_date DESC
         LIMIT %s
         """
 
@@ -443,19 +571,65 @@ def interpret_cluster(reader_client: ReaderDBClient, cluster_id: int, nlp):
             "sample_ids": [article_id for article_id, _, _ in articles]
         }
 
-        # Update cluster metadata in database
-        update_query = """
-        UPDATE clusters
-        SET metadata = %s
-        WHERE id = %s
-        """
-
         import json
-        cursor.execute(update_query, (json.dumps(metadata), cluster_id))
-        conn.commit()
+        metadata_json = json.dumps(metadata)
 
-        logger.info(
-            f"Updated metadata for cluster {cluster_id}: {len(top_entities)} entities, {len(top_chunks)} topics")
+        # First check if the metadata column exists in the clusters table
+        try:
+            check_query = """
+            SELECT EXISTS (
+                SELECT FROM information_schema.columns 
+                WHERE table_name = 'clusters' AND column_name = 'metadata'
+            )
+            """
+            cursor.execute(check_query)
+            column_exists = cursor.fetchone()[0]
+
+            if column_exists:
+                # Update cluster metadata in database
+                update_query = """
+                UPDATE clusters
+                SET metadata = %s
+                WHERE id = %s
+                """
+                cursor.execute(update_query, (metadata_json, cluster_id))
+                conn.commit()
+                logger.info(
+                    f"Updated metadata for cluster {cluster_id}: {len(top_entities)} entities, {len(top_chunks)} topics")
+            else:
+                # Try to add the column if it doesn't exist
+                try:
+                    logger.info(
+                        f"Metadata column doesn't exist in clusters table. Attempting to add it.")
+                    alter_query = """
+                    ALTER TABLE clusters 
+                    ADD COLUMN IF NOT EXISTS metadata JSONB;
+                    """
+                    cursor.execute(alter_query)
+                    conn.commit()
+
+                    # Now try the update again
+                    update_query = """
+                    UPDATE clusters
+                    SET metadata = %s
+                    WHERE id = %s
+                    """
+                    cursor.execute(update_query, (metadata_json, cluster_id))
+                    conn.commit()
+                    logger.info(
+                        f"Added metadata column and updated cluster {cluster_id}: {len(top_entities)} entities, {len(top_chunks)} topics")
+                except Exception as alter_error:
+                    # If we can't alter the table, just log the metadata instead
+                    logger.warning(
+                        f"Unable to add metadata column: {alter_error}")
+                    logger.info(
+                        f"Cluster {cluster_id} interpretation (not stored in DB): {len(top_entities)} entities, {len(top_chunks)} topics")
+                    logger.debug(f"Metadata content: {metadata_json[:100]}...")
+        except Exception as schema_error:
+            logger.warning(f"Error checking schema: {schema_error}")
+            # Just log the interpretation results without storing
+            logger.info(
+                f"Cluster {cluster_id} interpretation (not stored): {len(top_entities)} entities, {len(top_chunks)} topics")
 
         cursor.close()
         reader_client.release_connection(conn)

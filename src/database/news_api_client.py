@@ -104,7 +104,8 @@ class NewsAPIClient:
         # Try with retries only for connection/timeout errors
         while retries < self.max_retries:
             try:
-                response = requests.get(url, params=params, timeout=10)
+                # Increase timeout from 10 to 20 seconds
+                response = requests.get(url, params=params, timeout=20)
                 # Raise HTTPError for bad responses (4xx or 5xx)
                 response.raise_for_status()
                 return response

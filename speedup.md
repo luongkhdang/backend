@@ -1,3 +1,20 @@
+Heavy Libraries
+PyTorch: torch==2.3.0 (~2GB)
+Required for transformers and neural network operations
+Transformers: transformers==4.41.1 (~500MB for base package)
+Used for loading pretrained models
+SpaCy: spacy==3.7.5 (~150MB for base package)
+Used for NLP tasks
+Clustering Libraries:
+hdbscan==0.8.36
+scikit-learn==1.3.2
+pandas==2.2.0
+Combined size: ~300MB
+Cache Locations
+Hugging Face models: /root/.cache/huggingface
+SpaCy models: /usr/local/lib/python3.10/site-packages/spacy/data
+PyTorch: /root/.cache/torch
+
 Okay, I understand the problem. Re-downloading and reinstalling large libraries like PyTorch, Transformers, spaCy, and their associated models during every Docker rebuild significantly slows down development.
 
 Here's a breakdown of why this happens and the best way to minimize rebuild times using Docker best practices:

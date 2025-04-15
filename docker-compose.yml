@@ -26,6 +26,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: article-transfer-app:latest
     container_name: article-transfer
     restart: "no"
     depends_on:
@@ -90,7 +91,7 @@ services:
     volumes:
       - ./src:/app/src # Mount source code for easier development
       - ./logs:/app/logs # Mount logs directory for error reports
-      - huggingface_cache:/root/.cache/huggingface # Mount cache volume
+      - huggingface_cache:/root/.cache/huggingface # Mount cache volume for HuggingFace models
     networks:
       - reader_network
     dns:
