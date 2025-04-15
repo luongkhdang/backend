@@ -52,6 +52,7 @@ class SummaryDataset(Dataset):
             self.texts[idx],
             max_length=self.max_length,
             truncation=True,
+            padding='max_length',
             return_tensors="pt"
         )
         # Remove batch dimension added by tokenizer

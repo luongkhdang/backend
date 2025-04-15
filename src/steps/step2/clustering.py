@@ -57,7 +57,7 @@ def cluster_articles(
     embeddings: np.ndarray,
     min_cluster_size: int = 5,
     min_samples: int = 3,
-    metric: str = 'euclidean',
+    metric: str = 'cosine',
     cluster_selection_epsilon: float = 0.5,
     alpha: float = 1.0
 ) -> Tuple[np.ndarray, List[int]]:
@@ -68,7 +68,7 @@ def cluster_articles(
         embeddings: Article embedding vectors
         min_cluster_size: Minimum size of clusters
         min_samples: Minimum samples in neighborhood for core points
-        metric: Distance metric to use
+        metric: Distance metric to use (using cosine for high-dimensional data)
         cluster_selection_epsilon: Controls whether points are assigned to clusters
         alpha: Affects cluster boundary expansion
 
@@ -91,6 +91,8 @@ def cluster_articles(
         core_dist_n_jobs=-1  # Use all available cores
     )
 
+    # Note: HDBSCAN does not support GPU acceleration
+    # All computation is CPU-based regardless of hardware
     cluster_labels = clusterer.fit_predict(embeddings)
 
     # Get unique cluster IDs (excluding noise which is -1)

@@ -30,7 +30,8 @@ Related modules:
 import logging
 import json
 from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -39,54 +40,50 @@ logger = logging.getLogger(__name__)
 def create_cluster(conn, name: str = None, description: Optional[str] = None,
                    centroid: Optional[List[float]] = None, is_hot: bool = False) -> Optional[int]:
     """
-    Create a new cluster with created_at timestamp in Pacific Time (day-month-year format).
+    Create a new cluster in the database.
 
     Args:
         conn: Database connection
-        name: Name of the cluster (will be stored in metadata)
-        description: Optional description of the cluster (will be stored in metadata)
+        name: Name of the cluster (stored in metadata)
+        description: Optional description (stored in metadata)
         centroid: Optional centroid vector of the cluster
         is_hot: Whether the cluster is hot
 
     Returns:
-        int or None: ID of the created cluster, or None if failed
+        int or None: Cluster ID if successful, None otherwise
     """
     try:
         cursor = conn.cursor()
 
-        # Store name and description in metadata since the actual schema doesn't have these columns
+        # Combine name and description into metadata
         metadata = {}
         if name:
             metadata['name'] = name
         if description:
             metadata['description'] = description
 
-        # Add current date in Pacific Time with day-month-year format to metadata
-        # This is for display purposes - the actual created_at field is used for queries
-        cursor.execute(
-            "SELECT TO_CHAR(NOW() AT TIME ZONE 'America/Los_Angeles', 'DD-MM-YYYY')")
-        pacific_date = cursor.fetchone()[0]
-        metadata['pacific_date'] = pacific_date
-
         # Use default value for article_count
         article_count = 0
 
+        # Calculate current date in Pacific Time
+        pacific_tz = ZoneInfo('America/Los_Angeles')
+        pacific_date = datetime.now(pacific_tz).date()
+
         # Create the cluster with the fields that actually exist in the schema
-        # Use Pacific Time for created_at timestamp
         cursor.execute("""
             INSERT INTO clusters (
                 centroid, is_hot, article_count, metadata, created_at
             )
             VALUES (
-                %s, %s, %s, %s, 
-                (NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles')
+                %s, %s, %s, %s, %s
             )
             RETURNING id;
         """, (
             centroid,
             is_hot,
             article_count,
-            json.dumps(metadata) if metadata else None
+            json.dumps(metadata) if metadata else None,
+            pacific_date  # Use calculated Pacific date
         ))
 
         result = cursor.fetchone()
@@ -96,7 +93,7 @@ def create_cluster(conn, name: str = None, description: Optional[str] = None,
         if result:
             cluster_id = result[0]
             logger.info(
-                f"Created cluster {cluster_id} with Pacific Time date: {pacific_date}")
+                f"Created cluster {cluster_id}")
             return cluster_id
 
         return None
@@ -639,24 +636,26 @@ def delete_clusters_from_today(conn) -> int:
     try:
         cursor = conn.cursor()
 
-        # First, update all articles to remove cluster_id reference
+        # Calculate the current date in Pacific Time
+        pacific_tz = ZoneInfo('America/Los_Angeles')
+        today_pacific = datetime.now(pacific_tz).date()
+
+        # First, update all articles to remove cluster_id reference for clusters created today
         cursor.execute("""
             UPDATE articles
             SET cluster_id = NULL
             WHERE cluster_id IN (
                 SELECT id FROM clusters 
-                WHERE DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles') = 
-                      DATE(NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles')
+                WHERE created_at = %s
             )
-        """)
+        """, (today_pacific,))
 
-        # Then delete the clusters created today in Pacific time
+        # Then delete the clusters created today
         cursor.execute("""
             DELETE FROM clusters
-            WHERE DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles') = 
-                  DATE(NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles')
+            WHERE created_at = %s
             RETURNING id;
-        """)
+        """, (today_pacific,))
 
         deleted_rows = cursor.rowcount
         conn.commit()

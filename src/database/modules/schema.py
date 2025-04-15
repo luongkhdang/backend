@@ -101,7 +101,7 @@ def initialize_tables(conn) -> bool:
             is_hot BOOLEAN DEFAULT FALSE,
             article_count INTEGER,
             metadata JSONB,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at DATE,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)

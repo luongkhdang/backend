@@ -62,6 +62,7 @@ from .hotness import calculate_hotness_factors, get_weight_params
 from .database import insert_clusters, batch_update_article_cluster_assignments
 from .interpretation import interpret_cluster, get_cluster_keywords
 from .utils import initialize_nlp, SPACY_AVAILABLE
+from .metadata_generation import generate_and_update_cluster_metadata
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -229,7 +230,9 @@ def run() -> Dict[str, Any]:
             logger.info(f"Distance matrix shape: {distance_matrix.shape}")
 
             # Initialize HDBSCAN with precomputed distance matrix
-            # Note: prediction_data is not supported with precomputed distances
+            # Note: HDBSCAN does not support GPU acceleration, all computation is CPU-based
+            # regardless of available hardware. The precomputed matrix approach can be more efficient
+            # for cosine distances with high-dimensional data.
             clusterer = hdbscan.HDBSCAN(
                 metric='precomputed',  # Tell HDBSCAN we're giving it precomputed distances
                 min_cluster_size=min_cluster_size,
@@ -244,11 +247,11 @@ def run() -> Dict[str, Any]:
 
             # Fallback to using the cluster_articles function with euclidean metric
             logger.info(
-                "Falling back to euclidean metric using cluster_articles function")
+                "Falling back to direct clustering with cosine metric")
             labels, _ = cluster_articles(
                 embeddings=X,
                 min_cluster_size=min_cluster_size,
-                metric='euclidean'
+                metric='cosine'  # Use cosine metric for high-dimensional data
             )
 
         # Analyze clustering results
@@ -331,9 +334,48 @@ def run() -> Dict[str, Any]:
                 status["db_update_success"] = update_stats[0]
                 status["db_update_failure"] = update_stats[1]
 
-        # Step 8 (Optional): Basic cluster interpretation with spaCy
+        # Step 10: Enhanced cluster metadata generation
+        logger.info("Step 2.10: Generating enhanced cluster metadata")
+        try:
+            # Create a mapping of cluster_label -> list of article_ids
+            cluster_article_map = {}
+            for article_index, label in enumerate(labels):
+                if label >= 0:  # Skip noise points (label -1)
+                    if label not in cluster_article_map:
+                        cluster_article_map[label] = []
+                    cluster_article_map[label].append(
+                        article_ids[article_index])
+
+            # Create a mapping of article_id -> embedding for efficient lookups
+            embeddings_map = {article_ids[i]: embeddings[i]
+                              for i in range(len(article_ids))}
+
+            # Process each cluster
+            for label, cluster_articles in cluster_article_map.items():
+                db_cluster_id = cluster_db_map.get(label)
+                if db_cluster_id and cluster_articles:
+                    # Get the centroid for this cluster
+                    cluster_centroid = centroids.get(label)
+
+                    # Generate enhanced metadata for this cluster
+                    generate_and_update_cluster_metadata(
+                        cluster_id=db_cluster_id,
+                        article_ids=cluster_articles,
+                        embeddings_map=embeddings_map,
+                        cluster_centroid=cluster_centroid,
+                        reader_db_client=reader_client
+                    )
+
+            logger.info(
+                f"Successfully generated enhanced metadata for {len(cluster_article_map)} clusters")
+        except Exception as e:
+            logger.warning(
+                f"Error during enhanced metadata generation: {e}", exc_info=True)
+            # Don't fail the whole process if metadata generation fails
+
+        # Step 11 (Optional): Basic cluster interpretation with spaCy
         if SPACY_AVAILABLE and os.getenv("INTERPRET_CLUSTERS", "false").lower() == "true" and nlp is not None:
-            logger.info("Step 2.8: Performing basic cluster interpretation")
+            logger.info("Step 2.11: Performing basic cluster interpretation")
             try:
                 # Get cluster interpretations for a subset of clusters (limit to save time)
                 max_clusters_to_interpret = min(

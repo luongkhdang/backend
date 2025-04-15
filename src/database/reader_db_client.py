@@ -34,7 +34,6 @@ from src.database.modules import articles
 from src.database.modules import entities
 from src.database.modules import embeddings
 from src.database.modules import clusters
-from src.database.modules import dimensionality
 from src.database.modules import essays
 
 # Configure logging
@@ -878,101 +877,6 @@ class ReaderDBClient:
             finally:
                 self.release_connection(conn)
         return False
-
-    # Dimensionality reduction operations
-    def store_coordinates(self, article_id: int, coordinates: Dict[str, Any], method: str) -> bool:
-        """
-        Store dimensionality reduction coordinates for an article.
-
-        Args:
-            article_id: ID of the article
-            coordinates: Dictionary containing the coordinates and metadata
-            method: Dimensionality reduction method (e.g., 'umap', 'tsne', 'pca')
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        conn = self.get_connection()
-        if conn:
-            try:
-                return dimensionality.store_coordinates(conn, article_id, coordinates, method)
-            finally:
-                self.release_connection(conn)
-        return False
-
-    def batch_store_coordinates(self, coordinates_data: List[Dict[str, Any]]) -> Dict[str, int]:
-        """
-        Store multiple sets of coordinates in batches.
-
-        Args:
-            coordinates_data: List of dictionaries containing article_id, coordinates, method
-
-        Returns:
-            Dict[str, int]: Dictionary with counts of successful and failed operations
-        """
-        conn = self.get_connection()
-        if conn:
-            try:
-                return dimensionality.batch_store_coordinates(conn, coordinates_data)
-            finally:
-                self.release_connection(conn)
-        return {"success_count": 0, "error_count": 0}
-
-    def get_coordinates(self, article_id: int, method: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Get dimensionality reduction coordinates for an article.
-
-        Args:
-            article_id: ID of the article
-            method: Optional method filter (e.g., 'umap', 'tsne', 'pca')
-
-        Returns:
-            List[Dict[str, Any]]: List of coordinate data for the article
-        """
-        conn = self.get_connection()
-        if conn:
-            try:
-                return dimensionality.get_coordinates(conn, article_id, method)
-            finally:
-                self.release_connection(conn)
-        return []
-
-    def update_coordinates_config(self, config: Dict[str, Any], method: str) -> bool:
-        """
-        Update configuration metadata for a dimensionality reduction method.
-
-        Args:
-            config: Configuration dictionary
-            method: Dimensionality reduction method
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        conn = self.get_connection()
-        if conn:
-            try:
-                return dimensionality.update_coordinates_config(conn, config, method)
-            finally:
-                self.release_connection(conn)
-        return False
-
-    def get_coordinates_config(self, method: str) -> Optional[Dict[str, Any]]:
-        """
-        Get the configuration for a dimensionality reduction method.
-
-        Args:
-            method: Dimensionality reduction method
-
-        Returns:
-            Dict[str, Any] or None: The configuration data or None if not found
-        """
-        conn = self.get_connection()
-        if conn:
-            try:
-                return dimensionality.get_coordinates_config(conn, method)
-            finally:
-                self.release_connection(conn)
-        return None
 
     def get_largest_clusters(self, limit: int = 10) -> List[Dict[str, Any]]:
         """

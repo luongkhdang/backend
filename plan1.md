@@ -1,67 +1,64 @@
-# Plan to Enable and Verify GPU Utilization (plan1.md)
+# Plan: Enhance Cluster Metadata
 
-**Goal:** Ensure the `article-transfer` service can access and utilize the host's NVIDIA GPU (GTX 1060) for NLP tasks in Step 1.7, resolving the observed 0% utilization.
+**Goal:** Enhance the `metadata` JSONB column in the `clusters` table to provide a richer, more informative snapshot of each cluster's characteristics beyond just name, description, and basic metrics.
 
-**Phase 1: GPU Verification Utility (`src/utils/gpu_client.py`)**
+**Current Metadata:**
 
-1.  **Create File:** Create the file `src/utils/gpu_client.py`.
-2.  **Implement Check Function:** Add a function `check_gpu_availability()`:
-    - Import `torch` and `logging`.
-    - Check `torch.cuda.is_available()`.
-    - If `True`:
-      - Log INFO messages detailing the number of GPUs found (`torch.cuda.device_count()`) and the name of the default GPU (`torch.cuda.get_device_name(0)`).
-      - Log INFO confirming "PyTorch CUDA setup appears correct."
-      - Return `True`.
-    - If `False`:
-      - Log a WARNING message: "PyTorch cannot find CUDA. GPU acceleration will NOT be available. Check Docker setup, NVIDIA drivers, CUDA toolkit in the base image, and PyTorch CUDA build."
-      - Return `False`.
-3.  **Add Main Block:** Include an `if __name__ == "__main__":` block that calls `check_gpu_availability()` so the script can be run directly for testing.
+- `name`, `description` (if provided during creation)
+- `article_count` (updated periodically)
+- `metrics` (updated by `update_cluster_metrics`, structure determined by that function)
+- `pacific_date` (added previously for display)
 
-**Phase 2: Docker Configuration**
+**Proposed Additional Metadata Fields:**
 
-1.  **Base Image Requirements (Prerequisite - User Verification Needed):**
+1.  **`top_keywords` (List[str]):** The most frequent or representative keywords derived from the titles or content of articles within the cluster. (Limit: e.g., top 10)
+2.  **`key_entities` (List[Dict[str, Any]]):** The most prominent named entities (people, organizations, locations) mentioned across the articles in the cluster. Could include entity name, type, and frequency/aggregate score. (Limit: e.g., top 5)
+3.  **`date_range` (Dict[str, str]):** The earliest (`min_date`) and latest (`max_date`) publication dates of articles within the cluster, indicating its temporal span. Dates stored as ISO strings.
+4.  **`top_domains` (List[Dict[str, Any]]):** The most frequent source domains contributing articles to this cluster, along with their counts or percentages. (Limit: e.g., top 5)
+5.  **`representative_article_id` (Optional[int]):** The ID of an article that is very close to the cluster's centroid, serving as a prime example of the cluster's content.
 
-    - **Verify/Update Base Image:** The Docker base image used for `article-transfer` (e.g., `article-transfer-base:latest`) **must** have the following installed:
-      - NVIDIA Container Toolkit support (often handled by the base OS image if using official NVIDIA images or setting up manually).
-      - A PyTorch version compiled with CUDA support compatible with the host's NVIDIA driver version and the GTX 1060's architecture. (e.g., check PyTorch installation command - it should specify a CUDA version like `cu118` or `cu121`).
+**Implementation Plan:**
 
-2.  **`docker-compose.yml` Modifications:**
-    - **Target Service:** Locate the `article-transfer` service definition.
-    - **Enable GPU Access:** Add the `deploy` section to grant the container access to the GPU. This is the modern approach.
-      ```yaml
-      services:
-        article-transfer:
-          # ... existing configuration ...
-          deploy:
-            resources:
-              reservations:
-                devices:
-                  - driver: nvidia
-                    count: 1 # Request 1 GPU
-                    capabilities: [gpu, compute, utility]
-          # Potentially add environment variables (less common with 'deploy' but can help)
-          # environment:
-          #   # ... existing environment variables ...
-          #   NVIDIA_VISIBLE_DEVICES: all
-          #   NVIDIA_DRIVER_CAPABILITIES: compute,utility
-          # ... rest of service definition ...
-      ```
-    - _(Self-correction: The `deploy` key is preferred over older methods like `runtime: nvidia`)_.
-
-**Phase 3: Integration & Verification**
-
-1.  **`src/main.py` Integration:**
-    - Import the `check_gpu_availability` function from `src/utils/gpu_client`.
-    - Call `check_gpu_availability()` near the beginning of the `main()` function (e.g., after parsing arguments or logging startup).
-    - Log the boolean result to clearly indicate if the GPU check passed during container startup.
-2.  **Build and Run:**
-    - Rebuild the `article-transfer` image: `docker-compose build article-transfer`
-    - Run the service: `docker-compose up article-transfer` (or the full stack).
-3.  **Check Logs:** Observe the startup logs for the output of the `check_gpu_availability` function. This will confirm if PyTorch can see the GPU _inside the container_.
-4.  **Monitor Utilization:** If the logs indicate GPU availability, monitor GPU utilization using host tools (like `nvidia-smi`) _while Step 1.7 is actively summarizing long articles_. Utilization should now be > 0% during those specific tasks.
-
-**Notes:**
-
-- This plan focuses on enabling Docker access and verifying PyTorch's view. The Python code in `LocalNLPClient` already attempts GPU usage.
-- The most common failure points are the Docker base image lacking CUDA-enabled PyTorch or the `docker-compose.yml` not correctly requesting GPU resources.
-- The `gpu_client.py` script provides a simple, isolated way to test the core PyTorch CUDA detection within the container environment.
+1.  **Location:** The calculation and updating of this enhanced metadata should occur within **Step 2 (Clustering)**, specifically after the HDBSCAN algorithm has assigned articles to clusters and these assignments have been initially recorded in the database. The refactored `src/steps/step2/` structure is the target location.
+2.  **New Function:** Create a new function within the Step 2 logic (e.g., in `src/steps/step2/cluster_processing.py` or a new `metadata_generation.py` utility file):
+    ```python
+    def generate_and_update_cluster_metadata(
+        cluster_id: int,
+        article_ids: List[int],
+        embeddings_map: Dict[int, List[float]], # Map article_id -> embedding
+        cluster_centroid: Optional[List[float]],
+        reader_db_client: ReaderDBClient
+    ) -> None:
+        """
+        Calculates enhanced metadata for a cluster and updates the database.
+        Args:
+            cluster_id: The ID of the cluster to process.
+            article_ids: List of article IDs belonging to this cluster.
+            embeddings_map: Dictionary mapping article IDs to their embeddings.
+            cluster_centroid: The calculated centroid for this cluster.
+            reader_db_client: Instance of ReaderDBClient for DB operations.
+        """
+        # Implementation steps below...
+    ```
+3.  **Data Fetching (within the new function):**
+    - Use `reader_db_client` to fetch necessary data for the given `article_ids`:
+      - Article titles (`get_sample_titles_for_articles` or a tailored query).
+      - Article publication dates (`get_publication_dates_for_articles`).
+      - Article domains (requires a new `reader_db_client` method or extending an existing one).
+      - Linked entities via `article_entities` table (requires a new `reader_db_client` method).
+4.  **Metadata Calculation (within the new function):**
+    - **Keywords:** Implement a simple keyword extraction logic (e.g., process titles, remove stop words, count frequency, take top N).
+    - **Entities:** Aggregate fetched entities, rank by frequency (or influence score if available), take top N.
+    - **Date Range:** Find the minimum and maximum dates from the fetched publication dates. Format as ISO strings.
+    - **Domains:** Count occurrences of each domain, calculate percentages if desired, take top N.
+    - **Representative Article:** If a centroid exists, iterate through `article_ids`, calculate the distance between each article's embedding (from `embeddings_map`) and the `cluster_centroid`. Select the article ID with the minimum distance. (Requires a distance function, e.g., cosine distance).
+5.  **Database Update (within the new function):**
+    - Construct a dictionary `enhanced_metadata` containing the calculated fields (`top_keywords`, `key_entities`, `date_range`, `top_domains`, `representative_article_id`).
+    - Call `reader_db_client.update_cluster_metadata(cluster_id, enhanced_metadata)`. Ensure this method correctly _merges_ the new data with any existing metadata in the JSONB column.
+6.  **Integration into Step 2:**
+    - Identify the loop in `src/steps/step2/cluster_processing.py` (or similar) where clusters are processed after HDBSCAN (likely after `reader_db_client.batch_update_article_clusters`).
+    - Inside the loop for each valid cluster (not noise points, i.e., `cluster_id != -1`), call the `generate_and_update_cluster_metadata` function, passing the necessary arguments (cluster ID, article IDs for that cluster, embeddings, centroid, DB client).
+7.  **New `ReaderDBClient` Methods (if needed):**
+    - Add methods like `get_domains_for_articles(article_ids)` and `get_entities_for_articles(article_ids)` if they don't exist or cannot be easily adapted from existing ones.
+8.  **Dependencies:** Keyword extraction might require basic NLP libraries (like `nltk` or `spacy` for stop words/tokenization, potentially already installed) or can be done with standard Python collections. Distance calculation requires `numpy` or `scipy.spatial.distance`.
+9.  **Documentation:** Update header comments and docstrings for all modified/new files and functions.
