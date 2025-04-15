@@ -205,8 +205,12 @@ def insert_processed_articles(processed_articles: list) -> int:
 
     try:
         # Insert articles into the database
-        count = reader_client.batch_insert_articles(processed_articles)
-        return count
+        result = reader_client.batch_insert_articles(processed_articles)
+        # Extract success count from the result dictionary
+        if isinstance(result, dict):
+            return result.get("success", 0)
+        # For backward compatibility, in case it returns an int
+        return result if isinstance(result, int) else 0
     except Exception as e:
         logger.error(f"Error inserting articles into the database: {e}")
         return 0
@@ -416,11 +420,13 @@ def run(max_workers: int = None) -> int:
                         articles_to_insert = pending_articles[:]  # Copy
                         pending_articles = []
                     if articles_to_insert:
-                        count = reader_db.batch_insert_articles(
+                        result = reader_db.batch_insert_articles(
                             articles_to_insert)
-                        inserted_count += count
+                        # Extract success count from the result dictionary
+                        success_count = result.get("success", 0)
+                        inserted_count += success_count
                         last_db_update_time = time.time()
-                        return count
+                        return success_count
                     return 0
 
                 # Use thread pool for I/O bound tasks (content processing/validation)
@@ -535,8 +541,10 @@ def run(max_workers: int = None) -> int:
                     try:
                         # Loop through articles in the copied list
                         for article_id, embedding in embeddings_to_insert:
+                            # Convert embedding list to a dictionary expected by insert_embedding
+                            embedding_dict = {'embedding': embedding}
                             result = reader_db_embed.insert_embedding(
-                                article_id, embedding
+                                article_id, embedding_dict
                             )
                             if result:
                                 success_count_in_batch += 1
@@ -683,13 +691,17 @@ def run(max_workers: int = None) -> int:
 
                                 if embeddings_to_insert:
                                     for article_id, embedding in embeddings_to_insert:
+                                        # Convert embedding list to a dictionary expected by insert_embedding
+                                        embedding_dict = {
+                                            'embedding': embedding}
                                         result = reader_db_embed.insert_embedding(
-                                            article_id, embedding)
+                                            article_id, embedding_dict)
                                         if result:
                                             success_count += 1
                                     embedding_success_1_7 += success_count  # Update total count
                                     last_db_update_time_1_7 = time.time()
                                     return success_count
+                                return 0
 
                             def process_summarization_embedding_task(article_data: Dict[str, Any]) -> Tuple[int, bool, bool]:
                                 """

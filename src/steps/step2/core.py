@@ -301,14 +301,20 @@ def run() -> Dict[str, Any]:
                 return status
             raise
 
-        # Step 7: Store clusters in the database
-        logger.info("Step 2.7: Storing clusters in database")
+        # Step 7: Delete existing clusters from today before creating new ones
+        logger.info(
+            "Step 2.7: Deleting existing clusters from today (Pacific Time)")
+        deleted_count = reader_client.delete_todays_clusters()
+        logger.info(f"Deleted {deleted_count} existing clusters from today")
+
+        # Step 8: Store clusters in the database
+        logger.info("Step 2.8: Storing clusters in database")
         cluster_db_map = insert_clusters(
             reader_client, centroids, cluster_hotness_map)
         logger.info(f"Inserted {len(cluster_db_map)} clusters into database")
 
-        # Step 8: Update article cluster assignments
-        logger.info("Step 2.8: Updating article cluster assignments")
+        # Step 9: Update article cluster assignments
+        logger.info("Step 2.9: Updating article cluster assignments")
         update_stats = batch_update_article_cluster_assignments(
             reader_client, article_ids, labels, cluster_db_map, cluster_hotness_map)
 

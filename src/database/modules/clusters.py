@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 def create_cluster(conn, name: str = None, description: Optional[str] = None,
                    centroid: Optional[List[float]] = None, is_hot: bool = False) -> Optional[int]:
     """
-    Create a new cluster.
+    Create a new cluster with created_at timestamp in Pacific Time (day-month-year format).
 
     Args:
         conn: Database connection
@@ -61,15 +61,26 @@ def create_cluster(conn, name: str = None, description: Optional[str] = None,
         if description:
             metadata['description'] = description
 
+        # Add current date in Pacific Time with day-month-year format to metadata
+        # This is for display purposes - the actual created_at field is used for queries
+        cursor.execute(
+            "SELECT TO_CHAR(NOW() AT TIME ZONE 'America/Los_Angeles', 'DD-MM-YYYY')")
+        pacific_date = cursor.fetchone()[0]
+        metadata['pacific_date'] = pacific_date
+
         # Use default value for article_count
         article_count = 0
 
         # Create the cluster with the fields that actually exist in the schema
+        # Use Pacific Time for created_at timestamp
         cursor.execute("""
             INSERT INTO clusters (
                 centroid, is_hot, article_count, metadata, created_at
             )
-            VALUES (%s, %s, %s, %s, NOW())
+            VALUES (
+                %s, %s, %s, %s, 
+                (NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles')
+            )
             RETURNING id;
         """, (
             centroid,
@@ -84,7 +95,8 @@ def create_cluster(conn, name: str = None, description: Optional[str] = None,
 
         if result:
             cluster_id = result[0]
-            logger.info(f"Created cluster {cluster_id}")
+            logger.info(
+                f"Created cluster {cluster_id} with Pacific Time date: {pacific_date}")
             return cluster_id
 
         return None
@@ -610,3 +622,51 @@ def get_largest_clusters(conn, limit: int = 10) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error retrieving largest clusters: {e}")
         return []
+
+
+def delete_clusters_from_today(conn) -> int:
+    """
+    Delete all clusters created on the current day (Pacific Time).
+
+    This ensures we only maintain one set of clusters per day.
+
+    Args:
+        conn: Database connection
+
+    Returns:
+        int: Number of clusters deleted
+    """
+    try:
+        cursor = conn.cursor()
+
+        # First, update all articles to remove cluster_id reference
+        cursor.execute("""
+            UPDATE articles
+            SET cluster_id = NULL
+            WHERE cluster_id IN (
+                SELECT id FROM clusters 
+                WHERE DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles') = 
+                      DATE(NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles')
+            )
+        """)
+
+        # Then delete the clusters created today in Pacific time
+        cursor.execute("""
+            DELETE FROM clusters
+            WHERE DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles') = 
+                  DATE(NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles')
+            RETURNING id;
+        """)
+
+        deleted_rows = cursor.rowcount
+        conn.commit()
+        cursor.close()
+
+        logger.info(
+            f"Deleted {deleted_rows} clusters created today in Pacific Time")
+        return deleted_rows
+
+    except Exception as e:
+        logger.error(f"Error deleting today's clusters: {e}")
+        conn.rollback()
+        return 0

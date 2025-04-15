@@ -974,6 +974,41 @@ class ReaderDBClient:
                 self.release_connection(conn)
         return None
 
+    def get_largest_clusters(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get the largest clusters by article count.
+
+        Args:
+            limit: Maximum number of clusters to return
+
+        Returns:
+            List[Dict[str, Any]]: List of top clusters by article count
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return clusters.get_largest_clusters(conn, limit)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def delete_todays_clusters(self) -> int:
+        """
+        Delete all clusters created today in Pacific Time zone.
+
+        This ensures we maintain only one set of clusters per day.
+
+        Returns:
+            int: Number of clusters deleted
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return clusters.delete_clusters_from_today(conn)
+            finally:
+                self.release_connection(conn)
+        return 0
+
     def close(self):
         """Close the database connection pool."""
         if hasattr(self, 'connection_pool') and self.connection_pool:

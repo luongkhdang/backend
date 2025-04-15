@@ -96,7 +96,7 @@ services:
       # Use skip-network-check to bypass Docker CLI checks
       FORCE_CONTINUE_ON_NETWORK_ERROR: "true"
     # Add the skip-network-check flag to avoid Docker introspection
-    command: ["python", "src/main.py", "--workers", "4", "--skip-network-check"]
+    command: ["python", "src/main.py", "--workers", "4"]
     volumes:
       - ./src:/app/src # Mount source code for easier development
       - ./logs:/app/logs # Mount logs directory for error reports
