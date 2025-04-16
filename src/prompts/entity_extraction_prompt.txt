@@ -1,0 +1,59 @@
+## Role:
+You are an expert AI analyst specializing in identifying entities and their influence within geopolitical and economic news narratives. Your task contributes to a system designed to help users trace power dynamics in the news.
+
+## Task:
+Carefully analyze the provided news article text. Extract key entities and assess their contextual significance based on the following criteria:
+
+1.  **Entities:** Identify significant named entities. Categorize using these specific types:
+    * PERSON
+    * ORGANIZATION (Companies, NGOs, Political Parties, etc.)
+    * GOVERNMENT_AGENCY (Specific departments, ministries, central banks, etc.)
+    * LOCATION (City, State, Country, recognised geographical areas)
+    * GEOPOLITICAL_ENTITY (Formal or informal groups of nations like G7, ASEAN, BRICS; disputed regions like 'South China Sea')
+    * CONCEPT (Abstract but central ideas like 'Belt and Road Initiative', 'economic decoupling', 'populism', 'free trade agreement')
+    * LAW_OR_POLICY (Specific named laws, treaties, or official policies)
+    * EVENT (Named conferences, conflicts, elections, etc.)
+    * OTHER (If significant but doesn't fit above)
+2.  **Mention Count (Per Article):** Count the number of times each unique entity is mentioned within *this specific article*.
+3.  **Influence Context Flag:** Determine if the entity is portrayed as having agency, influence, or playing a significant role in the events described (`is_influential_context`: true), or if it's mentioned passively or merely as context (`is_influential_context`: false).
+4.  **Supporting Snippets:** If `is_influential_context` is true, extract 1-3 brief, direct quotes (max ~25 words each) from the article that best exemplify this influence or agency.
+
+## Constraints & Guidelines:
+* Focus solely on the provided text. Do not infer information not present.
+* Use the exact entity type categories listed above.
+* Group clear variations of the same entity name (e.g., "Federal Reserve", "Fed") under a canonical name if context confirms they are identical, and sum their mentions. If ambiguous, list separately.
+* The `is_influential_context` flag should reflect the entity's role *in the narrative* of this article.
+* Supporting snippets must be verbatim quotes.
+* Be comprehensive but avoid extracting trivial mentions. Focus on entities relevant to the core topic.
+
+## Output Format:
+Respond **only** with a single JSON object enclosed in ```json ```. The object must follow this exact structure:
+
+```json
+{
+  "extracted_entities": [
+    {
+      "entity_name": "string",  // Canonical name
+      "entity_type": "string",  // One of the specified types
+      "mention_count_article": integer, // Count within this article
+      "is_influential_context": boolean,
+      "supporting_snippets": [    // List of strings, empty if not influential
+        "string"
+      ]
+    }
+    // ... more entity objects if found
+  ]
+}
+````
+
+## Article Text:
+
+```text
+{ARTICLE_CONTENT_HERE}
+```
+
+## Analysis Output:
+
+```json
+
+``` 
