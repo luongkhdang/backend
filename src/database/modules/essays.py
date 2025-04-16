@@ -35,7 +35,8 @@ def insert_essay(conn, essay: Dict[str, Any]) -> Optional[int]:
 
     Args:
         conn: Database connection
-        essay: The essay data to insert
+        essay: The essay data to insert (expects 'type', 'title', 'content', 
+               optionally 'article_id', 'layer_depth', 'cluster_id', 'tags')
 
     Returns:
         int or None: The new essay ID if successful, None otherwise
@@ -43,38 +44,43 @@ def insert_essay(conn, essay: Dict[str, Any]) -> Optional[int]:
     try:
         cursor = conn.cursor()
 
-        # Extract essay data with defaults
-        title = essay.get('title', '')
-        content = essay.get('content', '')
-        cluster_id = essay.get('cluster_id')
-        author = essay.get('author', 'system')
-        essay_type = essay.get('type', 'summary')
-        metadata = essay.get('metadata', {})
+        # Extract essay data using correct schema fields
+        essay_type = essay.get('type', 'unknown')  # Required
+        title = essay.get('title', '')  # Required, default empty
+        content = essay.get('content', '')  # Required, default empty
+        article_id = essay.get('article_id')  # Optional
+        layer_depth = essay.get('layer_depth')  # Optional
+        cluster_id = essay.get('cluster_id')  # Optional
+        tags = essay.get('tags')  # Optional (list of strings)
 
-        # Insert the essay
+        # Insert the essay using correct columns
         cursor.execute("""
             INSERT INTO essays (
-                title, content, cluster_id, author, type, metadata, created_at
+                type, article_id, title, content, layer_depth, cluster_id, tags 
+                -- created_at uses DEFAULT CURRENT_TIMESTAMP
             )
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """, (
+            essay_type,
+            article_id,
             title,
             content,
+            layer_depth,
             cluster_id,
-            author,
-            essay_type,
-            json.dumps(metadata) if metadata else None
+            tags  # Pass list directly, psycopg2 handles TEXT[]
         ))
 
         new_id = cursor.fetchone()[0]
         conn.commit()
         cursor.close()
 
+        logger.info(
+            f"Successfully inserted essay {new_id} of type '{essay_type}'.")
         return new_id
 
     except Exception as e:
-        logger.error(f"Error inserting essay: {e}")
+        logger.error(f"Error inserting essay: {e}", exc_info=True)
         conn.rollback()
         return None
 
@@ -94,28 +100,29 @@ def link_essay_entity(conn, essay_id: int, entity_id: int) -> bool:
     try:
         cursor = conn.cursor()
 
-        # Insert the link
+        # Insert the link, do nothing on conflict. No RETURNING clause.
         cursor.execute("""
             INSERT INTO essay_entities (
                 essay_id, entity_id
             )
             VALUES (%s, %s)
-            ON CONFLICT (essay_id, entity_id) DO NOTHING
-            RETURNING id;
+            ON CONFLICT (essay_id, entity_id) DO NOTHING;
         """, (
             essay_id,
             entity_id
         ))
 
-        result = cursor.fetchone() is not None
+        # Assume success if no exception is raised.
+        # cursor.rowcount might be 0 if conflict occurred, but that's not an error here.
         conn.commit()
         cursor.close()
-
-        return result
+        logger.debug(
+            f"Attempted to link essay {essay_id} to entity {entity_id}.")
+        return True
 
     except Exception as e:
         logger.error(
-            f"Error linking essay {essay_id} to entity {entity_id}: {e}")
+            f"Error linking essay {essay_id} to entity {entity_id}: {e}", exc_info=True)
         conn.rollback()
         return False
 
@@ -134,33 +141,28 @@ def get_essay_by_id(conn, essay_id: int) -> Optional[Dict[str, Any]]:
     try:
         cursor = conn.cursor()
 
-        # Get the essay
+        # Get the essay using correct schema columns
         cursor.execute("""
-            SELECT id, title, content, cluster_id, author, type, metadata, created_at
+            SELECT id, type, article_id, title, content, layer_depth, cluster_id, created_at, tags
             FROM essays
             WHERE id = %s
         """, (essay_id,))
 
         row = cursor.fetchone()
-        cursor.close()
 
         if not row:
+            cursor.close()
             return None
 
-        # Convert row to dictionary
-        return {
-            'id': row[0],
-            'title': row[1],
-            'content': row[2],
-            'cluster_id': row[3],
-            'author': row[4],
-            'type': row[5],
-            'metadata': row[6] if row[6] else {},
-            'created_at': row[7]
-        }
+        # Convert row to dictionary using column names
+        columns = [desc[0] for desc in cursor.description]
+        essay_data = dict(zip(columns, row))
+        cursor.close()
+
+        return essay_data
 
     except Exception as e:
-        logger.error(f"Error retrieving essay {essay_id}: {e}")
+        logger.error(f"Error retrieving essay {essay_id}: {e}", exc_info=True)
         return None
 
 
@@ -178,29 +180,23 @@ def get_essays_by_cluster(conn, cluster_id: int) -> List[Dict[str, Any]]:
     try:
         cursor = conn.cursor()
 
-        # Get essays for the cluster
+        # Get essays for the cluster using correct schema columns
         cursor.execute("""
-            SELECT id, title, content, author, type, metadata, created_at
+            SELECT id, type, article_id, title, content, layer_depth, cluster_id, created_at, tags
             FROM essays
             WHERE cluster_id = %s
             ORDER BY created_at DESC
         """, (cluster_id,))
 
         essays = []
+        columns = [desc[0] for desc in cursor.description]
         for row in cursor.fetchall():
-            essays.append({
-                'id': row[0],
-                'title': row[1],
-                'content': row[2],
-                'author': row[3],
-                'type': row[4],
-                'metadata': row[5] if row[5] else {},
-                'created_at': row[6]
-            })
+            essays.append(dict(zip(columns, row)))
 
         cursor.close()
         return essays
 
     except Exception as e:
-        logger.error(f"Error retrieving essays for cluster {cluster_id}: {e}")
+        logger.error(
+            f"Error retrieving essays for cluster {cluster_id}: {e}", exc_info=True)
         return []

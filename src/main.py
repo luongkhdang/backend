@@ -37,6 +37,8 @@ import json  # Import json for pretty printing
 # Import step modules
 from src.steps.step1 import run as run_step1
 from src.steps.step2 import run as run_step2
+from src.steps.step3 import run as run_step3
+from src.steps.domain_goodness import calculate_domain_goodness_scores
 
 # Import network checker
 from src.utils.network_checker import check_network_connectivity, print_results
@@ -196,8 +198,69 @@ def main():
         logger.info(
             "Skipping Step 2: Clustering (RUN_CLUSTERING_STEP not true)")
 
+    # Execute Step 3: Entity Extraction (only if enabled via environment variable)
+    if os.getenv("RUN_STEP3", "false").lower() == "true":
+        logger.info("========= STARTING STEP 3: ENTITY EXTRACTION =========")
+        try:
+            step3_status = run_step3()
+            logger.info("Step 3 Summary:")
+            logger.debug(json.dumps(step3_status, indent=2))
+
+            if step3_status.get("success", False):
+                logger.info(
+                    f"Entity extraction successful: {step3_status.get('processed', 0)} articles processed")
+                logger.info(
+                    f"Created {step3_status.get('entity_links_created', 0)} entity links")
+                logger.info(
+                    f"Stored {step3_status.get('snippets_stored', 0)} supporting snippets")
+
+                # Calculate influence scores for entities extracted in this run
+                if os.getenv("CALCULATE_INFLUENCE_SCORES", "true").lower() == "true":
+                    logger.info(
+                        "Calculating influence scores for extracted entities")
+                    from src.database.reader_db_client import ReaderDBClient
+                    db_client = ReaderDBClient()
+                    try:
+                        influence_status = db_client.calculate_entities_influence_scores()
+                        logger.info(
+                            f"Influence score calculation: {influence_status}")
+                    finally:
+                        db_client.close()
+            else:
+                logger.warning(
+                    f"Entity extraction completed with issues: {step3_status.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.error(f"Step 3 failed with error: {e}", exc_info=True)
+        finally:
+            logger.info("========= STEP 3 COMPLETE =========")
+    else:
+        logger.info("Skipping Step 3: Entity Extraction (RUN_STEP3 not true)")
+
+    # Weekly domain goodness calculation (can be triggered separately or scheduled)
+    if os.getenv("CALCULATE_DOMAIN_GOODNESS", "false").lower() == "true":
+        logger.info("========= CALCULATING DOMAIN GOODNESS SCORES =========")
+        try:
+            from src.database.reader_db_client import ReaderDBClient
+            db_client = ReaderDBClient()
+            try:
+                domain_status = calculate_domain_goodness_scores(db_client)
+                logger.info(f"Domain goodness calculation: {domain_status}")
+
+                if domain_status.get("top_domains"):
+                    logger.info("Top domains by goodness score:")
+                    for domain in domain_status["top_domains"]:
+                        logger.info(
+                            f"  {domain['domain']}: {domain['score']:.4f}")
+            finally:
+                db_client.close()
+        except Exception as e:
+            logger.error(
+                f"Domain goodness calculation failed: {e}", exc_info=True)
+        finally:
+            logger.info(
+                "========= DOMAIN GOODNESS CALCULATION COMPLETE =========")
+
     # Future steps would be executed here
-    # step3_result = run_step3()
     # step4_result = run_step4()
 
     logger.info("DATA REFINERY PIPELINE COMPLETE")

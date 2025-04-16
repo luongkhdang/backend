@@ -34,24 +34,24 @@ def initialize_tables(conn) -> bool:
     try:
         cursor = conn.cursor()
 
+        # Ensure pgvector extension is enabled
+        cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+
         # Create articles table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS articles (
             id SERIAL PRIMARY KEY,
             scraper_id INTEGER UNIQUE,
             title TEXT,
-            url TEXT,
             content TEXT,
             pub_date TIMESTAMP,
             domain TEXT,
-            author TEXT,
-            is_valid BOOLEAN DEFAULT TRUE,
-            is_processed BOOLEAN DEFAULT FALSE,
+            processed_at TIMESTAMP,
+            extracted_entities BOOLEAN DEFAULT FALSE,
             is_hot BOOLEAN DEFAULT FALSE,
-            cluster_id INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            error TEXT
+            cluster_id INTEGER
+            -- Note: Foreign key to clusters cannot be added here due to potential cyclic dependency
+            -- or if clusters table might not exist yet. It could be added separately if needed.
         );
         """)
 
@@ -61,11 +61,11 @@ def initialize_tables(conn) -> bool:
             id SERIAL PRIMARY KEY,
             name TEXT UNIQUE,
             entity_type TEXT,
-            description TEXT,
             influence_score FLOAT DEFAULT 0.0,
             mentions INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            first_seen TIMESTAMP,
+            last_seen TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
 
@@ -80,30 +80,26 @@ def initialize_tables(conn) -> bool:
         );
         """)
 
-        # Create embeddings table with pgvector extension
-        cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        # Create embeddings table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS embeddings (
             id SERIAL PRIMARY KEY,
-            article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+            article_id INTEGER UNIQUE REFERENCES articles(id) ON DELETE CASCADE,
             embedding VECTOR(768),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(article_id)
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
 
-        # Create clusters table with pgvector and additional metadata field
+        # Create clusters table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS clusters (
             id SERIAL PRIMARY KEY,
             centroid VECTOR(768),
             is_hot BOOLEAN DEFAULT FALSE,
-            hotness_score FLOAT DEFAULT NULL,
             article_count INTEGER,
+            created_at DATE DEFAULT CURRENT_DATE, -- Set default to current date
             metadata JSONB,
-            created_at DATE,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            hotness_score FLOAT DEFAULT NULL
         );
         """)
 
@@ -111,12 +107,14 @@ def initialize_tables(conn) -> bool:
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS essays (
             id SERIAL PRIMARY KEY,
+            type TEXT,
+            article_id INTEGER, -- Not a foreign key based on schema? Consider implications.
             title TEXT,
             content TEXT,
-            summary TEXT,
+            layer_depth INTEGER,
             cluster_id INTEGER REFERENCES clusters(id) ON DELETE SET NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            tags TEXT[]
         );
         """)
 
@@ -125,19 +123,22 @@ def initialize_tables(conn) -> bool:
         CREATE TABLE IF NOT EXISTS essay_entities (
             essay_id INTEGER REFERENCES essays(id) ON DELETE CASCADE,
             entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (essay_id, entity_id)
         );
         """)
 
-        # Ensure required columns exist
-        ensure_column_exists(conn, "entities", "entity_type", "TEXT")
-        ensure_column_exists(
-            conn, "entities", "influence_score", "FLOAT DEFAULT 0.0")
-        ensure_column_exists(conn, "entities", "mentions", "INTEGER DEFAULT 0")
-        ensure_column_exists(conn, "articles", "is_hot",
-                             "BOOLEAN DEFAULT FALSE")
-        ensure_column_exists(conn, "clusters", "metadata", "JSONB")
+        # Create calculated_domain_goodness table (assuming this is still needed)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS calculated_domain_goodness (
+            domain TEXT PRIMARY KEY,
+            domain_goodness_score FLOAT NOT NULL DEFAULT 0.5,
+            calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_domain_goodness_domain ON calculated_domain_goodness(domain);
+        """)
+
+        # Removed ensure_column_exists calls as columns are now defined in CREATE TABLE
+        # Example: ensure_column_exists(conn, "entities", "entity_type", "TEXT") - Removed
 
         # Create indexes to improve query performance
         create_indexes(conn)
@@ -145,11 +146,13 @@ def initialize_tables(conn) -> bool:
         conn.commit()
         cursor.close()
 
-        logger.info("Database tables initialized successfully")
+        logger.info(
+            "Database tables initialized successfully according to provided schema")
         return True
 
     except Exception as e:
-        logger.error(f"Error initializing database tables: {e}")
+        # Add exc_info for more details
+        logger.error(f"Error initializing database tables: {e}", exc_info=True)
         conn.rollback()
         return False
 
@@ -234,3 +237,107 @@ def create_indexes(conn) -> bool:
             success = False
 
     return success
+
+
+# Add influence score-related tables after the existing tables
+# Add timestamp column to entities table
+CREATE_INFLUENCE_TIMESTAMP_SQL = """
+    ALTER TABLE entities 
+    ADD COLUMN IF NOT EXISTS influence_calculated_at TIMESTAMP;
+"""
+
+# Create entity influence factors table for transparency
+CREATE_ENTITY_INFLUENCE_FACTORS_TABLE = """
+    CREATE TABLE IF NOT EXISTS entity_influence_factors (
+        entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
+        calculation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        base_mention_score FLOAT,
+        source_quality_score FLOAT,
+        content_context_score FLOAT,
+        temporal_score FLOAT,
+        raw_data JSONB,  -- Store raw inputs for auditability
+        PRIMARY KEY (entity_id, calculation_timestamp)
+    );
+"""
+
+# Create entity type weights table
+CREATE_ENTITY_TYPE_WEIGHTS_TABLE = """
+    CREATE TABLE IF NOT EXISTS entity_type_weights (
+        entity_type TEXT PRIMARY KEY,
+        weight FLOAT NOT NULL DEFAULT 1.0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+"""
+
+# Initialize entity type weights with default values
+INITIALIZE_ENTITY_TYPE_WEIGHTS = """
+    INSERT INTO entity_type_weights (entity_type, weight) VALUES
+    ('PERSON', 1.0),
+    ('ORGANIZATION', 1.1),
+    ('GOVERNMENT_AGENCY', 1.2),
+    ('LOCATION', 0.8),
+    ('GEOPOLITICAL_ENTITY', 1.3),
+    ('CONCEPT', 1.0),
+    ('LAW_OR_POLICY', 1.1),
+    ('EVENT', 0.9),
+    ('OTHER', 0.7)
+    ON CONFLICT (entity_type) DO NOTHING;
+"""
+
+# Create entity snippets table for storing supporting text
+CREATE_ENTITY_SNIPPETS_TABLE = """
+    CREATE TABLE IF NOT EXISTS entity_snippets (
+        id SERIAL PRIMARY KEY,
+        entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
+        article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+        snippet TEXT NOT NULL,
+        is_influential BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_entity_snippets_entity_id ON entity_snippets(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_entity_snippets_article_id ON entity_snippets(article_id);
+"""
+
+# Create domain statistics table for domain goodness calculation
+CREATE_DOMAIN_STATISTICS_TABLE = """
+    CREATE TABLE IF NOT EXISTS domain_statistics (
+        domain TEXT PRIMARY KEY,
+        total_entries INTEGER DEFAULT 0,
+        hot_entries INTEGER DEFAULT 0,
+        average_cluster_hotness FLOAT DEFAULT 0.0,
+        calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+"""
+
+
+def setup_tables(conn):
+    """
+    Set up all database tables.
+
+    Args:
+        conn: Database connection
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        cursor = conn.cursor()
+
+        # Run all table creation SQL
+        # ... [existing tables setup code] ...
+
+        # Create influence-related tables
+        cursor.execute(CREATE_INFLUENCE_TIMESTAMP_SQL)
+        cursor.execute(CREATE_ENTITY_INFLUENCE_FACTORS_TABLE)
+        cursor.execute(CREATE_ENTITY_TYPE_WEIGHTS_TABLE)
+        cursor.execute(INITIALIZE_ENTITY_TYPE_WEIGHTS)
+        cursor.execute(CREATE_ENTITY_SNIPPETS_TABLE)
+        cursor.execute(CREATE_DOMAIN_STATISTICS_TABLE)
+
+        conn.commit()
+        cursor.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error setting up tables: {e}")
+        return False

@@ -59,6 +59,7 @@ This plan outlines the implementation steps for `src/steps/step3.py`, based on t
 
     - Define `_prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, float]) -> List[Dict[str, Any]]`.
     - **New Function:** Implement `db_client.get_recent_unprocessed_articles(days, limit)` in `reader_db_client.py` and `modules/articles.py`:
+
       ```python
       def get_recent_unprocessed_articles(conn, days: int = 2, limit: int = 2000) -> List[Dict[str, Any]]:
           """
@@ -89,6 +90,7 @@ This plan outlines the implementation steps for `src/steps/step3.py`, based on t
               logger.error(f"Error fetching recent unprocessed articles: {e}")
               return []
       ```
+
     - Fetch cluster hotness scores: Call `db_client.get_all_clusters()` and create a `cluster_id -> hotness_score` map (defaulting to 0.0 if `hotness_score` is missing).
     - Iterate through fetched articles:
       - Get `domain_goodness_score` from `domain_scores` (default 0.0 if missing).
@@ -133,6 +135,7 @@ This plan outlines the implementation steps for `src/steps/step3.py`, based on t
 
     - Define `_store_results(db_client: ReaderDBClient, entity_results: Dict[int, List[Dict[str, Any]]]) -> Dict[str, int]`.
     - **New Function:** Implement `db_client.find_or_create_entity(name, entity_type)` in `reader_db_client.py` and `modules/entities.py`:
+
       ```python
       def find_or_create_entity(conn, name: str, entity_type: str) -> Optional[int]:
           """
@@ -164,7 +167,9 @@ This plan outlines the implementation steps for `src/steps/step3.py`, based on t
               conn.rollback()
               return None
       ```
+
     - **New Function:** Implement `db_client.increment_entity_mentions(entity_id, count)` in `reader_db_client.py` and `modules/entities.py`:
+
       ```python
       def increment_entity_mentions(conn, entity_id: int, count: int = 1) -> bool:
           """
@@ -194,7 +199,9 @@ This plan outlines the implementation steps for `src/steps/step3.py`, based on t
               conn.rollback()
               return False
       ```
+
     - **New Function:** Implement `db_client.mark_article_processed(article_id)` in `reader_db_client.py` and `modules/articles.py`:
+
       ```python
       def mark_article_processed(conn, article_id: int) -> bool:
           """
@@ -223,6 +230,7 @@ This plan outlines the implementation steps for `src/steps/step3.py`, based on t
               conn.rollback()
               return False
       ```
+
     - Initialize counters: `processed_count = 0`, `entity_links_created = 0`, `errors = 0`.
     - Iterate through `entity_results.items()`, getting `article_id` and `extracted_data`.
     - If `extracted_data` indicates an error (e.g., contains an 'error' key), increment `errors` and continue to the next article.

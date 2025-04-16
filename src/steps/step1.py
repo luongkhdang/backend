@@ -36,7 +36,7 @@ import importlib.util
 # Import for Step 1.6: Embedding Generation
 from src.gemini.gemini_client import GeminiClient
 # Import RateLimiter
-from src.steps.rate_limit import RateLimiter
+from src.utils.rate_limit import RateLimiter
 # Import LocalNLPClient conditionally - will be checked at runtime
 # from src.localnlp.localnlp_client import LocalNLPClient
 from typing import Optional  # Add Optional type hint
@@ -489,9 +489,9 @@ def run(max_workers: int = None) -> int:
 
     # --- Embedding Generation Steps (Always run, use new DB connection) ---
 
-    # Initialize RateLimiter and GeminiClient (these are needed for both 1.6 and 1.7)
-    rate_limiter = RateLimiter()
-    gemini_client = GeminiClient(rate_limiter=rate_limiter)
+    # Initialize GeminiClient (needed for both 1.6 and 1.7)
+    # GeminiClient creates its own RateLimiter internally
+    gemini_client = GeminiClient()
 
     # Create a new database connection specifically for embedding steps
     reader_db_embed = initialize_reader_db_client()

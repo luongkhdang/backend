@@ -35,6 +35,7 @@ from src.database.modules import entities
 from src.database.modules import embeddings
 from src.database.modules import clusters
 from src.database.modules import essays
+from src.database.modules import domains
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -621,15 +622,18 @@ class ReaderDBClient:
 
     # Cluster operations
     def insert_cluster(self, name: str = None, description: Optional[str] = None,
-                       centroid: Optional[List[float]] = None, is_hot: bool = False) -> Optional[int]:
+                       centroid: Optional[List[float]] = None, is_hot: bool = False,
+                       article_count: int = 0, hotness_score: Optional[float] = None) -> Optional[int]:
         """
-        Insert a new cluster.
+        Insert a new cluster, passing relevant data to the clusters module.
 
         Args:
-            name: Name of the cluster (optional, stored in metadata)
-            description: Optional description (stored in metadata)
+            name: Name of the cluster (stored in metadata['name'])
+            description: Optional description (stored in metadata['description'])
             centroid: Optional centroid vector of the cluster
             is_hot: Whether the cluster is hot
+            article_count: Initial article count for the dedicated column
+            hotness_score: Initial hotness score for the dedicated column
 
         Returns:
             int or None: Cluster ID if successful, None otherwise
@@ -637,16 +641,23 @@ class ReaderDBClient:
         conn = self.get_connection()
         if conn:
             try:
-                # Generate a name if only centroid is provided
-                if centroid is not None and name is None:
-                    name = f"Cluster-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-                elif name is None:
-                    # Ensure name is not None if centroid is also None, provide a default
-                    name = f"Cluster-NoCentroid-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                # Construct metadata dictionary from name and description
+                metadata = {}
+                if name:
+                    metadata['name'] = name
+                if description:
+                    metadata['description'] = description
 
-                # Call the module function to handle the creation
+                # Call the module function with all relevant parameters
+                # Note: create_cluster now takes metadata dict directly
                 cluster_id = clusters.create_cluster(
-                    conn, name, description, centroid, is_hot)
+                    conn=conn,
+                    centroid=centroid,
+                    is_hot=is_hot,
+                    article_count=article_count,  # Pass directly
+                    metadata=metadata if metadata else None,  # Pass constructed dict
+                    hotness_score=hotness_score  # Pass directly
+                )
                 return cluster_id
             except Exception as e:
                 # Log the error originating from the module or the client call itself
@@ -735,7 +746,8 @@ class ReaderDBClient:
 
         Args:
             cluster_id: ID of the cluster to update
-            metadata: Dictionary of metadata to update
+            metadata: Dictionary of metadata to update/merge into existing metadata.
+                 Note: This will *replace* the entire metadata field.
 
         Returns:
             bool: True if successful, False otherwise
@@ -743,46 +755,13 @@ class ReaderDBClient:
         conn = self.get_connection()
         if conn:
             try:
-                cursor = conn.cursor()
-
-                # Get existing metadata
-                cursor.execute("""
-                    SELECT metadata FROM clusters WHERE id = %s
-                """, (cluster_id,))
-
-                row = cursor.fetchone()
-                if not row:
-                    logger.error(f"Cluster {cluster_id} not found")
-                    cursor.close()
-                    return False
-
-                existing_metadata = row[0] if row[0] else {}
-                if isinstance(existing_metadata, str):
-                    try:
-                        existing_metadata = json.loads(existing_metadata)
-                    except json.JSONDecodeError:
-                        logger.warning(
-                            f"Could not decode existing metadata for cluster {cluster_id}. Overwriting.")
-                        existing_metadata = {}
-
-                # Merge existing with new metadata
-                updated_metadata = {**existing_metadata, **metadata}
-
-                # Update the cluster, serializing the metadata dictionary to JSON
-                # Also remove updated_at to avoid potential column absence issues
-                cursor.execute("""
-                    UPDATE clusters
-                    SET metadata = %s
-                    WHERE id = %s
-                    RETURNING id;
-                """, (json.dumps(updated_metadata), cluster_id))
-
-                result = cursor.fetchone() is not None
-                conn.commit()
-                cursor.close()
-                return result
+                # Call the updated update_cluster function from the clusters module
+                # Pass only the metadata field to be updated.
+                # The module function now handles replacing the metadata.
+                return clusters.update_cluster(conn=conn, cluster_id=cluster_id, metadata=metadata)
             except Exception as e:
-                logger.error(f"Error updating cluster metadata: {e}")
+                logger.error(
+                    f"Error updating cluster metadata for {cluster_id}: {e}", exc_info=True)
                 conn.rollback()
                 return False
             finally:
@@ -791,7 +770,7 @@ class ReaderDBClient:
 
     def update_cluster_article_count(self, cluster_id: int, article_count: int) -> bool:
         """
-        Update the article count for a cluster.
+        Update the dedicated article_count field for a cluster.
 
         Args:
             cluster_id: ID of the cluster
@@ -803,37 +782,11 @@ class ReaderDBClient:
         conn = self.get_connection()
         if conn:
             try:
-                cursor = conn.cursor()
-
-                cursor.execute("""
-                    SELECT metadata FROM clusters WHERE id = %s
-                """, (cluster_id,))
-
-                row = cursor.fetchone()
-                if not row:
-                    logger.error(f"Cluster {cluster_id} not found")
-                    return False
-
-                existing_metadata = row[0] if row[0] else {}
-
-                # Update article count in metadata
-                existing_metadata['article_count'] = article_count
-
-                # Update the cluster metadata
-                cursor.execute("""
-                    UPDATE clusters
-                    SET metadata = %s,
-                        updated_at = NOW()
-                    WHERE id = %s
-                    RETURNING id;
-                """, (existing_metadata, cluster_id))
-
-                result = cursor.fetchone() is not None
-                conn.commit()
-                cursor.close()
-                return result
+                # Call the updated update_cluster function, passing only article_count
+                return clusters.update_cluster(conn=conn, cluster_id=cluster_id, article_count=article_count)
             except Exception as e:
-                logger.error(f"Error updating cluster article count: {e}")
+                logger.error(
+                    f"Error updating cluster article count for {cluster_id}: {e}", exc_info=True)
                 conn.rollback()
                 return False
             finally:
@@ -917,3 +870,164 @@ class ReaderDBClient:
         """Close the database connection pool."""
         if hasattr(self, 'connection_pool') and self.connection_pool:
             connection.close_pool(self.connection_pool)
+
+    def get_all_domain_goodness_scores(self) -> Dict[str, float]:
+        """
+        Get all domain goodness scores from the database.
+
+        Returns:
+            Dict[str, float]: Dictionary mapping domains to their goodness scores
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return domains.get_all_domain_goodness_scores(conn)
+            except Exception as e:
+                logger.error(f"Error fetching domain goodness scores: {e}")
+                return {}
+            finally:
+                self.release_connection(conn)
+        return {}
+
+    def get_recent_unprocessed_articles(self, days: int = 2, limit: int = 2000) -> List[Dict[str, Any]]:
+        """
+        Get recent unprocessed articles.
+
+        Args:
+            days: Number of days to look back
+            limit: Maximum number of articles to return
+
+        Returns:
+            List of article dictionaries
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return articles.get_recent_unprocessed_articles(conn, days, limit)
+            except Exception as e:
+                logger.error(
+                    f"Error fetching recent unprocessed articles: {e}")
+                return []
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def find_or_create_entity(self, name: str, entity_type: str) -> Optional[int]:
+        """
+        Find an entity by name or create it if it doesn't exist.
+
+        Args:
+            name: Entity name
+            entity_type: Entity type
+
+        Returns:
+            Entity ID or None if error
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entities.find_or_create_entity(conn, name, entity_type)
+            except Exception as e:
+                logger.error(f"Error finding/creating entity {name}: {e}")
+                return None
+            finally:
+                self.release_connection(conn)
+        return None
+
+    def increment_global_entity_mentions(self, entity_id: int, count: int = 1) -> bool:
+        """
+        Increment the global mentions count for an entity in the entities table.
+
+        Args:
+            entity_id: Entity ID
+            count: Amount to increment by
+
+        Returns:
+            True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entities.increment_global_entity_mentions(conn, entity_id, count)
+            except Exception as e:
+                logger.error(
+                    f"Error incrementing global mentions for entity {entity_id}: {e}")
+                return False
+            finally:
+                self.release_connection(conn)
+        return False
+
+    def mark_article_processed(self, article_id: int) -> bool:
+        """
+        Mark an article as processed.
+
+        Args:
+            article_id: ID of the article to mark as processed
+
+        Returns:
+            True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return articles.mark_article_processed(conn, article_id)
+            except Exception as e:
+                logger.error(
+                    f"Error marking article {article_id} as processed: {e}")
+                return False
+            finally:
+                self.release_connection(conn)
+        return False
+
+    def calculate_entities_influence_scores(self, entity_ids: Optional[List[int]] = None,
+                                            recency_days: int = 30) -> Dict[str, Any]:
+        """
+        Calculate influence scores for specified entities or all entities.
+
+        Args:
+            entity_ids: Optional list of entity IDs to calculate for. If None, calculates for all recently updated entities.
+            recency_days: Number of days to prioritize for recency calculation
+
+        Returns:
+            Dict with success count, error count, and calculation summary
+        """
+        try:
+            from src.database.modules.influence import update_all_influence_scores
+
+            with self.get_connection() as conn:
+                result = update_all_influence_scores(
+                    conn, entity_ids, recency_days)
+                return result
+
+        except Exception as e:
+            logger.error(f"Error in batch influence calculation: {e}")
+            return {
+                "success_count": 0,
+                "error_count": 0,
+                "total_entities": 0,
+                "error": str(e)
+            }
+
+    def calculate_entity_influence_score(self, entity_id: int, recency_days: int = 30) -> float:
+        """
+        Calculate comprehensive influence score for a single entity.
+
+        Args:
+            entity_id: Entity ID to calculate score for
+            recency_days: Number of days to prioritize for recency calculation
+
+        Returns:
+            Calculated influence score
+        """
+        try:
+            from src.database.modules.influence import calculate_entity_influence_score
+
+            with self.get_connection() as conn:
+                score = calculate_entity_influence_score(
+                    conn, entity_id, recency_days)
+                return score
+
+        except Exception as e:
+            logger.error(
+                f"Error calculating influence score for entity {entity_id}: {e}")
+            return 0.0

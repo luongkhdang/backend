@@ -44,6 +44,16 @@ class RateLimiter:
         logger.info(
             f"RateLimiter initialized with RPM limits: {model_rpm_limits}")
 
+    def get_current_rpm(self, model_name: str) -> int:
+        """Calculates the approximate current RPM based on timestamps."""
+        with self.lock:
+            current_time = time.monotonic()
+            timestamps = self.call_timestamps[model_name]
+            # Remove timestamps older than 60 seconds
+            while timestamps and timestamps[0] <= current_time - 60:
+                timestamps.popleft()
+            return len(timestamps)
+
     def is_allowed(self, model_name: str) -> bool:
         """
         Checks if a call to the specified model is allowed based on RPM limit.
@@ -65,11 +75,22 @@ class RateLimiter:
             timestamps = self.call_timestamps[model_name]
 
             # Remove timestamps older than 60 seconds
+            # Use a copy for logging to avoid modifying while iterating/checking
+            original_count = len(timestamps)
             while timestamps and timestamps[0] <= current_time - 60:
                 timestamps.popleft()
+            removed_count = original_count - len(timestamps)
+            if removed_count > 0:
+                logger.debug(
+                    f"RateLimiter [{model_name}]: Removed {removed_count} old timestamps.")
 
             # Check if the number of calls in the last 60 seconds exceeds the limit
-            if len(timestamps) < limit:
+            current_count = len(timestamps)
+            allowed = current_count < limit
+            logger.debug(
+                f"RateLimiter [{model_name}]: Check: {current_count} calls / {limit} RPM limit -> Allowed: {allowed}")
+
+            if allowed:
                 return True
             else:
                 # Optional: Log when rate limit is hit
@@ -87,6 +108,8 @@ class RateLimiter:
             limit = self.model_rpm_limits.get(model_name)
             if limit is None:
                 # Don't track calls for models without limits
+                logger.debug(
+                    f"RateLimiter [{model_name}]: No limit configured, not registering call.")
                 return
 
             current_time = time.monotonic()
@@ -99,7 +122,8 @@ class RateLimiter:
             # Add the current timestamp
             timestamps.append(current_time)
             # Optional: Log call registration
-            # logger.debug(f"Registered call for model '{model_name}'. Current count in window: {len(timestamps)}")
+            logger.debug(
+                f"RateLimiter [{model_name}]: Registered call. Current count in window: {len(timestamps)} / {limit} RPM")
 
     def wait_if_needed(self, model_name: str) -> None:
         """
@@ -112,12 +136,18 @@ class RateLimiter:
             with self.lock:
                 timestamps = self.call_timestamps[model_name]
                 if not timestamps:  # Should not happen if is_allowed is False, but safe check
+                    logger.debug(
+                        f"RateLimiter [{model_name}]: No timestamps found while waiting, breaking wait loop.")
                     break
                 # Calculate how long to wait until the oldest call expires
-                wait_time = (timestamps[0] + 60) - \
-                    time.monotonic() + 0.1  # Add small buffer
+                oldest_call_time = timestamps[0]
+                current_time_in_wait = time.monotonic()
+                wait_time = (oldest_call_time + 60) - \
+                    current_time_in_wait + 0.1  # Add small buffer
 
-            logger.debug(
-                f"Rate limit reached for {model_name}. Waiting for {wait_time:.2f} seconds.")
-            time.sleep(max(0, wait_time))
-            # Re-check is_allowed in the next loop iteration
+                # Recalculate inside lock scope if needed, or pass value
+                current_rpm = self.get_current_rpm(model_name)
+                logger.debug(
+                    f"RateLimiter [{model_name}]: Limit reached ({current_rpm} RPM). Waiting for {max(0, wait_time):.2f} seconds (until {oldest_call_time + 60:.2f}).")
+                time.sleep(max(0, wait_time))
+                # Re-check is_allowed in the next loop iteration

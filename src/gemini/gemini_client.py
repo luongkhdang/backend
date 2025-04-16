@@ -7,9 +7,9 @@ and text generation with model selection and rate limiting.
 
 Exported functions/classes:
 - GeminiClient: Class for interacting with the Gemini API
-  - __init__(self, rate_limiter=None): Initializes the client with API key and rate limiter.
+  - __init__(self): Initializes the client with API key and creates an internal rate limiter.
   - generate_embedding(text, task_type, retries, initial_delay): Generates embeddings for text with retry logic.
-  - generate_text_with_prompt(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0) -> Optional[str]: Generates text based on article content and a prompt, using model selection logic.
+  - generate_text_with_prompt(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[str]: Generates text based on article content and a prompt, using model selection logic.
 
 Related files:
 - src/steps/step1.py: Uses this client for embedding generation.
@@ -236,7 +236,8 @@ class GeminiClient:
         return None
 
     def generate_text_with_prompt(self, article_content: str, processing_tier: int,
-                                  retries: int = 3, initial_delay: float = 1.0) -> Optional[str]:
+                                  retries: int = 3, initial_delay: float = 1.0,
+                                  model_override: Optional[str] = None) -> Optional[str]:
         """
         Generates text (e.g., entity extraction JSON) based on article content and a prompt.
 
@@ -247,6 +248,7 @@ class GeminiClient:
             processing_tier (int): The processing tier (0, 1, or 2) - currently unused but available.
             retries (int): Maximum number of retry attempts for the entire process (across models).
             initial_delay (float): Initial delay for retries in seconds.
+            model_override (Optional[str]): Optional specific model to use instead of tier-based selection.
 
         Returns:
             Optional[str]: The generated text (expected to be JSON string), or None if failed.
@@ -264,9 +266,23 @@ class GeminiClient:
         full_prompt = self.prompt_template.replace(
             "{ARTICLE_CONTENT_HERE}", article_content)
 
-        # Define model preference order (can be adjusted based on tier later)
-        preferred_models = list(self.GENERATION_MODELS_CONFIG.keys())
-        all_models_to_try = preferred_models + [self.FALLBACK_MODEL]
+        # Define model preference order, handling model_override if provided
+        if model_override and model_override.startswith("models/"):
+            # Use specified model first, then fall back to defaults if needed
+            preferred_models = [model_override]
+            all_models_to_try = preferred_models + \
+                list(self.GENERATION_MODELS_CONFIG.keys()) + \
+                [self.FALLBACK_MODEL]
+            # Remove duplicates while preserving order
+            all_models_to_try = list(dict.fromkeys(all_models_to_try))
+            logger.info(
+                f"Using overridden model selection with primary model: {model_override}")
+        else:
+            # Use default tier-based selection
+            preferred_models = list(self.GENERATION_MODELS_CONFIG.keys())
+            all_models_to_try = preferred_models + [self.FALLBACK_MODEL]
+            logger.info(
+                f"Using default model selection with tier {processing_tier}")
 
         current_delay = initial_delay
         total_attempts = 0
@@ -275,11 +291,21 @@ class GeminiClient:
             logger.info(f"Attempting text generation with model: {model_name}")
 
             # Check rate limit *before* attempting the call
-            if self.rate_limiter and not self.rate_limiter.is_allowed(model_name):
-                logger.warning(
-                    f"RPM limit reached for {model_name}. Skipping to next model.")
-                continue  # Skip this model and try the next one
+            limit_check_passed = True
+            if self.rate_limiter:
+                logger.debug(f"Checking rate limit for {model_name}...")
+                if not self.rate_limiter.is_allowed(model_name):
+                    limit_check_passed = False
+                    logger.warning(
+                        f"RPM limit likely reached for {model_name}. Skipping to next model.")
+                    continue  # Skip this model and try the next one
+                else:
+                    logger.debug(f"Rate limit check passed for {model_name}.")
+            else:
+                logger.debug(
+                    "Rate limiter not available, proceeding without check.")
 
+            # This part only runs if limit_check_passed is True
             # Reset attempt counter for this specific model if needed, or use global retries
             model_attempt = 0
             max_model_retries = 2  # Allow a couple of retries per model before switching
@@ -291,6 +317,8 @@ class GeminiClient:
                 try:
                     # Wait if needed (should be rare if is_allowed check passed, but safety)
                     if self.rate_limiter:
+                        logger.debug(
+                            f"Calling wait_if_needed for {model_name} (safety check)...")
                         self.rate_limiter.wait_if_needed(model_name)
 
                     # Configure the generative model instance
@@ -316,6 +344,8 @@ class GeminiClient:
                     # Register the successful call *after* it completes
                     if self.rate_limiter:
                         self.rate_limiter.register_call(model_name)
+                        # Add a debug log after registration if desired
+                        # logger.debug(f"Call registered for {model_name} in GeminiClient.")
 
                     # --- Process Response ---
                     # Accessing response text might vary slightly depending on API version/response structure
@@ -352,9 +382,11 @@ class GeminiClient:
                     logger.warning(
                         f"Text generation error (Attempt {model_attempt}/{max_model_retries}) using {model_name}: {e}")
                     # Check if it's a rate limit error - this might trigger skipping the model
-                    if "rate limit" in str(e).lower() or "quota" in str(e).lower():
+                    error_str = str(e).lower()
+                    # More robust check for rate limit / quota errors
+                    if "rate limit" in error_str or "quota" in error_str or "resource has been exhausted" in error_str:
                         logger.error(
-                            f"Rate limit error encountered with {model_name}. Switching model if possible.")
+                            f"Rate limit/Quota error encountered with {model_name}: {e}. Switching model if possible.")
                         break  # Exit inner loop to try next model
 
                     # If not rate limit, apply backoff and retry with the *same* model (if attempts left)

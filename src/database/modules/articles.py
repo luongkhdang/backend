@@ -29,6 +29,10 @@ Exported functions:
   Gets a sample of titles for a list of article IDs
 - get_publication_dates_for_articles(conn, article_ids: List[int]) -> Dict[int, Optional[datetime]]
   Gets publication dates for a list of article IDs
+- get_recent_unprocessed_articles(conn, days: int = 2, limit: int = 2000) -> List[Dict[str, Any]]
+  Gets recent unprocessed articles
+- mark_article_processed(conn, article_id: int) -> bool
+  Marks an article as having had its entities extracted
 
 Related modules:
 - Connection management from connection.py
@@ -38,7 +42,7 @@ Related modules:
 import logging
 import json
 from typing import Dict, List, Tuple, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 try:
     import dateutil.parser as dateutil_parser
@@ -633,3 +637,66 @@ def get_publication_dates_for_articles(conn, article_ids: List[int]) -> Dict[int
         logger.error(f"Error fetching publication dates: {e}")
         # Return dict with None values on error
         return {article_id: None for article_id in article_ids}
+
+
+def get_recent_unprocessed_articles(conn, days: int = 2, limit: int = 2000) -> List[Dict[str, Any]]:
+    """
+    Get recent unprocessed articles.
+
+    Args:
+        conn: Database connection
+        days: Number of days to look back
+        limit: Maximum number of articles to return
+
+    Returns:
+        List of article dictionaries
+    """
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, domain, cluster_id, content
+            FROM articles
+            WHERE extracted_entities = FALSE
+            AND pub_date >= (CURRENT_DATE - INTERVAL '%s DAYS')
+            ORDER BY pub_date DESC
+            LIMIT %s
+        """, (days, limit))
+
+        columns = [desc[0] for desc in cursor.description]
+        articles = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        cursor.close()
+
+        return articles
+    except Exception as e:
+        logger.error(f"Error fetching recent unprocessed articles: {e}")
+        return []
+
+
+def mark_article_processed(conn, article_id: int) -> bool:
+    """
+    Mark an article as having had its entities extracted.
+
+    Args:
+        conn: Database connection
+        article_id: ID of the article to mark as processed
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE articles
+            SET extracted_entities = TRUE,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (article_id,))
+
+        success = cursor.rowcount > 0
+        conn.commit()
+        cursor.close()
+        return success
+    except Exception as e:
+        logger.error(f"Error marking article {article_id} as processed: {e}")
+        conn.rollback()
+        return False

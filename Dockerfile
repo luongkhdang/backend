@@ -43,6 +43,7 @@ RUN python -c "import sys; print(sys.path)" && \
     python -c "import src.gemini.gemini_client; print('Verified gemini_client')" && \
     python -c "from src.steps.step1 import run; print('Verified step1')" && \
     python -c "from src.steps.step2 import run; print('Verified step2')" && \
+    python -c "from src.steps.step3 import run; print('Verified step3')" && \
     echo "APP IMPORTS VERIFIED SUCCESSFULLY"
 
 # Command to run the application
