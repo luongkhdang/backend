@@ -6,8 +6,8 @@ to store clustering results and update article cluster assignments.
 
 Exported functions:
 - insert_clusters(reader_client: ReaderDBClient, centroids: Dict[int, List[float]], 
-                 cluster_hotness_map: Dict[int, bool]) -> Dict[int, int]
-  Inserts clusters into the database with hotness values
+                 cluster_hotness_map: Dict[int, bool], cluster_hotness_scores: Dict[int, float]) -> Dict[int, int]
+  Inserts clusters into the database with hotness values and scores
 - batch_update_article_cluster_assignments(reader_client: ReaderDBClient, 
                                           article_ids: List[int], labels: List[int], cluster_db_map: Dict[int, int]) -> Dict[str, int]
   Updates cluster assignments for multiple articles in batch
@@ -31,15 +31,17 @@ logger = logging.getLogger(__name__)
 def insert_clusters(
     reader_client: ReaderDBClient,
     centroids: Dict[int, List[float]],
-    cluster_hotness_map: Dict[int, bool]
+    cluster_hotness_map: Dict[int, bool],
+    cluster_hotness_scores: Dict[int, float]
 ) -> Dict[int, int]:
     """
-    Insert clusters into the database with hotness value from calculated map.
+    Insert clusters into the database with hotness value and score.
 
     Args:
         reader_client: Initialized ReaderDBClient
         centroids: Dictionary mapping cluster labels to centroid vectors
         cluster_hotness_map: Dictionary mapping cluster labels to is_hot status
+        cluster_hotness_scores: Dictionary mapping cluster labels to numerical hotness scores
 
     Returns:
         Dictionary mapping cluster labels to database cluster IDs
@@ -50,14 +52,16 @@ def insert_clusters(
         # Convert numpy types to native Python types if needed
         label_key = int(label) if hasattr(label, 'item') else label
 
-        # Get the is_hot value for this cluster from the hotness map
-        # or default to False if not in map
+        # Get the is_hot value and score for this cluster
         is_hot = cluster_hotness_map.get(label_key, False)
+        hotness_score = cluster_hotness_scores.get(label_key)
 
-        # Insert cluster into database
+        # Insert cluster into database (initially with hotness_score=NULL)
+        # We update the score immediately after getting the ID
         cluster_id = reader_client.insert_cluster(
             centroid=centroid,
             is_hot=is_hot
+            # hotness_score is not set here initially
         )
 
         if cluster_id:
@@ -65,7 +69,35 @@ def insert_clusters(
             logger.debug(
                 f"Inserted cluster {label_key} as DB ID {cluster_id} (hot: {is_hot})")
 
-    logger.info(f"Inserted {len(cluster_db_map)} clusters into database")
+            # Update the hotness_score for the newly created cluster
+            if hotness_score is not None:
+                conn = None
+                try:
+                    conn = reader_client.get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE clusters 
+                        SET hotness_score = %s 
+                        WHERE id = %s;
+                    """, (hotness_score, cluster_id))
+                    conn.commit()
+                    cursor.close()
+                    logger.debug(
+                        f"Updated hotness score for cluster {cluster_id} to {hotness_score:.4f}")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to update hotness score for cluster {cluster_id}: {e}")
+                    if conn:
+                        conn.rollback()
+                finally:
+                    if conn:
+                        reader_client.release_connection(conn)
+            else:
+                logger.warning(
+                    f"No hotness score found for cluster label {label_key}, DB ID {cluster_id}")
+
+    logger.info(
+        f"Processed {len(cluster_db_map)} clusters for insertion/update")
 
     # Log how many hot clusters
     hot_count = sum(

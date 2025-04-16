@@ -7,7 +7,7 @@ identifying representative articles.
 
 Exported functions:
 - generate_and_update_cluster_metadata(cluster_id, article_ids, embeddings_map, 
-                                     cluster_centroid, reader_db_client) -> None
+                                     cluster_centroid, hotness_score, reader_db_client) -> None
   Calculates enhanced metadata for a cluster and updates the database
 
 Related files:

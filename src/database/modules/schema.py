@@ -99,6 +99,7 @@ def initialize_tables(conn) -> bool:
             id SERIAL PRIMARY KEY,
             centroid VECTOR(768),
             is_hot BOOLEAN DEFAULT FALSE,
+            hotness_score FLOAT DEFAULT NULL,
             article_count INTEGER,
             metadata JSONB,
             created_at DATE,

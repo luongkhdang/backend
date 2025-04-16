@@ -281,7 +281,7 @@ def run() -> Dict[str, Any]:
         logger.info(
             "Step 2.6: Determining cluster hotness using weighted factors")
         try:
-            cluster_hotness_map = calculate_hotness_factors(
+            cluster_hotness_map, cluster_hotness_scores = calculate_hotness_factors(
                 cluster_data=cluster_data,
                 article_ids=article_ids,
                 pub_dates=pub_dates,
@@ -313,7 +313,7 @@ def run() -> Dict[str, Any]:
         # Step 8: Store clusters in the database
         logger.info("Step 2.8: Storing clusters in database")
         cluster_db_map = insert_clusters(
-            reader_client, centroids, cluster_hotness_map)
+            reader_client, centroids, cluster_hotness_map, cluster_hotness_scores)
         logger.info(f"Inserted {len(cluster_db_map)} clusters into database")
 
         # Step 9: Update article cluster assignments

@@ -11,80 +11,6 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 
-def migrate_cluster_created_at(client: ReaderDBClient):
-    """Migrate the clusters.created_at column from TIMESTAMP to DATE (Pacific Time)."""
-    conn = None
-    try:
-        conn = client.get_connection()
-        cursor = conn.cursor()
-
-        # Check current data type of created_at
-        cursor.execute("""
-            SELECT data_type 
-            FROM information_schema.columns
-            WHERE table_name = 'clusters' AND column_name = 'created_at';
-        """)
-        result = cursor.fetchone()
-        current_type = result[0] if result else None
-
-        if current_type and 'timestamp' in current_type.lower():
-            logger.info(
-                "Migrating clusters.created_at from TIMESTAMP to DATE (Pacific Time)...")
-
-            # 1. Add a temporary DATE column
-            logger.info("Step 1: Adding temporary date column...")
-            cursor.execute(
-                "ALTER TABLE clusters ADD COLUMN IF NOT EXISTS created_at_date_temp DATE;")
-            conn.commit()
-
-            # 2. Populate the temporary column with converted dates (Pacific Time)
-            logger.info(
-                "Step 2: Populating temporary column with converted Pacific dates...")
-            cursor.execute("""
-                UPDATE clusters 
-                SET created_at_date_temp = DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles')
-                WHERE created_at IS NOT NULL;
-            """)
-            conn.commit()
-            logger.info(f"Updated {cursor.rowcount} rows.")
-
-            # 3. Drop the old timestamp column
-            logger.info("Step 3: Dropping old timestamp column...")
-            cursor.execute("ALTER TABLE clusters DROP COLUMN created_at;")
-            conn.commit()
-
-            # 4. Rename the temporary column to the final name
-            logger.info("Step 4: Renaming temporary column...")
-            cursor.execute(
-                "ALTER TABLE clusters RENAME COLUMN created_at_date_temp TO created_at;")
-            conn.commit()
-
-            logger.info(
-                "Migration of clusters.created_at completed successfully.")
-        elif current_type == 'date':
-            logger.info(
-                "clusters.created_at is already DATE type. Migration not needed.")
-        else:
-            logger.warning(
-                f"Could not determine type or unexpected type '{current_type}' for clusters.created_at. Skipping migration.")
-
-        cursor.close()
-
-    except ProgrammingError as pe:
-        # Handle specific errors like column already exists if run multiple times partially
-        logger.warning(
-            f"Programming error during migration (might be expected if run partially before): {pe}")
-        if conn:
-            conn.rollback()
-    except Exception as e:
-        logger.error(f"Error during clusters.created_at migration: {e}")
-        if conn:
-            conn.rollback()
-    finally:
-        if conn:
-            client.release_connection(conn)
-
-
 def main():
     """Set up the database and test the connection."""
     client = None  # Initialize client to None
@@ -109,11 +35,6 @@ def main():
         else:
             logger.error("Failed to initialize tables!")
             # Decide if you want to exit here or continue
-
-        # Run Migrations
-        logger.info("Running database migrations (if necessary)...")
-        migrate_cluster_created_at(client)  # Run the new migration
-        logger.info("Migrations complete.")
 
         # Test the connection
         logger.info("Testing database connection...")

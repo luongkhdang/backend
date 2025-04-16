@@ -8,7 +8,7 @@ It uses a Top N selection approach to mark the highest scoring clusters as hot.
 Exported functions:
 - calculate_hotness_factors(cluster_data: Dict[int, List[int]], article_ids: List[int], 
                            pub_dates: List[Optional[datetime]], reader_client: ReaderDBClient, 
-                           nlp: Optional[Any] = None) -> Dict[int, bool]
+                           nlp: Optional[Any] = None) -> Tuple[Dict[int, bool], Dict[int, float]]
   Determines which clusters should be marked as hot based on multiple weighted factors and Top N selection
 - get_weight_params() -> Dict[str, float]: Returns the weight parameters for hotness calculation
 
@@ -46,7 +46,7 @@ def calculate_hotness_factors(
     pub_dates: List[Optional[datetime]],
     reader_client: ReaderDBClient,
     nlp: Optional[Any] = None
-) -> Dict[int, bool]:
+) -> Tuple[Dict[int, bool], Dict[int, float]]:
     """
     Calculate which clusters should be marked as hot based on a weighted score of four factors
     and a Top N selection approach:
@@ -65,7 +65,9 @@ def calculate_hotness_factors(
         nlp: Optional spaCy model for keyword extraction (if topic relevance is enabled)
 
     Returns:
-        Dictionary mapping cluster labels to boolean hot status
+        Tuple containing:
+        - Dict[int, bool]: Mapping cluster labels to boolean hot status
+        - Dict[int, float]: Mapping cluster labels to numerical hotness scores
     """
     # Get core topic keywords from environment or use default list
     default_core_topics = (
@@ -287,7 +289,7 @@ def calculate_hotness_factors(
     logger.info(
         f"Hotness calculation complete: {json.dumps(log_data, default=str)}")
 
-    return hotness_map
+    return hotness_map, hotness_scores
 
 
 def get_weight_params() -> Dict[str, float]:
