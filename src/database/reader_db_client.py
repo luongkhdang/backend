@@ -36,6 +36,7 @@ from src.database.modules import embeddings
 from src.database.modules import clusters
 from src.database.modules import essays
 from src.database.modules import domains
+from src.database.modules import entity_snippets
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -430,7 +431,7 @@ class ReaderDBClient:
                 self.release_connection(conn)
         return None
 
-    def link_article_entity(self, article_id: int, entity_id: int, mention_count: int = 1) -> bool:
+    def link_article_entity(self, article_id: int, entity_id: int, mention_count: int = 1, is_influential_context: bool = False) -> bool:
         """
         Link an article to an entity with mention count.
 
@@ -438,6 +439,7 @@ class ReaderDBClient:
             article_id: ID of the article
             entity_id: ID of the entity
             mention_count: Number of mentions of the entity in the article
+            is_influential_context: Whether this entity appears in an influential context (default: False)
 
         Returns:
             bool: True if successful, False otherwise
@@ -445,7 +447,7 @@ class ReaderDBClient:
         conn = self.get_connection()
         if conn:
             try:
-                return entities.link_article_entity(conn, article_id, entity_id, mention_count)
+                return entities.link_article_entity(conn, article_id, entity_id, mention_count, is_influential_context)
             finally:
                 self.release_connection(conn)
         return False
@@ -1031,3 +1033,119 @@ class ReaderDBClient:
             logger.error(
                 f"Error calculating influence score for entity {entity_id}: {e}")
             return 0.0
+
+    # Entity snippet operations
+    def store_entity_snippet(self, entity_id: int, article_id: int, snippet: str, is_influential: bool = False) -> bool:
+        """
+        Store a text snippet associated with an entity and article.
+
+        Args:
+            entity_id: ID of the entity
+            article_id: ID of the article
+            snippet: Text snippet containing or related to the entity
+            is_influential: Whether this snippet is considered influential for the entity
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entity_snippets.store_entity_snippet(conn, entity_id, article_id, snippet, is_influential)
+            finally:
+                self.release_connection(conn)
+        return False
+
+    def get_entity_snippets(self, entity_id: int, limit: int = 30) -> List[Dict[str, Any]]:
+        """
+        Get snippets for a specific entity, ordered by influence and recency.
+
+        Args:
+            entity_id: ID of the entity
+            limit: Maximum number of snippets to return
+
+        Returns:
+            List[Dict[str, Any]]: List of snippet records
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entity_snippets.get_entity_snippets(conn, entity_id, limit)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_article_entity_snippets(self, article_id: int, entity_id: int) -> List[Dict[str, Any]]:
+        """
+        Get snippets for a specific entity in a specific article.
+
+        Args:
+            article_id: ID of the article
+            entity_id: ID of the entity
+
+        Returns:
+            List[Dict[str, Any]]: List of snippet records
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entity_snippets.get_article_entity_snippets(conn, article_id, entity_id)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def delete_entity_snippets(self, entity_id: int) -> int:
+        """
+        Delete all snippets for a specific entity.
+
+        Args:
+            entity_id: ID of the entity
+
+        Returns:
+            int: Number of deleted snippets
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entity_snippets.delete_entity_snippets(conn, entity_id)
+            finally:
+                self.release_connection(conn)
+        return 0
+
+    def delete_article_entity_snippets(self, article_id: int, entity_id: int) -> int:
+        """
+        Delete snippets for a specific entity in a specific article.
+
+        Args:
+            article_id: ID of the article
+            entity_id: ID of the entity
+
+        Returns:
+            int: Number of deleted snippets
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entity_snippets.delete_article_entity_snippets(conn, article_id, entity_id)
+            finally:
+                self.release_connection(conn)
+        return 0
+
+    def get_article_snippets(self, article_id: int, limit_per_entity: int = 5) -> Dict[int, List[Dict[str, Any]]]:
+        """
+        Get snippets for all entities in a specific article.
+
+        Args:
+            article_id: ID of the article
+            limit_per_entity: Maximum number of snippets to return per entity
+
+        Returns:
+            Dict[int, List[Dict[str, Any]]]: Dictionary mapping entity IDs to lists of snippet records
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entity_snippets.get_article_snippets(conn, article_id, limit_per_entity)
+            finally:
+                self.release_connection(conn)
+        return {}

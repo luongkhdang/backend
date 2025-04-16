@@ -7,7 +7,7 @@ including inserting, linking, and retrieving entities.
 Exported functions:
 - insert_entity(conn, entity: Dict[str, Any]) -> Optional[int]
   Inserts an entity into the database
-- link_article_entity(conn, article_id: int, entity_id: int, mention_count: int = 1) -> bool
+- link_article_entity(conn, article_id: int, entity_id: int, mention_count: int = 1, is_influential_context: bool = False) -> bool
   Links an article to an entity with a mention count
 - get_entities_by_influence(conn, limit: int = 20) -> List[Dict[str, Any]]
   Gets entities sorted by influence score
@@ -99,7 +99,7 @@ def insert_entity(conn, entity: Dict[str, Any]) -> Optional[int]:
         return None
 
 
-def link_article_entity(conn, article_id: int, entity_id: int, mention_count: int = 1) -> bool:
+def link_article_entity(conn, article_id: int, entity_id: int, mention_count: int = 1, is_influential_context: bool = False) -> bool:
     """
     Link an article to an entity with a mention count.
 
@@ -108,6 +108,7 @@ def link_article_entity(conn, article_id: int, entity_id: int, mention_count: in
         article_id: ID of the article
         entity_id: ID of the entity
         mention_count: Number of mentions (default: 1)
+        is_influential_context: Whether this entity appears in an influential context (default: False)
 
     Returns:
         bool: True if successful, False otherwise
@@ -119,15 +120,17 @@ def link_article_entity(conn, article_id: int, entity_id: int, mention_count: in
         # Removed RETURNING id as it's not in the schema.
         cursor.execute("""
             INSERT INTO article_entities (
-                article_id, entity_id, mention_count
+                article_id, entity_id, mention_count, is_influential_context
             )
-            VALUES (%s, %s, %s)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (article_id, entity_id) DO UPDATE
-            SET mention_count = article_entities.mention_count + EXCLUDED.mention_count; -- Accumulate mentions on conflict
+            SET mention_count = article_entities.mention_count + EXCLUDED.mention_count,
+                is_influential_context = EXCLUDED.is_influential_context OR article_entities.is_influential_context; -- Keep as true if it was ever true
         """, (
             article_id,
             entity_id,
-            mention_count
+            mention_count,
+            is_influential_context
         ))
 
         # Check if the operation affected any row
@@ -138,7 +141,7 @@ def link_article_entity(conn, article_id: int, entity_id: int, mention_count: in
         # Log success/failure based on rowcount
         if success:
             logger.debug(
-                f"Successfully linked article {article_id} to entity {entity_id} with count {mention_count}.")
+                f"Successfully linked article {article_id} to entity {entity_id} with count {mention_count}, influential: {is_influential_context}.")
         else:
             # This might happen if ON CONFLICT DO UPDATE didn't change anything (e.g., mention_count was 0)
             # or if there was an issue not raising an exception but still failing.
@@ -174,8 +177,10 @@ def get_entities_by_influence(conn, limit: int = 20) -> List[Dict[str, Any]]:
     try:
         cursor = conn.cursor()
         # Select directly from entities table, order by influence_score
+        # Include updated_at and influence_calculated_at for consistency
         cursor.execute("""
-            SELECT id, name, entity_type, influence_score, mentions, first_seen, last_seen, created_at
+            SELECT id, name, entity_type, influence_score, mentions, 
+                   first_seen, last_seen, created_at, updated_at, influence_calculated_at
             FROM entities
             ORDER BY influence_score DESC NULLS LAST, mentions DESC
             LIMIT %s
@@ -212,17 +217,15 @@ def get_entity_influence_for_articles(conn, article_ids: List[int]) -> Dict[int,
     try:
         cursor = conn.cursor()
 
-        # Use tuple for IN clause parameter binding
-        article_ids_tuple = tuple(article_ids)
-
         # Query to calculate average entity influence score per article
+        # Pass the list directly for = ANY(%s) binding
         cursor.execute("""
             SELECT ae.article_id, AVG(e.influence_score) as avg_influence_score
             FROM article_entities ae
             JOIN entities e ON ae.entity_id = e.id
-            WHERE ae.article_id = ANY(%s) -- Use ANY for array/tuple binding
+            WHERE ae.article_id = ANY(%s)
             GROUP BY ae.article_id
-        """, (article_ids_tuple,))  # Pass as a tuple
+        """, (article_ids,))  # Pass the list directly
 
         # Initialize with None
         influence_scores = {article_id: None for article_id in article_ids}
@@ -312,19 +315,19 @@ def increment_entity_mentions(conn, article_id: int, entity_id: int, count: int 
             )
             VALUES (%s, %s, %s)
             ON CONFLICT (article_id, entity_id) DO UPDATE
-            SET mention_count = article_entities.mention_count + EXCLUDED.mention_count
-            RETURNING id;
+            SET mention_count = article_entities.mention_count + EXCLUDED.mention_count;
         """, (
             article_id,
             entity_id,
             count
         ))
 
-        result = cursor.fetchone() is not None
+        # Check if the operation affected any row (insert or update)
+        success = cursor.rowcount > 0
         conn.commit()
         cursor.close()
 
-        return result
+        return success  # Return True if a row was inserted or updated
 
     except Exception as e:
         logger.error(

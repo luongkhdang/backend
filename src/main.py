@@ -33,11 +33,12 @@ import time
 import argparse
 from dotenv import load_dotenv
 import json  # Import json for pretty printing
+import asyncio  # Add asyncio import
 
 # Import step modules
 from src.steps.step1 import run as run_step1
 from src.steps.step2 import run as run_step2
-from src.steps.step3 import run as run_step3
+from src.steps.step3 import run as run_step3  # run_step3 is now async
 from src.steps.domain_goodness import calculate_domain_goodness_scores
 
 # Import network checker
@@ -132,7 +133,7 @@ def check_network(skip_check=False, retry_count=3, retry_delay=5):
     return True
 
 
-def main():
+async def main():  # Make main async
     """
     Main function orchestrating all steps of the Data Refinery Pipeline
     """
@@ -152,7 +153,7 @@ def main():
         retry_delay=args.retry_delay
     ):
         logger.error("Aborting pipeline due to network issues")
-        return 1
+        return 1  # Return non-zero exit code
 
     # Execute Step 1: Data Collection, Processing and Storage
     step1_result = run_step1(max_workers=args.workers)
@@ -202,7 +203,7 @@ def main():
     if os.getenv("RUN_STEP3", "false").lower() == "true":
         logger.info("========= STARTING STEP 3: ENTITY EXTRACTION =========")
         try:
-            step3_status = run_step3()
+            step3_status = await run_step3()  # Use await for the async function
             logger.info("Step 3 Summary:")
             logger.debug(json.dumps(step3_status, indent=2))
 
@@ -221,6 +222,8 @@ def main():
                     from src.database.reader_db_client import ReaderDBClient
                     db_client = ReaderDBClient()
                     try:
+                        # Note: calculate_entities_influence_scores is currently synchronous
+                        # If it becomes async later, it would need await here.
                         influence_status = db_client.calculate_entities_influence_scores()
                         logger.info(
                             f"Influence score calculation: {influence_status}")
@@ -243,6 +246,7 @@ def main():
             from src.database.reader_db_client import ReaderDBClient
             db_client = ReaderDBClient()
             try:
+                # Note: calculate_domain_goodness_scores is currently synchronous
                 domain_status = calculate_domain_goodness_scores(db_client)
                 logger.info(f"Domain goodness calculation: {domain_status}")
 
@@ -269,5 +273,12 @@ def main():
 
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    # Use asyncio.run to execute the async main function
+    try:
+        exit_code = asyncio.run(main())
+        sys.exit(exit_code)
+    except Exception as e:
+        # Catch any top-level errors during async execution
+        logger.critical(
+            f"Pipeline failed with unhandled exception: {e}", exc_info=True)
+        sys.exit(1)  # Exit with non-zero code on critical failure

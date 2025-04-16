@@ -14,6 +14,7 @@ Related files:
 - src/main.py: Calls this module as part of the pipeline
 - src/database/reader_db_client.py: Database operations for articles and entities
 - src/gemini/gemini_client.py: Used for entity extraction API calls
+- src/utils/task_manager.py: Manages concurrent execution of API calls
 """
 
 import logging
@@ -21,14 +22,18 @@ import os
 import json
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict
+import asyncio
 
 # Import database client
 from src.database.reader_db_client import ReaderDBClient
 
 # Import Gemini client for API calls
 from src.gemini.gemini_client import GeminiClient
+
+# Import TaskManager for concurrent API calls
+from src.utils.task_manager import TaskManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -56,7 +61,7 @@ FALLBACK_MODEL = os.getenv('GEMINI_FLASH_LITE_MODEL',
                            'models/gemini-2.0-flash-lite')
 
 
-def run() -> Dict[str, Any]:
+async def run() -> Dict[str, Any]:
     """
     Main function to run the entity extraction process.
 
@@ -76,6 +81,7 @@ def run() -> Dict[str, Any]:
         # Initialize clients
         db_client = ReaderDBClient()
         gemini_client = GeminiClient()
+        task_manager = TaskManager()  # Initialize the TaskManager
 
         # Step 1: Get domain goodness scores
         domain_scores = _get_domain_goodness_scores(db_client)
@@ -90,30 +96,69 @@ def run() -> Dict[str, Any]:
                 "articles_found": 0,
                 "processed": 0,
                 "entity_links_created": 0,
+                "snippets_stored": 0,
                 "errors": 0,
                 "runtime_seconds": time.time() - start_time
             }
 
         logger.info(f"Found {len(prioritized_articles)} articles to process.")
 
-        # Step 3: Extract entities via API
-        entity_results = _extract_entities(gemini_client, prioritized_articles)
+        # Process using batched approach that stores to DB after each batch
+        batch_size = int(os.getenv("ENTITY_EXTRACTION_BATCH_SIZE", "10"))
+        total_batches = (len(prioritized_articles) +
+                         batch_size - 1) // batch_size
 
-        # Step 4: Store entity data and update article status
-        store_results = _store_results(db_client, entity_results)
+        # Initialize counters for final status
+        total_processed = 0
+        total_entity_links = 0
+        total_snippets = 0
+        total_errors = 0
+
+        # Process each batch
+        for batch_index in range(0, len(prioritized_articles), batch_size):
+            batch_num = batch_index // batch_size + 1
+            batch = prioritized_articles[batch_index:batch_index + batch_size]
+
+            logger.info(
+                f"Processing batch {batch_num}/{total_batches} ({len(batch)} articles)")
+
+            # Step 3: Extract entities for this batch (use await)
+            batch_entity_results = await _extract_entities_batch(
+                gemini_client, batch)
+            logger.info(
+                f"Entity extraction complete for batch {batch_num}. Found data for {len(batch_entity_results)} articles.")
+
+            # Step 4: Store entity data for this batch immediately
+            if batch_entity_results:
+                logger.info(
+                    f"Storing entity results for batch {batch_num} ({len(batch_entity_results)} articles)")
+                batch_store_results = _store_results(
+                    db_client, batch_entity_results)
+
+                # Update counters
+                total_processed += batch_store_results.get("processed", 0)
+                total_entity_links += batch_store_results.get("links", 0)
+                total_snippets += batch_store_results.get("snippets", 0)
+                total_errors += batch_store_results.get("errors", 0)
+
+                logger.info(f"Batch {batch_num} complete: Processed {batch_store_results.get('processed', 0)} articles, "
+                            f"created {batch_store_results.get('links', 0)} entity links, "
+                            f"stored {batch_store_results.get('snippets', 0)} snippets.")
 
         # Prepare final status report
         status = {
             "success": True,
             "articles_found": len(prioritized_articles),
-            "processed": store_results.get("processed", 0),
-            "entity_links_created": store_results.get("links", 0),
-            "errors": store_results.get("errors", 0),
+            "processed": total_processed,
+            "entity_links_created": total_entity_links,
+            "snippets_stored": total_snippets,
+            "errors": total_errors,
             "runtime_seconds": time.time() - start_time
         }
 
         logger.info(f"Step 3 completed in {status['runtime_seconds']:.2f} seconds. "
-                    f"Processed {status['processed']} articles, created {status['entity_links_created']} entity links.")
+                    f"Processed {status['processed']} articles, created {status['entity_links_created']} entity links, "
+                    f"stored {status['snippets_stored']} supporting snippets.")
 
         return status
 
@@ -137,25 +182,20 @@ def _get_domain_goodness_scores(db_client: ReaderDBClient) -> Dict[str, float]:
         Dictionary mapping domains to their goodness scores
     """
     try:
-        # Try to fetch existing domain goodness scores
-        try:
-            # This function needs to be implemented in reader_db_client.py
-            domain_scores = db_client.get_all_domain_goodness_scores()
-            if domain_scores:
-                logger.info(
-                    f"Found {len(domain_scores)} domain goodness scores.")
-                return domain_scores
-        except Exception as e:
-            logger.warning(f"Error fetching domain goodness scores: {e}")
+        # Fetch existing domain goodness scores
+        domain_scores = db_client.get_all_domain_goodness_scores()
+        if domain_scores:
+            logger.info(f"Found {len(domain_scores)} domain goodness scores.")
+            return domain_scores
 
-        # Fallback: Use default scores
-        logger.warning(
-            "Using default domain goodness scores (0.5 for all domains).")
-        return defaultdict(lambda: 0.5)
+        # If no scores found, return empty dictionary - no fallbacks
+        logger.warning("No domain goodness scores found in database.")
+        return {}
 
     except Exception as e:
         logger.error(f"Error in _get_domain_goodness_scores: {e}")
-        return defaultdict(lambda: 0.5)
+        # No fallback - raise the exception
+        raise
 
 
 def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, float]) -> List[Dict[str, Any]]:
@@ -257,83 +297,101 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
         return []
 
 
-def _extract_entities(gemini_client: GeminiClient, articles: List[Dict[str, Any]]) -> Dict[int, Any]:
+async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Dict[str, Any]]) -> Dict[int, Any]:
     """
-    Extract entities from articles using Gemini API based on assigned tier.
+    Extract entities from a batch of articles using Gemini API concurrently.
 
     Args:
         gemini_client: Initialized GeminiClient instance
-        articles: List of prioritized article dictionaries
+        articles: Batch of article dictionaries to process
 
     Returns:
-        Dictionary mapping article IDs to their extracted entity data (or error info)
+        Dictionary mapping article IDs to their extracted entity data (or error dict)
     """
+    logger.info(
+        f"Preparing to extract entities for {len(articles)} articles using TaskManager")
+
+    # Create task definitions for each article
+    tasks_definitions = []
+
+    for article in articles:
+        article_id = article.get('id')
+        content = article.get('content')
+        tier = article.get('processing_tier')
+        model_to_use = TIER_MODEL_MAP.get(tier, FALLBACK_MODEL)
+
+        if not article_id or not content:
+            logger.warning(
+                f"Skipping article {article_id} with missing ID or content.")
+            # We'll handle these separately since they're not valid tasks
+            continue
+
+        # Create a task definition dictionary with all necessary data
+        task_definition = {
+            'article_id': article_id,
+            'content': content,
+            'processing_tier': tier,
+            'model_to_use': model_to_use
+        }
+        tasks_definitions.append(task_definition)
+
+    # Special handling for skipped articles (missing ID/content)
+    skipped_results = {}
+    for article in articles:
+        article_id = article.get('id')
+        if article_id and (not article.get('content')):
+            skipped_results[article_id] = {"error": "Missing ID or content"}
+
+    # Use TaskManager to run the tasks concurrently
+    if tasks_definitions:
+        # Get a reference to the TaskManager instance created in run()
+        task_manager = TaskManager()  # Create a new instance for this batch
+        extraction_results = await task_manager.run_tasks(gemini_client, tasks_definitions)
+
+        # Merge with skipped results
+        extraction_results.update(skipped_results)
+
+        return extraction_results
+    else:
+        logger.warning("No valid articles to process in batch")
+        return skipped_results
+
+
+def _extract_entities(gemini_client: GeminiClient, articles: List[Dict[str, Any]]) -> Dict[int, Any]:
+    """
+    Extract entities from all articles using Gemini API.
+    This is the original function that processes all articles at once.
+    For batch-by-batch processing with immediate DB storage, use the new run() implementation.
+
+    DEPRECATED: This synchronous method has been replaced by the async implementation
+    in the run() function that uses TaskManager.
+
+    Args:
+        gemini_client: Initialized GeminiClient instance
+        articles: List of all prioritized article dictionaries
+
+    Returns:
+        Dictionary mapping article IDs to their extracted entity data
+    """
+    logger.warning(
+        "_extract_entities (synchronous full processing) called. This is DEPRECATED and should not be used.")
+
     entity_results = {}
     batch_size = int(os.getenv("ENTITY_EXTRACTION_BATCH_SIZE", "10"))
-    processed_count = 0
 
-    for i in range(0, len(articles), batch_size):
-        batch = articles[i:i + batch_size]
-        logger.info(
-            f"Processing article batch {i // batch_size + 1} / {(len(articles) + batch_size - 1) // batch_size}")
+    # We can't safely call async methods from this sync context
+    # This is just a placeholder to avoid breaking existing code if called
 
-        # In a real scenario, you might use threading or asyncio here
-        for article in batch:
-            article_id = article.get('id')
-            content = article.get('content')
-            tier = article.get('processing_tier')
-            model_to_use = TIER_MODEL_MAP.get(tier, FALLBACK_MODEL)
-
-            if not article_id or not content:
-                logger.warning(
-                    f"Skipping article with missing ID or content: {article_id}")
-                entity_results[article_id] = {"error": "Missing ID or content"}
-                continue
-
-            try:
-                # Use GeminiClient to generate text (entities)
-                extraction_result = gemini_client.generate_text_with_prompt(
-                    article_content=content,
-                    processing_tier=tier,
-                    model_override=model_to_use  # Pass the selected model
-                )
-
-                if extraction_result:
-                    # Attempt to parse the JSON string response
-                    try:
-                        parsed_entities = json.loads(extraction_result)
-                        entity_results[article_id] = parsed_entities
-                        logger.debug(
-                            f"Successfully extracted entities for article {article_id}")
-                    except json.JSONDecodeError as json_err:
-                        logger.warning(
-                            f"Failed to parse JSON from Gemini for article {article_id}: {json_err}")
-                        entity_results[article_id] = {
-                            "error": "Invalid JSON response", "raw_response": extraction_result}
-                else:
-                    logger.warning(
-                        f"No entity extraction result from Gemini for article {article_id}")
-                    entity_results[article_id] = {
-                        "error": "No response from API"}
-
-            except Exception as api_err:
-                logger.error(
-                    f"Error calling Gemini API for article {article_id}: {api_err}", exc_info=True)
-                entity_results[article_id] = {
-                    "error": f"API call failed: {api_err}"}
-
-            processed_count += 1
-            # Optional: Add a small delay between API calls if needed
-            # time.sleep(0.1)
-
-    logger.info(
-        f"Finished entity extraction API calls for {processed_count} articles.")
+    logger.error(
+        "Deprecated _extract_entities called. Please use the async version with TaskManager.")
+    # Return empty results - better to fail explicitly than provide partial incorrect results
     return entity_results
 
 
 def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) -> Dict[str, int]:
     """
     Store extracted entities, link them to articles, and update article status.
+    Processes and commits results in batches of 10 articles for incremental progress.
 
     Args:
         db_client: Database client instance
@@ -344,87 +402,184 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
     """
     processed_count = 0
     entity_links_created = 0
+    snippets_stored = 0
     errors = 0
 
     if not entity_results:
-        return {"processed": 0, "links": 0, "errors": 0}
+        return {"processed": 0, "links": 0, "snippets": 0, "errors": 0}
+
+    # Get list of article IDs to process in batches
+    article_ids = list(entity_results.keys())
+    batch_size = 10  # Process 10 articles at a time for DB operations
+    total_batches = (len(article_ids) + batch_size - 1) // batch_size
 
     logger.info(
-        f"Storing entity results for {len(entity_results)} articles...")
+        f"Storing entity results for {len(entity_results)} articles in batches of {batch_size}...")
 
-    for article_id, extracted_data in entity_results.items():
-        try:
-            # Check if this result contains an error
-            if isinstance(extracted_data, dict) and 'error' in extracted_data:
-                logger.warning(
-                    f"Skipping article {article_id} due to extraction error: {extracted_data.get('error')}")
-                errors += 1
-                continue
+    # Process articles in batches to provide incremental commits
+    for batch_index in range(0, len(article_ids), batch_size):
+        batch_article_ids = article_ids[batch_index:batch_index + batch_size]
+        batch_num = batch_index // batch_size + 1
 
-            # Process extracted entities
-            if isinstance(extracted_data, list):
-                for entity_data in extracted_data:
-                    # Extract entity info
-                    entity_name = entity_data.get('entity_name')
-                    entity_type = entity_data.get('entity_type')
-                    # Default to 1 if no mentions list
-                    mention_count = len(entity_data.get('mentions', [1]))
+        logger.info(
+            f"Processing storage batch {batch_num}/{total_batches} ({len(batch_article_ids)} articles)")
 
-                    if not entity_name or not entity_type:
-                        logger.warning(
-                            f"Skipping entity with missing name or type: {entity_data}")
-                        continue
+        # Track batch metrics for reporting
+        batch_processed = 0
+        batch_links = 0
+        batch_snippets = 0
+        batch_errors = 0
 
-                    # Find or create entity
-                    try:
-                        # This function needs to be implemented in reader_db_client.py
-                        entity_id = db_client.find_or_create_entity(
-                            name=entity_name, entity_type=entity_type)
+        for article_id in batch_article_ids:
+            extracted_data = entity_results[article_id]
+            try:
+                # Check if this result contains an error
+                if isinstance(extracted_data, dict) and 'error' in extracted_data:
+                    logger.warning(
+                        f"Skipping article {article_id} due to extraction error: {extracted_data.get('error')}")
+                    batch_errors += 1
+                    continue
 
-                        if not entity_id:
+                # Process extracted entities - Check for dict with 'extracted_entities' list or just a list
+                entity_list_to_process = None
+                if isinstance(extracted_data, dict) and 'extracted_entities' in extracted_data and isinstance(extracted_data['extracted_entities'], list):
+                    # Handle successful dictionary response containing the list
+                    entity_list_to_process = extracted_data['extracted_entities']
+                elif isinstance(extracted_data, list):
+                    # Handle case where the response is directly the list (legacy or alternative format)
+                    logger.warning(
+                        f"Received direct list for article {article_id}, expected dict with 'extracted_entities' key.")
+                    entity_list_to_process = extracted_data
+
+                if entity_list_to_process is not None:  # Proceed if we found a valid list of entities
+                    # Check if the list is empty
+                    if not entity_list_to_process:
+                        logger.info(
+                            f"No entities extracted for article {article_id} (empty list).")
+                        # Mark article as processed even if no entities were found
+                        try:
+                            db_client.mark_article_processed(
+                                article_id=article_id)
+                            batch_processed += 1  # Count as processed
+                        except Exception as e:
+                            logger.error(
+                                f"Error marking article {article_id} as processed (no entities): {e}")
+                            batch_errors += 1  # Still an error if DB update fails
+                        continue  # Move to the next article
+
+                    # Process the non-empty list of entities
+                    for entity_data in entity_list_to_process:
+                        # Extract entity info
+                        entity_name = entity_data.get('entity_name')
+                        entity_type = entity_data.get('entity_type')
+                        # CORRECTED MENTION KEY: Use 'mention_count_article' from prompt
+                        mention_count = entity_data.get(
+                            'mention_count_article', 1)  # Default to 1 if missing
+                        # Get supporting snippets if available
+                        supporting_snippets = entity_data.get(
+                            'supporting_snippets', [])
+                        is_influential = entity_data.get(
+                            'is_influential_context', False)
+
+                        if not entity_name or not entity_type:
                             logger.warning(
-                                f"Failed to create/find entity {entity_name}")
+                                f"Skipping entity with missing name or type in article {article_id}: {entity_data}")
                             continue
 
-                        # Link article to entity with mention count
-                        link_success = db_client.link_article_entity(
-                            article_id=article_id,
-                            entity_id=entity_id,
-                            mention_count=mention_count,
-                            is_influential_context=entity_data.get(
-                                'is_influential_context', False)
-                        )
+                        # Find or create entity
+                        try:
+                            entity_id = db_client.find_or_create_entity(
+                                name=entity_name, entity_type=entity_type)
 
-                        if link_success:
-                            entity_links_created += 1
+                            if not entity_id:
+                                logger.warning(
+                                    f"Failed to create/find entity '{entity_name}' for article {article_id}")
+                                continue
 
-                            # Increment global entity mentions count
-                            # This function needs to be implemented in reader_db_client.py
-                            db_client.increment_global_entity_mentions(
-                                entity_id=entity_id, count=mention_count)
+                            # Link article to entity with mention count and influential context flag
+                            link_success = db_client.link_article_entity(
+                                article_id=article_id,
+                                entity_id=entity_id,
+                                mention_count=mention_count,
+                                is_influential_context=is_influential
+                            )
 
+                            if link_success:
+                                batch_links += 1
+
+                                # Increment global entity mentions count
+                                db_client.increment_global_entity_mentions(
+                                    entity_id=entity_id, count=mention_count)
+
+                                # Store supporting snippets only if entity is influential
+                                if is_influential and supporting_snippets:
+                                    for snippet in supporting_snippets:
+                                        # Snippets in the prompt are just strings, not dicts
+                                        if isinstance(snippet, str) and snippet:
+                                            snippet_success = db_client.store_entity_snippet(
+                                                entity_id=entity_id,
+                                                article_id=article_id,
+                                                snippet=snippet,
+                                                # is_influential flag in snippet table indicates if the snippet itself is influential
+                                                # The prompt structure doesn't provide this per snippet, only per entity.
+                                                # Defaulting to True if the entity was influential.
+                                                is_influential=is_influential
+                                            )
+                                            if snippet_success:
+                                                batch_snippets += 1
+                                        else:
+                                            logger.warning(
+                                                f"Skipping invalid snippet format for entity {entity_id} in article {article_id}: {snippet}")
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error storing entity '{entity_name}' for article {article_id}: {e}", exc_info=True)
+                            # Consider incrementing batch_errors here?
+
+                    # Mark article as processed (after processing all its entities)
+                    try:
+                        db_client.mark_article_processed(article_id=article_id)
+                        batch_processed += 1
                     except Exception as e:
                         logger.error(
-                            f"Error storing entity {entity_name} for article {article_id}: {e}")
+                            f"Error marking article {article_id} as processed: {e}")
+                        batch_errors += 1  # Error during marking processed
+                else:  # Neither dict with 'extracted_entities' nor list found
+                    logger.warning(
+                        f"Unexpected data format for article {article_id}: {type(extracted_data)}")
+                    batch_errors += 1
 
-                # Mark article as processed
-                try:
-                    # This function needs to be implemented in reader_db_client.py
-                    db_client.mark_article_processed(article_id=article_id)
-                    processed_count += 1
-                except Exception as e:
-                    logger.error(
-                        f"Error marking article {article_id} as processed: {e}")
+            except Exception as e:
+                logger.error(
+                    f"Error processing results for article {article_id}: {e}")
+                batch_errors += 1
+
+        # Update running totals with batch results
+        processed_count += batch_processed
+        entity_links_created += batch_links
+        snippets_stored += batch_snippets
+        errors += batch_errors
+
+        # Log batch completion
+        logger.info(
+            f"Batch {batch_num}/{total_batches} complete: Processed {batch_processed} articles, created {batch_links} links, stored {batch_snippets} snippets.")
+
+        # Explicitly ensure the current batch is committed by releasing and getting a new connection
+        # This ensures DB writes are persisted in case of interruptions
+        try:
+            # First release any existing connection back to the pool
+            # Assuming get_connection() returns the connection object itself
+            conn = db_client.get_connection()
+            if conn:
+                db_client.release_connection(conn)
+                logger.debug(
+                    f"Committed batch {batch_num} to database (connection released)")
             else:
                 logger.warning(
-                    f"Unexpected data format for article {article_id}: {type(extracted_data)}")
-                errors += 1
-
+                    f"Could not get connection to commit batch {batch_num}")
         except Exception as e:
-            logger.error(
-                f"Error processing results for article {article_id}: {e}")
-            errors += 1
+            logger.warning(f"Error during explicit batch commit: {e}")
 
     logger.info(
-        f"Storage complete. Processed {processed_count} articles, created {entity_links_created} entity links.")
-    return {"processed": processed_count, "links": entity_links_created, "errors": errors}
+        f"Storage complete. Total: {processed_count} articles processed, {entity_links_created} entity links created, {snippets_stored} snippets stored, {errors} errors.")
+    return {"processed": processed_count, "links": entity_links_created, "snippets": snippets_stored, "errors": errors}

@@ -83,7 +83,8 @@ def calculate_domain_goodness_scores(db_client, min_entries: int = 5,
             f"Found {len(domains_data)} domains with max {max_entries} entries")
 
         # Process each domain
-        scores = []
+        # Store full statistics for insertion later
+        processed_domain_data = []
         domains_processed = 0
         domains_skipped = 0
 
@@ -118,40 +119,48 @@ def calculate_domain_goodness_scores(db_client, min_entries: int = 5,
             # Calculate final score (capped at 1.0)
             final_score = min(base_score + consistency_bonus, 1.0)
 
-            scores.append((domain, final_score))
+            # Append all calculated data for the domain
+            # Ensure avg_hotness is not None
+            processed_domain_data.append(
+                (domain, total_entries, hot_entries, avg_hotness or 0.0, final_score))
             domains_processed += 1
 
-        # Step 3: Store results in calculated_domain_goodness table
-        logger.info(f"Storing calculated scores for {len(scores)} domains...")
+        # Step 3: Store results in domain_statistics table
+        logger.info(
+            f"Storing calculated scores for {len(processed_domain_data)} domains...")
 
-        # Clear existing scores
-        # Use semicolon
-        cursor.execute("TRUNCATE TABLE calculated_domain_goodness;")
+        # Clear existing scores from the correct table
+        # Use TRUNCATE for speed, ensure permissions allow it
+        cursor.execute("TRUNCATE TABLE domain_statistics;")
 
         # Insert new scores using correct columns
         insert_count = 0
-        for domain, score in scores:
-            # calculated_at uses DEFAULT CURRENT_TIMESTAMP
-            cursor.execute("""
-                INSERT INTO calculated_domain_goodness (domain, domain_goodness_score)
-                VALUES (%s, %s)
-            """, (domain, score))
+        # Use the correct columns for domain_statistics
+        insert_query = """
+            INSERT INTO domain_statistics 
+            (domain, total_entries, hot_entries, average_cluster_hotness, goodness_score, calculated_at)
+            VALUES (%s, %s, %s, %s, %s, DEFAULT) 
+        """
+
+        for domain_data in processed_domain_data:
+            # domain_data is (domain, total_entries, hot_entries, avg_hotness, final_score)
+            cursor.execute(insert_query, domain_data)
             insert_count += 1
 
             # Commit in batches to avoid memory issues with very large datasets
             if insert_count % 100 == 0:
                 conn.commit()
                 logger.debug(
-                    f"Committed batch of {insert_count} domain scores...")
+                    f"Committed batch of {insert_count} domain statistics...")
 
         # Final commit
         conn.commit()
-        logger.info(f"Final commit of {insert_count} domain scores.")
+        logger.info(f"Final commit of {insert_count} domain statistics.")
 
         runtime = time.time() - start_time
 
         # Get top domains using the updated _get_top_domains function
-        top_domains_list = _get_top_domains(cursor, 5)
+        top_domains_list = _get_top_domains(cursor, 5)  # Pass the cursor
 
         # Log summary statistics
         summary = {
@@ -188,11 +197,11 @@ def calculate_domain_goodness_scores(db_client, min_entries: int = 5,
 def _get_top_domains(cursor, limit: int = 5) -> List[Dict[str, Any]]:
     """Get top domains by goodness score for reporting."""
     try:
-        # Use correct column name domain_goodness_score
+        # Use correct table (domain_statistics) and column name (goodness_score)
         cursor.execute("""
-            SELECT domain, domain_goodness_score
-            FROM calculated_domain_goodness
-            ORDER BY domain_goodness_score DESC
+            SELECT domain, goodness_score
+            FROM domain_statistics
+            ORDER BY goodness_score DESC
             LIMIT %s
         """, (limit,))
 

@@ -4,17 +4,27 @@ influence.py - Entity Influence Score Calculation Module
 
 This module implements advanced influence score calculation for entities by analyzing
 mentions across articles, source quality, content context, and temporal factors.
+It utilizes weights based on entity types and stores calculation factors for transparency.
 
 Exported functions:
-- calculate_entity_influence_score(conn, entity_id, recency_days): Calculates a comprehensive influence score
-  - Returns float: Calculated influence score
-- update_all_influence_scores(conn, entity_ids, recency_days): Updates influence scores for multiple entities
-  - Returns Dict[str, Any]: Success and error counts
+- calculate_entity_influence_score(conn: Any, entity_id: int, recency_days: int) -> float: Calculates a comprehensive influence score.
+  - Parameters:
+    - conn: Database connection object.
+    - entity_id (int): ID of the entity to calculate score for.
+    - recency_days (int): Number of days to prioritize for recency (default: 30).
+  - Returns (float): Calculated influence score (0.0 if error or entity not found).
+- update_all_influence_scores(conn: Any, entity_ids: Optional[List[int]], recency_days: int) -> Dict[str, Any]: Updates influence scores for multiple entities.
+  - Parameters:
+    - conn: Database connection object.
+    - entity_ids (Optional[List[int]]): List of entity IDs to update (if None, uses entities from recent articles).
+    - recency_days (int): Number of days to prioritize for recency (default: 30).
+  - Returns (Dict[str, Any]): Dictionary with success count, error count, and total entities processed.
 
 Related files:
-- src/database/modules/entities.py: Basic entity operations
-- src/database/reader_db_client.py: Client wrapper for these functions
-- src/steps/step3/__init__.py: Uses these functions for entity processing
+- src/database/modules/entities.py: Basic entity operations.
+- src/database/modules/schema.py: Defines `entity_type_weights` and `entity_influence_factors` tables.
+- src/database/reader_db_client.py: Client wrapper for these functions.
+- src/steps/step3/__init__.py: Uses these functions for entity processing.
 """
 
 import logging
@@ -28,12 +38,13 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Placeholder Weights - Adjust based on desired factor importance
-# Removed context and type weights due to schema changes
-WEIGHTS = {
-    'base': 0.50,    # Base mention metrics (Increased weight)
-    'quality': 0.25,  # Source quality (Increased weight)
-    'temporal': 0.25  # Recency and trend (Increased weight)
+# Weights for combining component scores - adjust based on desired factor importance
+# These determine the relative contribution of each factor before entity type modification.
+COMPONENT_WEIGHTS = {
+    'base': 0.40,     # Base mention metrics (reach)
+    'quality': 0.20,  # Source quality (domain goodness)
+    'temporal': 0.20,  # Recency and trend
+    'context': 0.20   # Influential context proportion
 }
 
 
@@ -50,7 +61,7 @@ def calculate_entity_influence_score(conn, entity_id: int, recency_days: int = 3
         Calculated influence score (0.0 if error or entity not found)
     """
     try:
-        # Step 1: Collect raw data
+        # Step 1: Collect raw data (now includes entity_type)
         raw_data = _collect_entity_influence_data(
             conn, entity_id, recency_days)
 
@@ -63,34 +74,48 @@ def calculate_entity_influence_score(conn, entity_id: int, recency_days: int = 3
         base_score = _calculate_base_mention_score(raw_data)
         quality_score = _calculate_source_quality_score(raw_data)
         temporal_score = _calculate_temporal_score(raw_data)
-        # Removed context_score calculation
+        context_score = _calculate_context_score(raw_data)
 
         # Step 3: Apply weights to component scores
-        # Using pre-defined WEIGHTS dictionary
-        final_score = (
-            WEIGHTS['base'] * base_score +
-            WEIGHTS['quality'] * quality_score +
-            WEIGHTS['temporal'] * temporal_score
+        weighted_score = (
+            COMPONENT_WEIGHTS['base'] * base_score +
+            COMPONENT_WEIGHTS['quality'] * quality_score +
+            COMPONENT_WEIGHTS['temporal'] * temporal_score +
+            COMPONENT_WEIGHTS['context'] * context_score
         )
 
-        # Step 4: Apply entity type modifier (REMOVED due to schema/complexity)
-        # entity_type = raw_data.get('entity_type')
-        # type_weight = _get_entity_type_weight(conn, entity_type)
-        # final_score *= type_weight
+        # Step 4: Apply entity type modifier
+        entity_type = raw_data.get('entity_type')
+        type_weight = _get_entity_type_weight(conn, entity_type)
+        final_score = weighted_score * type_weight
 
-        # Step 5: Store calculation factors for transparency (REMOVED DB storage)
-        # Log the factors instead for now
-        logger.debug(
-            f"Influence factors for entity {entity_id}: base={base_score:.3f}, quality={quality_score:.3f}, temporal={temporal_score:.3f}, final={final_score:.3f}")
-        # _store_influence_factors(conn, entity_id, { ... })
+        # Ensure score stays within a reasonable range (e.g., 0 to potentially > 1 if weights allow)
+        final_score = max(0, final_score)
 
-        # Step 6: Update the entity's influence score
-        success = _update_entity_influence_score(conn, entity_id, final_score)
+        # Step 5: Store calculation factors for transparency
+        factors_data = {
+            "base_mention_score": base_score,
+            "source_quality_score": quality_score,
+            "content_context_score": context_score,
+            "temporal_score": temporal_score,
+            "entity_type_weight_used": type_weight,
+            "final_weighted_score_pre_type": weighted_score,
+            "final_influence_score": final_score,
+            "raw_data": raw_data  # Include the raw collected data
+        }
+        factors_stored = _store_influence_factors(
+            conn, entity_id, factors_data)
+        if not factors_stored:
+            logger.warning(
+                f"Failed to store influence factors for entity {entity_id}.")
+
+        # Step 6: Update the entity's influence score and timestamp
+        success = _update_entity_influence_score(
+            conn, entity_id, final_score)
         if not success:
             logger.warning(
                 f"Failed to update influence score for entity {entity_id} in the database.")
-            # Decide if we should return 0.0 or the calculated score despite DB update failure
-            # For now, return the calculated score but log the warning.
+            # Return calculated score despite DB update failure, log warning.
 
         return final_score
 
@@ -201,7 +226,7 @@ def _collect_entity_influence_data(conn, entity_id: int, recency_days: int) -> O
     try:
         cursor = conn.cursor()
 
-        # Get basic entity info (using correct columns)
+        # Get basic entity info (including entity_type)
         cursor.execute("""
             SELECT name, entity_type, mentions
             FROM entities
@@ -216,26 +241,27 @@ def _collect_entity_influence_data(conn, entity_id: int, recency_days: int) -> O
         entity_name, entity_type, total_mentions = entity_row
 
         # 1. Get article count and total mention count from article_entities
-        # Note: total_mentions from entities table might be slightly different if not perfectly synced,
-        # using article_entities sum is more direct for this calculation.
+        # Also get sum of mentions where is_influential_context is TRUE
         cursor.execute("""
             SELECT
                 COUNT(DISTINCT article_id) as article_count,
-                SUM(mention_count) as mention_sum
+                SUM(mention_count) as mention_sum,
+                SUM(CASE WHEN is_influential_context THEN mention_count ELSE 0 END) as influential_mention_sum
             FROM article_entities
             WHERE entity_id = %s
         """, (entity_id,))
         mention_stats = cursor.fetchone()
         article_count = mention_stats[0] if mention_stats else 0
         mention_sum_in_articles = mention_stats[1] if mention_stats and mention_stats[1] is not None else 0
+        influential_mention_sum = mention_stats[2] if mention_stats and mention_stats[2] is not None else 0
 
         # 2. Get domain goodness scores for articles mentioning this entity
         cursor.execute("""
-            SELECT cdg.domain_goodness_score
+            SELECT ds.goodness_score
             FROM article_entities ae
             JOIN articles a ON ae.article_id = a.id
-            LEFT JOIN calculated_domain_goodness cdg ON a.domain = cdg.domain
-            WHERE ae.entity_id = %s AND cdg.domain_goodness_score IS NOT NULL
+            LEFT JOIN domain_statistics ds ON a.domain = ds.domain
+            WHERE ae.entity_id = %s AND ds.goodness_score IS NOT NULL
         """, (entity_id,))
         # Use 0.5 as default if no score found
         domain_scores = [row[0] for row in cursor.fetchall()] or [0.5]
@@ -251,54 +277,40 @@ def _collect_entity_influence_data(conn, entity_id: int, recency_days: int) -> O
         # Use 0.0 as default if no score found
         cluster_scores = [row[0] for row in cursor.fetchall()] or [0.0]
 
-        # 4. Get temporal data (mentions over time)
-        recent_date_cutoff = datetime.now() - timedelta(days=recency_days)
-
+        # 4. Get publication dates for recent mentions
+        cutoff_date = datetime.now() - timedelta(days=recency_days)
         cursor.execute("""
-            SELECT
-                COUNT(DISTINCT article_id) as recent_articles,
-                SUM(mention_count) as recent_mentions
+            SELECT a.pub_date
             FROM article_entities ae
             JOIN articles a ON ae.article_id = a.id
-            WHERE ae.entity_id = %s AND a.pub_date >= %s
-        """, (entity_id, recent_date_cutoff))
-        recent_stats = cursor.fetchone()
-        recent_articles = recent_stats[0] if recent_stats else 0
-        recent_mentions = recent_stats[1] if recent_stats and recent_stats[1] is not None else 0
+            WHERE ae.entity_id = %s AND a.pub_date IS NOT NULL AND a.pub_date >= %s
+        """, (entity_id, cutoff_date))
+        recent_pub_dates = [row[0] for row in cursor.fetchall()]
 
-        # 5. Get processing tier distribution (REMOVED)
-        # tier_distribution = {}
-
-        # 6. Get trend data (comparing current period vs previous period)
-        prev_period_start = recent_date_cutoff - timedelta(days=recency_days)
-
+        # 5. Get publication dates for all mentions (for trend analysis if needed later)
         cursor.execute("""
-            SELECT SUM(mention_count) as prev_period_mentions
+            SELECT a.pub_date
             FROM article_entities ae
             JOIN articles a ON ae.article_id = a.id
-            WHERE ae.entity_id = %s AND a.pub_date >= %s AND a.pub_date < %s
-        """, (entity_id, prev_period_start, recent_date_cutoff))
-        prev_mentions_row = cursor.fetchone()
-        prev_mentions = prev_mentions_row[0] if prev_mentions_row and prev_mentions_row[0] is not None else 0
+            WHERE ae.entity_id = %s AND a.pub_date IS NOT NULL
+            ORDER BY a.pub_date DESC
+        """, (entity_id,))
+        all_pub_dates = [row[0] for row in cursor.fetchall()]
 
         cursor.close()
 
-        # Compile all data
         return {
-            'entity_id': entity_id,
-            'entity_name': entity_name,
-            'entity_type': entity_type,
-            'total_mentions_in_entities': total_mentions,  # From entities table
-            'mention_sum_in_articles': mention_sum_in_articles,  # Sum from article_entities
-            'article_count': article_count,
-            'avg_domain_goodness': sum(domain_scores) / len(domain_scores) if domain_scores else 0.5,
-            'avg_cluster_hotness': sum(cluster_scores) / len(cluster_scores) if cluster_scores else 0.0,
-            'recent_mentions': recent_mentions,
-            'recent_articles': recent_articles,
-            'prev_period_mentions': prev_mentions,
-            'recency_days': recency_days
-            # 'tier_distribution': tier_distribution, # Removed
-            # 'influential_count': influential_count, # Removed
+            "entity_id": entity_id,
+            "entity_name": entity_name,
+            "entity_type": entity_type,  # Added entity_type
+            "total_global_mentions": total_mentions,
+            "linked_article_count": article_count,
+            "mention_sum_in_articles": mention_sum_in_articles,
+            "influential_mention_sum": influential_mention_sum,
+            "domain_scores": domain_scores,
+            "cluster_hotness_scores": cluster_scores,
+            "recent_pub_dates": recent_pub_dates,
+            "all_pub_dates": all_pub_dates
         }
     except Exception as e:
         logger.error(
@@ -314,7 +326,7 @@ def _calculate_base_mention_score(data: Dict[str, Any]) -> float:
     Normalizes based on typical ranges (adjust based on data distribution).
     """
     mentions = data.get('mention_sum_in_articles', 0)
-    articles = data.get('article_count', 0)
+    articles = data.get('linked_article_count', 0)
 
     # Avoid division by zero
     if articles == 0:
@@ -339,39 +351,36 @@ def _calculate_base_mention_score(data: Dict[str, Any]) -> float:
 
 
 def _calculate_source_quality_score(data: Dict[str, Any]) -> float:
-    """
-    Calculate score based on average domain goodness and cluster hotness.
-    Assumes goodness/hotness are already roughly 0-1 scales.
-    """
-    avg_goodness = data.get('avg_domain_goodness', 0.5)  # Default to neutral
-    avg_hotness = data.get('avg_cluster_hotness', 0.0)
+    """Calculate score based on average domain goodness of mentioning articles."""
+    domain_scores = data.get('domain_scores', [])
+    if not domain_scores:
+        return 0.5  # Default score if no domains or scores found
 
-    # Combine (adjust weighting if needed)
-    # Simple average assumes equal importance
-    quality_score = (avg_goodness + avg_hotness) / 2.0
-
-    return min(max(quality_score, 0.0), 1.0)  # Clamp between 0 and 1
+    # Simple average for now, could be weighted later
+    avg_score = sum(domain_scores) / len(domain_scores)
+    # Normalize? Domain scores should ideally be 0-1, but let's clamp just in case.
+    return max(0.0, min(1.0, avg_score))
 
 
 def _calculate_temporal_score(data: Dict[str, Any]) -> float:
     """
     Calculate score based on recency and trend.
     """
-    recent_mentions = data.get('recent_mentions', 0)
+    recent_mentions = data.get('recent_pub_dates', [])
     total_mentions = data.get('mention_sum_in_articles', 0)
-    prev_mentions = data.get('prev_period_mentions', 0)
+    prev_mentions = data.get('all_pub_dates', [])
 
     # Recency component: Proportion of mentions that are recent
     recency_factor = 0.0
     if total_mentions > 0:
-        recency_factor = recent_mentions / total_mentions
+        recency_factor = len(recent_mentions) / total_mentions
 
     # Trend component: Growth compared to previous period
     # Use smoothing (add 1) to avoid extreme values with low counts
     trend_factor = 0.0
-    if prev_mentions + 1 > 0:
+    if len(prev_mentions) > 0:
         # Calculate growth ratio
-        growth_ratio = (recent_mentions + 1) / (prev_mentions + 1)
+        growth_ratio = (len(recent_mentions) + 1) / (len(prev_mentions) + 1)
         # Map growth ratio to a 0-1 scale (e.g., using tanh or log)
         # Simple mapping: Clamp growth > 1, penalize decline < 1
         if growth_ratio >= 1:
@@ -390,43 +399,114 @@ def _calculate_temporal_score(data: Dict[str, Any]) -> float:
     return min(max(temporal_score, 0.0), 1.0)  # Clamp between 0 and 1
 
 
-def _get_entity_type(conn, entity_id: int) -> Optional[str]:
+def _calculate_context_score(data: Dict[str, Any]) -> float:
+    """Calculate score based on the proportion of mentions in influential contexts."""
+    mention_sum = data.get('mention_sum_in_articles', 0)
+    influential_sum = data.get('influential_mention_sum', 0)
+
+    if mention_sum <= 0:
+        return 0.0  # No mentions, no influential context score
+
+    proportion = influential_sum / mention_sum
+    # Apply logistic function to amplify significance of having *any* influential context
+    # k affects steepness, midpoint is 0.5
+    k = 5
+    midpoint = 0.2  # Lower midpoint: even a small proportion is significant
+    score = 1 / (1 + math.exp(-k * (proportion - midpoint)))
+
+    return max(0.0, min(1.0, score))
+
+
+def _get_entity_type_weight(conn, entity_type: Optional[str]) -> float:
     """
-    Retrieve the type of a given entity.
+    Fetch the weight multiplier for a given entity type from the database.
+    Defaults to 1.0 if type is None or not found.
+    """
+    if not entity_type:
+        return 1.0
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT weight FROM entity_type_weights WHERE entity_type = %s
+        """, (entity_type,))
+        result = cursor.fetchone()
+        cursor.close()
+        if result:
+            return float(result[0])
+        else:
+            logger.warning(
+                f"No weight found for entity type '{entity_type}'. Defaulting to 1.0.")
+            return 1.0
+    except Exception as e:
+        logger.error(
+            f"Error fetching weight for entity type '{entity_type}': {e}", exc_info=True)
+        # Default to 1.0 on error to avoid calculation failure
+        return 1.0
+
+
+def _store_influence_factors(conn, entity_id: int, factors_data: Dict[str, Any]) -> bool:
+    """
+    Store the calculated influence factors and raw data in the entity_influence_factors table.
     """
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT entity_type FROM entities WHERE id = %s", (entity_id,))
-        result = cursor.fetchone()
+        # Serialize the raw data part to JSONB
+        raw_data_json = json.dumps(factors_data.get("raw_data", {}))
+
+        cursor.execute("""
+            INSERT INTO entity_influence_factors (
+                entity_id, calculation_timestamp,
+                base_mention_score, source_quality_score, content_context_score, temporal_score,
+                raw_data
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (entity_id, calculation_timestamp) DO UPDATE SET
+                base_mention_score = EXCLUDED.base_mention_score,
+                source_quality_score = EXCLUDED.source_quality_score,
+                content_context_score = EXCLUDED.content_context_score,
+                temporal_score = EXCLUDED.temporal_score,
+                raw_data = EXCLUDED.raw_data;
+        """, (
+            entity_id, datetime.now(),  # Use current timestamp for calculation_timestamp
+            factors_data.get("base_mention_score"),
+            factors_data.get("source_quality_score"),
+            factors_data.get("content_context_score"),
+            factors_data.get("temporal_score"),
+            raw_data_json
+        ))
+        conn.commit()
         cursor.close()
-        return result[0] if result else None
+        logger.debug(
+            f"Successfully stored influence factors for entity {entity_id}")
+        return True
     except Exception as e:
-        logger.error(f"Error getting entity type for {entity_id}: {e}")
-        return None
+        conn.rollback()  # Rollback on error
+        logger.error(
+            f"Error storing influence factors for entity {entity_id}: {e}", exc_info=True)
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        return False
 
 
 def _update_entity_influence_score(conn, entity_id: int, final_score: float) -> bool:
-    """
-    Update the influence score for an entity in the database.
-    """
+    """Update the influence score and timestamp in the entities table."""
     try:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE entities
-            SET influence_score = %s
+            SET influence_score = %s,
+                influence_calculated_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-            RETURNING id;
         """, (final_score, entity_id))
-        success = cursor.fetchone() is not None
+        updated_rows = cursor.rowcount
         conn.commit()
         cursor.close()
-        if not success:
-            logger.warning(
-                f"Attempted to update influence score for non-existent entity ID: {entity_id}")
-        return success
+        return updated_rows > 0
     except Exception as e:
+        conn.rollback()  # Rollback on error
         logger.error(
-            f"Error updating influence score for entity {entity_id}: {e}", exc_info=True)
-        conn.rollback()
+            f"Error updating final influence score for entity {entity_id}: {e}", exc_info=True)
+        if 'cursor' in locals() and cursor:
+            cursor.close()
         return False

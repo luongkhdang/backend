@@ -1,101 +1,77 @@
-!IMPORTANT: SINCE WE ARE IN DEVELOPMENT MODE, LET'S ONLY PROCESS 1 DAY OLD ARTICLES (TODAY AND YESTERDAY).
+# Plan 1: Intelligent Rate Limit Handling in GeminiClient
 
-THIS IS THE IMPLEMENTATION PLAN FOR STEP 3.
+Rate limit:
+Requests per minute (RPM)
+Requests per day (RPD)
 
-**Objective:** To process 2000 news articles daily, extracting relevant entities, determining their contextual influence within each article, and calculating a global influence score for each unique entity, leveraging tiered AI processing based on combined topic hotness and source quality.
+assorted by performance (best on top):
+model (RPM) (TPM (RPD) (input) (output):
 
-**Inputs:**
+'models/gemini-2.0-flash-thinking-exp-01-21' 10 1500
+'models/gemini-2.0-flash-exp' 10 1500
+'models/gemini-2.0-flash' 15 1500
 
-- ~2000 daily articles from `articles` table (`id`, `domain`, `cluster_id`, `content`).
-- `clusters` table (`id`, `hotness_score`).
-- Pre-calculated `domain_goodness_score` for each domain.
-- (Implicitly) Existing data in `entities` and `article_entities` for updates.
+fallback when hit rate limit error:
+'models/gemini-2.0-flash-lite' 30 1500
 
-**Outputs:**
+**Objective:** Modify the `GeminiClient` to wait for a preferred model's rate limit cooldown if the wait time is below a configurable threshold, instead of immediately switching to a lower-preference or fallback model.
 
-- New/updated records in `article_entities` linking articles to entities with per-article `mention_count`.
-- New/updated records in `entities` table with `entity_type`, global `mentions` count, and calculated `influence_score`.
+**Rationale:**
 
-**Detailed Step-by-Step Plan:**
+- **Better Model Usage:** Maximizes the use of higher-quality, preferred models by waiting for short cooldowns instead of defaulting to potentially less capable fallback models.
+- **Resource Efficiency:** Avoids unnecessary API calls to fallback models when a short wait would allow the preferred model to be used.
+- **Configurability:** Allows tuning the maximum acceptable wait time based on performance needs.
 
-1.  **Domain Goodness Score Calculation (Run Periodically - e.g., Daily/Weekly):**
+**Implementation Steps:**
 
-    - **Purpose:** To assess the general quality and relevance of news sources based on volume and track record of producing "hot" content.
-    - **Method:**
-      - Calculate `total_entries` and `hot_percentage` per domain (deriving `is_hot` potentially from `cluster.hotness_score > threshold`).
-      - Apply minimum entry threshold: Score domains only if `total_entries > 5` **OR** `hot_percentage = 100.0`. Assign 0 otherwise.
-      - Calculate `NormLogVolume` based on `LOG(total_entries)`.
-      - Calculate `BaseGoodness = (0.6 * NormLogVolume) + (0.4 * hot_percentage / 100.0)`.
-      - Add Consistency Bonus: `FinalGoodness = BaseGoodness + (0.1 if hot_percentage > 15.0 else 0.0)`.
-      - Store `domain_goodness_score` per domain for lookup.
+1.  **Modify `RateLimiter` (`src/utils/rate_limit.py`):**
 
-2.  **Daily Article Prioritization & Tiering (Run Daily):**
+    - **Add `get_wait_time` Method:**
+      - Create a new public method `def get_wait_time(self, model_name: str) -> float:`.
+      - This method should perform the same logic as the beginning of `wait_if_needed` (acquire lock, clean old timestamps, check current count against limit).
+      - If the current count is _less than_ the limit, return `0.0` (no wait needed).
+      - If the current count _meets or exceeds_ the limit:
+        - Calculate the time until the oldest timestamp in the current 60-second window expires (`(oldest_call_time + 60) - current_time_monotonic`).
+        - Return this calculated wait time (ensure it's non-negative, add a small buffer like 0.1s if desired).
+      - Release the lock before returning.
+      - Ensure the method handles cases where `model_name` has no configured limit or no timestamps exist gracefully (e.g., return 0.0).
 
-    - **Purpose:** To rank the 2000 daily articles and assign a processing tier to allocate AI resources effectively.
-    - **Method:**
-      - For each of the 2000 `articles`: fetch its `cluster_hotness_score` (via `cluster_id`, default 0) and its pre-calculated `domain_goodness_score`.
-      - Normalize both scores to a 0-1 range.
-      - Calculate `Combined_Priority_Score = (0.65 * norm_hotness) + (0.35 * norm_domain_goodness)`.
-      - Rank articles by `Combined_Priority_Score` (descending).
-      - Assign `processing_tier` (0, 1, or 2) based on rank: Tier 0 = Top ~150, Tier 1 = Next ~350, Tier 2 = Remainder ~1500. Associate this tier with the article for this run.
+2.  **Modify `GeminiClient` (`src/gemini/gemini_client.py`):**
 
-3.  **Gemini API Entity/Context Extraction (Run Daily - Tier-Based):**
+    - **Add Configuration:**
+      - Define a class constant or instance variable for the maximum wait time, e.g., `MAX_RATE_LIMIT_WAIT_SECONDS`.
+      - Fetch its value from an environment variable (e.g., `GEMINI_MAX_WAIT_SECONDS`, default to 5-10 seconds) during `__init__`.
+    - **Update `generate_text_with_prompt` (Sync):**
+      - Inside the loop iterating through `all_models_to_try`.
+      - Before attempting an API call, check `is_allowed = self.rate_limiter.is_allowed(model_name)`.
+      - **If `is_allowed` is `False`:**
+        - Call `wait_time = self.rate_limiter.get_wait_time(model_name)`.
+        - **If `0 < wait_time <= self.MAX_RATE_LIMIT_WAIT_SECONDS`:**
+          - Log that we are waiting for the specific model (e.g., `f"Rate limit hit for {model_name}. Waiting {wait_time:.2f}s..."`).
+          - Call `self.rate_limiter.wait_if_needed(model_name)` to perform the actual wait.
+          - _Do not skip the model._ Let the code proceed to attempt the API call within the existing retry logic for that model. The `wait_if_needed` call replaces the need for an immediate retry sleep for _this specific_ rate limit condition.
+        - **Else (wait_time is 0 or > threshold):**
+          - Log that the wait time is too long or not needed, and we are skipping to the next model (e.g., `f"Rate limit wait for {model_name} ({wait_time:.2f}s) > threshold. Skipping."`).
+          - Use `continue` to move to the next model in the `all_models_to_try` loop.
+      - **If `is_allowed` is `True`:**
+        - Proceed with the API call attempt as usual within the retry loop.
+    - **Update `generate_text_with_prompt_async` (Async):**
+      - Implement the _exact same logic_ as described above for the synchronous version, but use:
+        - `await self.rate_limiter.wait_if_needed_async(model_name)` when waiting.
+        - Ensure logs and control flow (`continue`) are identical.
 
-    - **Purpose:** To use the appropriate Gemini model to extract entities and assess their context within each article's content.
-    - **Method:**
-      - For each article, select the Gemini model based on `processing_tier`:
-        - Tier 0: `'models/gemini-2.0-flash-thinking-exp-01-21'` (Fallback: `'models/gemini-2.0-flash'`)
-        - Tier 1: `'models/gemini-2.0-flash-exp'` (Fallback: `'models/gemini-2.0-flash'`)
-        - Tier 2: `'models/gemini-2.0-flash'` (Fallback: `'models/gemini-2.0-flash-lite'`)
-      - Use the finalized Gemini prompt (requesting structured JSON with `entity_name`, `entity_type`, `mention_count` [per-article], `is_influential_context`, `supporting_snippets`).
-      - Submit API request with article `content`, handle retries/fallbacks.
-      - Parse the structured JSON response. Store the result associated with the `article_id`, noting the source tier (T0/T1/T2).
+3.  **Update `docker-compose.yml` (Optional but Recommended):**
+    - Add the `GEMINI_MAX_WAIT_SECONDS` environment variable with a default value (e.g., `10`) to the `article-transfer` and `backend` service definitions.
 
-4.  **Store Per-Article Entity Results :**
+**Expected Outcome:**
 
-    - **Purpose:** To persist the link between articles and the entities mentioned within them, along with the per-article mention count.
-    - **Method:**
-      - For each entity identified in an article (from Step 3 or 4):
-        - Find or create the `entity_id` in the `entities` table:
-          ```sql
-          INSERT INTO entities (name, entity_type)
-          VALUES ($1, $2)
-          ON CONFLICT (name) DO UPDATE SET updated_at = CURRENT_TIMESTAMP -- Optionally update type if needed
-          RETURNING id;
-          ```
-          _(Get the returned `entity_id`)_.
-        - Insert the relationship into the junction table:
-          ```sql
-          INSERT INTO article_entities (article_id, entity_id, mention_count)
-          VALUES ($1, $2, $3)
-          ON CONFLICT (article_id, entity_id) DO NOTHING;
-          ```
-          _(Where $1=article_id, $2=entity_id, $3=per-article mention_count)_.
+- When a preferred Gemini model hits its rate limit, the `GeminiClient` will check the estimated cooldown time.
+- If the cooldown is less than or equal to `GEMINI_MAX_WAIT_SECONDS`, the client will wait and then retry the _same preferred model_.
+- If the cooldown is longer, the client will skip that model for the current request and try the next model in the preference list or the fallback model.
+- This should result in more effective use of the preferred models without introducing excessively long delays.
 
-5.  **Calculate Global Influence Score & Update Entities Table (Run Daily/Batch):**
-    - **Purpose:** To calculate and update the global `influence_score` and total `mentions` for each unique entity based on its appearances across articles over time.
-    - **Method (Conceptual - Algorithm Needs Development):**
-      - For each unique `entity_id` processed or updated today (or in a batch):
-        - **Gather Inputs:** Aggregate relevant data points associated with this entity across _multiple_ `article_entities` records (potentially filtering by recency):
-          - Per-article `mention_count` (sum for global `mentions`).
-          - `is_influential_context` flags (proportion/count of influential mentions).
-          - `domain_goodness_score` of the source articles.
-          - `cluster_hotness_score` of the source articles/clusters.
-          - Recency (`first_seen` via `entities.created_at`, `last_seen` via `MAX(article_entities.created_at)` or `entities.updated_at`).
-          - Extraction quality (counts/proportions from Tier 0/1/2 vs Local Fallback).
-          - `entity_type`.
-        - **Calculate Score:** Apply a scoring algorithm (e.g., weighted sum of normalized input factors) to compute the `influence_score`. This algorithm needs to be designed based on desired emphasis (e.g., prioritize recent influential mentions in hot topics from good domains). _Keep the initial algorithm relatively simple._
-        - **Update `entities` Table:**
-          ```sql
-          UPDATE entities
-          SET
-              influence_score = $1, -- Calculated score
-              mentions = $2,       -- Updated global mention count
-              entity_type = $3,    -- Can update type if needed
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = $4;
-          ```
+**Testing:**
 
----
-
-This comprehensive plan outlines the flow for Stage D, from prioritizing articles using combined signals, leveraging tiered AI for extraction, handling fallbacks, storing results per article, and finally updating the global entity metrics including the crucial `influence_score`.
+- Verify logging indicates when the client waits vs. when it skips a model due to rate limits.
+- Simulate rate limit scenarios (if possible) or closely monitor logs during runs with high API usage.
+- Test with different values for `GEMINI_MAX_WAIT_SECONDS`.

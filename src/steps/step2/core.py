@@ -312,8 +312,13 @@ def run() -> Dict[str, Any]:
 
         # Step 8: Store clusters in the database
         logger.info("Step 2.8: Storing clusters in database")
+
+        # Calculate cluster article counts
+        cluster_article_counts = {label: len(
+            indices) for label, indices in cluster_data.items()}
+
         cluster_db_map = insert_clusters(
-            reader_client, centroids, cluster_hotness_map, cluster_hotness_scores)
+            reader_client, centroids, cluster_hotness_map, cluster_hotness_scores, cluster_article_counts)
         logger.info(f"Inserted {len(cluster_db_map)} clusters into database")
 
         # Step 9: Update article cluster assignments

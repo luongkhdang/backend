@@ -77,6 +77,8 @@ services:
       GEMINI_FLASH_LITE_RPM: ${GEMINI_FLASH_LITE_RPM:-30}
       GEMINI_FLASH_LITE_TPM: ${GEMINI_FLASH_LITE_TPM:-1000000}
       GEMINI_FLASH_LITE_RPD: ${GEMINI_FLASH_LITE_RPD:-1500}
+      # Rate limit wait settings for intelligent model selection
+      GEMINI_MAX_WAIT_SECONDS: ${GEMINI_MAX_WAIT_SECONDS:-40}
 
       # --- Other Settings --- #
       # Python path for Google imports
@@ -194,6 +196,8 @@ services:
       GEMINI_FLASH_RPM: ${GEMINI_FLASH_RPM:-15}
       GEMINI_FLASH_LITE_MODEL: ${GEMINI_FLASH_LITE_MODEL:-models/gemini-2.0-flash-lite}
       GEMINI_FLASH_LITE_RPM: ${GEMINI_FLASH_LITE_RPM:-30}
+      # Rate limit wait settings for intelligent model selection
+      GEMINI_MAX_WAIT_SECONDS: ${GEMINI_MAX_WAIT_SECONDS:-40}
       # Step 3: Entity Extraction settings
       RUN_STEP3: ${RUN_STEP3:-true}
       ENTITY_EXTRACTION_BATCH_SIZE: ${ENTITY_EXTRACTION_BATCH_SIZE:-10}

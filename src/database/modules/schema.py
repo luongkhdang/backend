@@ -65,7 +65,8 @@ def initialize_tables(conn) -> bool:
             mentions INTEGER DEFAULT 0,
             first_seen TIMESTAMP,
             last_seen TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
 
@@ -78,6 +79,11 @@ def initialize_tables(conn) -> bool:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (article_id, entity_id)
         );
+        """)
+
+        # Add is_influential_context column to article_entities if it doesn't exist
+        cursor.execute("""
+        ALTER TABLE article_entities ADD COLUMN IF NOT EXISTS is_influential_context BOOLEAN DEFAULT FALSE;
         """)
 
         # Create embeddings table
@@ -127,18 +133,80 @@ def initialize_tables(conn) -> bool:
         );
         """)
 
-        # Create calculated_domain_goodness table (assuming this is still needed)
+        # Create domain_statistics table (replacing calculated_domain_goodness)
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS calculated_domain_goodness (
+        CREATE TABLE IF NOT EXISTS domain_statistics (
             domain TEXT PRIMARY KEY,
-            domain_goodness_score FLOAT NOT NULL DEFAULT 0.5,
+            total_entries INTEGER DEFAULT 0,
+            hot_entries INTEGER DEFAULT 0,
+            average_cluster_hotness FLOAT DEFAULT 0.0,
+            goodness_score FLOAT DEFAULT 0.0,
             calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE INDEX IF NOT EXISTS idx_domain_goodness_domain ON calculated_domain_goodness(domain);
+        CREATE INDEX IF NOT EXISTS idx_domain_statistics_score ON domain_statistics(goodness_score DESC);
         """)
 
-        # Removed ensure_column_exists calls as columns are now defined in CREATE TABLE
-        # Example: ensure_column_exists(conn, "entities", "entity_type", "TEXT") - Removed
+        # Add influence_calculated_at column to entities table
+        cursor.execute("""
+        ALTER TABLE entities 
+        ADD COLUMN IF NOT EXISTS influence_calculated_at TIMESTAMP;
+        """)
+
+        # Create entity influence factors table for transparency
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS entity_influence_factors (
+            entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
+            calculation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            base_mention_score FLOAT,
+            source_quality_score FLOAT,
+            content_context_score FLOAT,
+            temporal_score FLOAT,
+            raw_data JSONB,  -- Store raw inputs for auditability
+            PRIMARY KEY (entity_id, calculation_timestamp)
+        );
+        """)
+
+        # Create entity type weights table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS entity_type_weights (
+            entity_type TEXT PRIMARY KEY,
+            weight FLOAT NOT NULL DEFAULT 1.0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # Initialize entity type weights with default values
+        cursor.execute("""
+        INSERT INTO entity_type_weights (entity_type, weight) VALUES
+        ('PERSON', 1.0),
+        ('ORGANIZATION', 1.1),
+        ('GOVERNMENT_AGENCY', 1.2),
+        ('LOCATION', 0.8),
+        ('GEOPOLITICAL_ENTITY', 1.3),
+        ('CONCEPT', 1.0),
+        ('LAW_OR_POLICY', 1.1),
+        ('EVENT', 0.9),
+        ('OTHER', 0.7)
+        ON CONFLICT (entity_type) DO NOTHING;
+        """)
+
+        # Create entity snippets table for storing supporting text
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS entity_snippets (
+            id SERIAL PRIMARY KEY,
+            entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
+            article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+            snippet TEXT NOT NULL,
+            is_influential BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # Create entity_snippets indexes
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_entity_snippets_entity_id ON entity_snippets(entity_id);
+        CREATE INDEX IF NOT EXISTS idx_entity_snippets_article_id ON entity_snippets(article_id);
+        """)
 
         # Create indexes to improve query performance
         create_indexes(conn)
@@ -237,107 +305,3 @@ def create_indexes(conn) -> bool:
             success = False
 
     return success
-
-
-# Add influence score-related tables after the existing tables
-# Add timestamp column to entities table
-CREATE_INFLUENCE_TIMESTAMP_SQL = """
-    ALTER TABLE entities 
-    ADD COLUMN IF NOT EXISTS influence_calculated_at TIMESTAMP;
-"""
-
-# Create entity influence factors table for transparency
-CREATE_ENTITY_INFLUENCE_FACTORS_TABLE = """
-    CREATE TABLE IF NOT EXISTS entity_influence_factors (
-        entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
-        calculation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        base_mention_score FLOAT,
-        source_quality_score FLOAT,
-        content_context_score FLOAT,
-        temporal_score FLOAT,
-        raw_data JSONB,  -- Store raw inputs for auditability
-        PRIMARY KEY (entity_id, calculation_timestamp)
-    );
-"""
-
-# Create entity type weights table
-CREATE_ENTITY_TYPE_WEIGHTS_TABLE = """
-    CREATE TABLE IF NOT EXISTS entity_type_weights (
-        entity_type TEXT PRIMARY KEY,
-        weight FLOAT NOT NULL DEFAULT 1.0,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-"""
-
-# Initialize entity type weights with default values
-INITIALIZE_ENTITY_TYPE_WEIGHTS = """
-    INSERT INTO entity_type_weights (entity_type, weight) VALUES
-    ('PERSON', 1.0),
-    ('ORGANIZATION', 1.1),
-    ('GOVERNMENT_AGENCY', 1.2),
-    ('LOCATION', 0.8),
-    ('GEOPOLITICAL_ENTITY', 1.3),
-    ('CONCEPT', 1.0),
-    ('LAW_OR_POLICY', 1.1),
-    ('EVENT', 0.9),
-    ('OTHER', 0.7)
-    ON CONFLICT (entity_type) DO NOTHING;
-"""
-
-# Create entity snippets table for storing supporting text
-CREATE_ENTITY_SNIPPETS_TABLE = """
-    CREATE TABLE IF NOT EXISTS entity_snippets (
-        id SERIAL PRIMARY KEY,
-        entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
-        article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
-        snippet TEXT NOT NULL,
-        is_influential BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_entity_snippets_entity_id ON entity_snippets(entity_id);
-    CREATE INDEX IF NOT EXISTS idx_entity_snippets_article_id ON entity_snippets(article_id);
-"""
-
-# Create domain statistics table for domain goodness calculation
-CREATE_DOMAIN_STATISTICS_TABLE = """
-    CREATE TABLE IF NOT EXISTS domain_statistics (
-        domain TEXT PRIMARY KEY,
-        total_entries INTEGER DEFAULT 0,
-        hot_entries INTEGER DEFAULT 0,
-        average_cluster_hotness FLOAT DEFAULT 0.0,
-        calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-"""
-
-
-def setup_tables(conn):
-    """
-    Set up all database tables.
-
-    Args:
-        conn: Database connection
-
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    try:
-        cursor = conn.cursor()
-
-        # Run all table creation SQL
-        # ... [existing tables setup code] ...
-
-        # Create influence-related tables
-        cursor.execute(CREATE_INFLUENCE_TIMESTAMP_SQL)
-        cursor.execute(CREATE_ENTITY_INFLUENCE_FACTORS_TABLE)
-        cursor.execute(CREATE_ENTITY_TYPE_WEIGHTS_TABLE)
-        cursor.execute(INITIALIZE_ENTITY_TYPE_WEIGHTS)
-        cursor.execute(CREATE_ENTITY_SNIPPETS_TABLE)
-        cursor.execute(CREATE_DOMAIN_STATISTICS_TABLE)
-
-        conn.commit()
-        cursor.close()
-        return True
-    except Exception as e:
-        logger.error(f"Error setting up tables: {e}")
-        return False

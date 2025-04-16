@@ -303,7 +303,7 @@ def update_article_cluster(conn, article_id: int, cluster_id: Optional[int], is_
 
 def batch_update_article_clusters(conn, assignments: List[Tuple[int, Optional[int], bool]]) -> Dict[str, int]:
     """
-    Update multiple article cluster assignments and hotness flags in batch.
+    Update multiple article cluster assignments and hotness flags in batch using unnest for parameterization.
 
     Args:
         conn: Database connection
@@ -315,79 +315,79 @@ def batch_update_article_clusters(conn, assignments: List[Tuple[int, Optional[in
     if not assignments:
         return {"success": 0, "failure": 0}
 
+    success_count = 0
+    failure_count = 0
+    # Prepare data for unnest: Separate lists for each column type
+    article_ids = [a[0] for a in assignments]
+    cluster_ids = [a[1] for a in assignments]  # Can contain None
+    is_hots = [a[2] for a in assignments]
+
     try:
         cursor = conn.cursor()
 
-        # Split assignments into batches
-        batch_size = 1000
-        success_count = 0
-        failure_count = 0
+        # Use unnest for parameterization
+        query = """
+        UPDATE articles a
+        SET cluster_id = u.cluster_id,
+            is_hot = u.is_hot
+        FROM unnest(%s::int[], %s::int[], %s::bool[]) AS u(article_id, cluster_id, is_hot)
+        WHERE a.id = u.article_id;
+        """
+        # Note: We cast cluster_ids to int[] which works even with NULLs in the array.
 
-        for i in range(0, len(assignments), batch_size):
-            batch = assignments[i:i+batch_size]
+        cursor.execute(query, (article_ids, cluster_ids, is_hots))
+        # cursor.rowcount might give the number of updated rows if supported
+        # Assuming success if no exception is raised for now
+        updated_rows = cursor.rowcount if cursor.rowcount >= 0 else - \
+            1  # -1 indicates rowcount not available/reliable
 
-            try:
-                # Convert batch to SQL-friendly format and handle NULL properly
-                values = []
-                for article_id, cluster_id, is_hot in batch:
-                    is_hot_value = "TRUE" if is_hot else "FALSE"
-                    if cluster_id is None:
-                        values.append(f"({article_id}, NULL, {is_hot_value})")
-                    else:
-                        values.append(
-                            f"({article_id}, {cluster_id}, {is_hot_value})")
+        if updated_rows == -1:
+            # If rowcount is not available, assume success unless an error occurred (handled below)
+            # This is optimistic but avoids false failure reports if rowcount is unsupported
+            success_count = len(assignments)
+            failure_count = 0
+            logger.warning(
+                f"Batch update rowcount not available. Assuming {success_count} successes based on lack of exceptions.")
+        elif updated_rows != len(assignments):
+            success_count = updated_rows
+            failure_count = len(assignments) - success_count
+            logger.warning(
+                f"Batch update using unnest reported {updated_rows} updated rows for {len(assignments)} assignments. Potential failures or duplicates occurred.")
+        else:
+            success_count = updated_rows
+            failure_count = 0
 
-                values_str = ", ".join(values)
-
-                # SQL query using temporary table for efficient update
-                query = f"""
-                UPDATE articles
-                SET cluster_id = temp.cluster_id,
-                    is_hot = temp.is_hot
-                FROM (VALUES {values_str}) AS temp(article_id, cluster_id, is_hot)
-                WHERE articles.id = temp.article_id
-                """
-
-                cursor.execute(query)
-                success_count += len(batch)
-            except Exception as e:
-                logger.error(f"Error updating batch {i//batch_size}: {e}")
-                failure_count += len(batch)
-                # Continue with next batch rather than failing completely
-
-        # Update cluster article counts
+        # Update cluster article counts (This part remains the same, but adjusted variable names)
         try:
-            # Get unique cluster IDs (excluding None)
-            cluster_ids = set()
-            for _, cluster_id, _ in assignments:
-                if cluster_id is not None:
-                    cluster_ids.add(cluster_id)
+            cluster_id_set = set(cid for cid in cluster_ids if cid is not None)
 
-            # Update count for each cluster
-            for cluster_id in cluster_ids:
+            for cluster_id_val in cluster_id_set:
                 cursor.execute("""
                     UPDATE clusters
                     SET article_count = (
-                        SELECT COUNT(*) 
-                        FROM articles 
+                        SELECT COUNT(*)
+                        FROM articles
                         WHERE cluster_id = %s
                     )
                     WHERE id = %s;
-                """, (cluster_id, cluster_id))
+                """, (cluster_id_val, cluster_id_val))
         except Exception as e:
-            logger.error(f"Error updating cluster article counts: {e}")
-            # Don't count this as a failure for article assignment
+            logger.error(
+                f"Error updating cluster article counts after batch article update: {e}")
+            # Don't rollback the main article update for this error
 
         conn.commit()
         cursor.close()
 
         logger.info(
-            f"Updated {success_count} article cluster assignments and hotness flags (failed: {failure_count})")
+            f"Updated {success_count} article cluster assignments using unnest (estimated failures: {failure_count})")
         return {"success": success_count, "failure": failure_count}
 
     except Exception as e:
-        logger.error(f"Failed to update cluster assignments: {e}")
-        conn.rollback()
+        logger.error(
+            f"Failed to update cluster assignments using unnest: {e}", exc_info=True)
+        conn.rollback()  # Rollback on main update failure
+        # If the main update failed, all are considered failures
         return {"success": 0, "failure": len(assignments)}
 
 
@@ -688,7 +688,7 @@ def mark_article_processed(conn, article_id: int) -> bool:
         cursor.execute("""
             UPDATE articles
             SET extracted_entities = TRUE,
-                updated_at = CURRENT_TIMESTAMP
+                processed_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (article_id,))
 

@@ -134,8 +134,13 @@ def calculate_hotness_factors(
         # 3. Entity Influence Factor (Raw): Calculate average influence score
         influence_scores = reader_client.get_entity_influence_for_articles(
             article_db_ids)
-        avg_influence = sum(influence_scores.values()) / \
-            len(article_db_ids) if article_db_ids else 0
+
+        # Filter out None values before calculating the average
+        valid_scores = [
+            score for score in influence_scores.values() if score is not None]
+        avg_influence = sum(valid_scores) / \
+            len(valid_scores) if valid_scores else 0
+
         raw_scores["influence"][label] = avg_influence
 
         # 4. Topic Relevance Factor (Raw): Binary score based on keyword matching

@@ -33,12 +33,13 @@ def get_all_domain_goodness_scores(conn) -> Dict[str, float]:
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT domain, domain_goodness_score
-            FROM calculated_domain_goodness
+            SELECT domain, goodness_score 
+            FROM domain_statistics
         """)
 
         # Convert result to a dictionary
-        domain_scores = {row[0]: row[1] for row in cursor.fetchall()}
+        domain_scores = {row[0]: row[1]
+                         for row in cursor.fetchall() if row[1] is not None}
         cursor.close()
 
         return domain_scores
