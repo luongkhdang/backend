@@ -29,6 +29,8 @@ Exported functions:
   Gets the largest clusters by article count
 - delete_clusters_from_today(conn) -> int
   Deletes all clusters created on the current day (Pacific Time)
+- get_cluster_hotness_scores(conn, cluster_ids: List[int]) -> Dict[int, float]
+  Gets hotness scores for multiple clusters by their IDs
 
 Related modules:
 - Connection management from connection.py
@@ -587,3 +589,54 @@ def delete_clusters_from_today(conn) -> int:
         logger.error(f"Error deleting today's clusters: {e}")
         conn.rollback()
         return 0
+
+
+def get_cluster_hotness_scores(conn, cluster_ids: List[int]) -> Dict[int, float]:
+    """
+    Get hotness scores for multiple clusters by their IDs.
+
+    Args:
+        conn: Database connection
+        cluster_ids: List of cluster IDs to fetch scores for
+
+    Returns:
+        Dict[int, float]: Dictionary mapping cluster IDs to their hotness scores (defaults to 0.0 if no score)
+    """
+    if not cluster_ids:
+        return {}
+
+    try:
+        cursor = conn.cursor()
+
+        # Create a placeholder string for the IN clause
+        placeholders = ', '.join(['%s'] * len(cluster_ids))
+
+        # Query hotness scores for the provided cluster IDs
+        cursor.execute(f"""
+            SELECT id, hotness_score
+            FROM clusters
+            WHERE id IN ({placeholders})
+        """, cluster_ids)
+
+        # Build the result dictionary
+        hotness_scores = {}
+        for row in cursor.fetchall():
+            cluster_id, hotness_score = row
+            # Use 0.0 as fallback if hotness_score is None
+            hotness_scores[cluster_id] = float(
+                hotness_score) if hotness_score is not None else 0.0
+
+        cursor.close()
+
+        # Add entries with 0.0 for any cluster_ids not found in DB
+        for cluster_id in cluster_ids:
+            if cluster_id not in hotness_scores and cluster_id is not None:
+                hotness_scores[cluster_id] = 0.0
+
+        return hotness_scores
+
+    except Exception as e:
+        logger.error(
+            f"Error fetching cluster hotness scores: {e}", exc_info=True)
+        # Return dict with 0.0 for all requested IDs on error
+        return {cluster_id: 0.0 for cluster_id in cluster_ids if cluster_id is not None}

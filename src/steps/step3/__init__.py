@@ -1,15 +1,9 @@
+#!/usr/bin/env python3
 """
-step3.py - Entity Extraction Module
+step3/__init__.py - Entity Extraction Module
 
-This module implements Step 3 of the data refinery pipeline: processing recent articles to extract
-entities, store entity relationships, and update basic entity statistics. It prioritizes articles
-based on combined domain goodness and cluster hotness scores, then calls Gemini API for entity
-extraction with tier-based model selection.
-
-The module now also extracts narrative frame phrases from articles, which are short descriptors 
-(2-4 words) that represent how stories are presented (e.g., "economic impact", "national security", 
-"moral obligation"). These frame phrases are stored in the articles table and provide insight into 
-the dominant perspectives used in news coverage.
+Entity extraction process that prioritizes articles, extracts entities using Gemini API,
+and stores results in the database. The process uses tier-based model selection.
 
 Exported functions:
 - run(): Main function that orchestrates the entity extraction process
@@ -21,55 +15,49 @@ Related files:
 - src/gemini/gemini_client.py: Used for entity extraction API calls
 - src/utils/task_manager.py: Manages concurrent execution of API calls
 """
-
 import logging
 import os
-import json
 import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-from collections import defaultdict
+import json
 import asyncio
+from typing import Dict, List, Any, Optional, Tuple
 
-# Import database client
+# Import DB and API clients
 from src.database.reader_db_client import ReaderDBClient
-
-# Import Gemini client for API calls
 from src.gemini.gemini_client import GeminiClient
-
-# Import TaskManager for concurrent API calls
 from src.utils.task_manager import TaskManager
 
 # Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Constants
-ARTICLE_LIMIT = 2000
-DAYS_LOOKBACK = 2
-TIER0_COUNT = 150
-TIER1_COUNT = 350
-CLUSTER_HOTNESS_WEIGHT = 0.65
-DOMAIN_GOODNESS_WEIGHT = 0.35
-# Add inter-batch delay constant
-INTER_BATCH_DELAY_SECONDS = float(
-    os.getenv("ENTITY_BATCH_DELAY_SECONDS", "2.0"))
-# Add circuit breaker settings
-MAX_CONSECUTIVE_FAILURES = int(os.getenv("MAX_CONSECUTIVE_FAILURES", "3"))
-FAILURE_COOLDOWN_SECONDS = int(os.getenv("FAILURE_COOLDOWN_SECONDS", "30"))
+# Constants for configuration
+DAYS_LOOKBACK = int(os.getenv("ENTITY_LOOKBACK_DAYS", "3"))
+ARTICLE_LIMIT = int(os.getenv("ENTITY_MAX_PRIORITY_ARTICLES", "2000"))
+BATCH_SIZE = int(os.getenv("ENTITY_EXTRACTION_BATCH_SIZE", "10"))
 
-# Tier-to-Model mapping for Gemini API
-TIER_MODEL_MAP = {
-    # Highest quality
-    0: os.getenv('GEMINI_FLASH_THINKING_MODEL', 'models/gemini-2.0-flash-thinking-exp-01-21'),
-    # Mid-tier
-    1: os.getenv('GEMINI_FLASH_EXP_MODEL', 'models/gemini-2.0-flash-exp'),
-    # Base tier
-    2: os.getenv('GEMINI_FLASH_MODEL', 'models/gemini-2.0-flash')
+# Tier-specific models and fallbacks
+TIER_MODELS = {
+    0: {  # Tier 0 (highest priority) - Top 30%
+        'primary': 'models/gemini-2.0-flash-thinking-exp-01-21',
+        'fallback': 'models/gemini-2.0-flash'
+    },
+    1: {  # Tier 1 (medium priority) - Next 50%
+        'primary': 'models/gemini-2.0-flash-exp',
+        'fallback': 'models/gemini-2.0-flash'
+    },
+    2: {  # Tier 2 (lowest priority) - Bottom 20%
+        'primary': 'models/gemini-2.0-flash',
+        'fallback': 'models/gemini-2.0-flash-lite'
+    }
 }
-FALLBACK_MODEL = os.getenv('GEMINI_FLASH_LITE_MODEL',
-                           'models/gemini-2.0-flash-lite')
+
+# Global fallback model
+FALLBACK_MODEL = 'models/gemini-2.0-flash-lite'
+
+# Error handling constants
+MAX_CONSECUTIVE_FAILURES = 3
+FAILURE_COOLDOWN_SECONDS = 60
+INTER_BATCH_DELAY_SECONDS = 30  # Delay between batches
 
 
 async def run() -> Dict[str, Any]:
@@ -78,10 +66,11 @@ async def run() -> Dict[str, Any]:
 
     This function:
     1. Retrieves domain goodness scores
-    2. Fetches and prioritizes recent unprocessed articles
-    3. Extracts entities using Gemini API with tier-based model selection
-    4. Stores entity results in the database
-    5. Updates article processing status
+    2. Fetches and prioritizes unprocessed articles
+    3. Divides articles into processing tiers
+    4. Creates balanced batches with articles from each tier
+    5. Extracts entities using Gemini API with tier-based model selection
+    6. Stores entity results in the database
 
     Returns:
         Dict[str, Any]: Status report containing metrics about the extraction process
@@ -101,7 +90,7 @@ async def run() -> Dict[str, Any]:
         # Step 1: Get domain goodness scores
         domain_scores = _get_domain_goodness_scores(db_client)
 
-        # Step 2: Fetch and prioritize articles
+        # Step 2: Fetch and prioritize articles - already assigns tiers
         prioritized_articles = _prioritize_articles(db_client, domain_scores)
 
         if not prioritized_articles:
@@ -116,39 +105,88 @@ async def run() -> Dict[str, Any]:
                 "runtime_seconds": time.time() - start_time
             }
 
-        logger.info(f"Found {len(prioritized_articles)} articles to process.")
+        # Step 3: Divide articles into three tiers based on assigned processing_tier
+        tier0_articles = [
+            a for a in prioritized_articles if a.get('processing_tier') == 0]
+        tier1_articles = [
+            a for a in prioritized_articles if a.get('processing_tier') == 1]
+        tier2_articles = [
+            a for a in prioritized_articles if a.get('processing_tier') == 2]
 
-        # Process using batched approach that stores to DB after each batch
-        batch_size = int(os.getenv("ENTITY_EXTRACTION_BATCH_SIZE", "10"))
-        total_batches = (len(prioritized_articles) +
-                         batch_size - 1) // batch_size
+        logger.info(f"Articles by tier: {len(tier0_articles)} in tier 0, "
+                    f"{len(tier1_articles)} in tier 1, {len(tier2_articles)} in tier 2")
 
         # Initialize counters for final status
         total_processed = 0
         total_entity_links = 0
         total_snippets = 0
         total_errors = 0
+        batch_index = 0  # For batch numbering
 
         # Add heartbeat logging
         last_heartbeat = time.time()
         heartbeat_interval = 60  # Log a heartbeat every minute
 
-        # Process each batch
-        for batch_index in range(0, len(prioritized_articles), batch_size):
+        # Process articles in balanced batches until all tiers are empty
+        while tier0_articles or tier1_articles or tier2_articles:
+            batch_index += 1
+
+            # Compose a balanced batch with the defined ratio (4/5/1)
+            current_batch = []
+
+            # Add up to 4 articles from tier 0
+            tier0_to_add = min(4, len(tier0_articles))
+            if tier0_to_add > 0:
+                current_batch.extend(tier0_articles[:tier0_to_add])
+                tier0_articles = tier0_articles[tier0_to_add:]
+
+            # Add up to 5 articles from tier 1
+            tier1_to_add = min(5, len(tier1_articles))
+            if tier1_to_add > 0:
+                current_batch.extend(tier1_articles[:tier1_to_add])
+                tier1_articles = tier1_articles[tier1_to_add:]
+
+            # Add up to 1 article from tier 2
+            tier2_to_add = min(1, len(tier2_articles))
+            if tier2_to_add > 0:
+                current_batch.extend(tier2_articles[:tier2_to_add])
+                tier2_articles = tier2_articles[tier2_to_add:]
+
+            # If no articles were added to the batch, we're done
+            if not current_batch:
+                break
+
+            # Assign specific models based on tier
+            for article in current_batch:
+                # Default to tier 2 if missing
+                tier = article.get('processing_tier', 2)
+
+                # Assign primary and fallback models based on tier
+                article['model_to_use'] = TIER_MODELS[tier]['primary']
+                article['fallback_model'] = TIER_MODELS[tier]['fallback']
+
+            # Log batch composition
+            tier_counts = {}
+            for article in current_batch:
+                tier = article.get('processing_tier', 0)
+                tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+            logger.info(f"Processing batch {batch_index} with {len(current_batch)} articles "
+                        f"(T0: {tier_counts.get(0, 0)}, T1: {tier_counts.get(1, 0)}, T2: {tier_counts.get(2, 0)})")
+
             # Heartbeat logging
             current_time = time.time()
             if current_time - last_heartbeat >= heartbeat_interval:
+                remaining = len(tier0_articles) + \
+                    len(tier1_articles) + len(tier2_articles)
+                total = remaining + total_processed
+                progress = ((total - remaining) / total) * \
+                    100 if total > 0 else 0
                 logger.info(
-                    f"Heartbeat: Still processing. Current progress: {batch_index // batch_size}/{total_batches} batches")
+                    f"Heartbeat: Processing batch {batch_index}, overall progress: {progress:.1f}%")
                 last_heartbeat = current_time
 
-            batch_num = batch_index // batch_size + 1
-            batch = prioritized_articles[batch_index:batch_index + batch_size]
-
-            logger.info(
-                f"Processing batch {batch_num}/{total_batches} ({len(batch)} articles)")
-
-            # If we've hit consecutive failures, implement circuit breaker pattern
+            # Circuit breaker pattern
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                 logger.warning(
                     f"Circuit breaker triggered after {consecutive_failures} failures. Cooling down for {FAILURE_COOLDOWN_SECONDS} seconds")
@@ -156,19 +194,19 @@ async def run() -> Dict[str, Any]:
                 consecutive_failures = 0  # Reset counter after cooldown
 
             try:
-                # Step 3: Extract entities for this batch (use await)
+                # Step 4: Extract entities for this batch (use await)
                 batch_entity_results = await _extract_entities_batch(
-                    gemini_client, batch, task_manager)  # Pass the task_manager instance
+                    gemini_client, current_batch, task_manager)  # Pass the task_manager instance
 
                 if batch_entity_results:
                     # Reset failure counter on success
                     consecutive_failures = 0
                     logger.info(
-                        f"Entity extraction complete for batch {batch_num}. Found data for {len(batch_entity_results)} articles.")
+                        f"Entity extraction complete for batch {batch_index}. Found data for {len(batch_entity_results)} articles.")
 
-                    # Step 4: Store entity data for this batch immediately
+                    # Step 5: Store entity data for this batch immediately
                     logger.info(
-                        f"Storing entity results for batch {batch_num} ({len(batch_entity_results)} articles)")
+                        f"Storing entity results for batch {batch_index} ({len(batch_entity_results)} articles)")
                     batch_store_results = _store_results(
                         db_client, batch_entity_results)
 
@@ -178,27 +216,37 @@ async def run() -> Dict[str, Any]:
                     total_snippets += batch_store_results.get("snippets", 0)
                     total_errors += batch_store_results.get("errors", 0)
 
-                    logger.info(f"Batch {batch_num} complete: Processed {batch_store_results.get('processed', 0)} articles, "
+                    logger.info(f"Batch {batch_index} complete: Processed {batch_store_results.get('processed', 0)} articles, "
                                 f"created {batch_store_results.get('links', 0)} entity links, "
                                 f"stored {batch_store_results.get('snippets', 0)} snippets.")
                 else:
                     # Increment failure counter on empty results
                     consecutive_failures += 1
                     logger.warning(
-                        f"Batch {batch_num} returned no results. Consecutive failures: {consecutive_failures}")
+                        f"Batch {batch_index} returned no results. Consecutive failures: {consecutive_failures}")
             except Exception as e:
                 # Increment failure counter on exception
                 consecutive_failures += 1
                 logger.error(
-                    f"Error processing batch {batch_num}: {e}", exc_info=True)
+                    f"Error processing batch {batch_index}: {e}", exc_info=True)
                 logger.warning(f"Consecutive failures: {consecutive_failures}")
 
             # Add a delay between batches to allow rate limits to reset
-            # Only add delay if not the last batch
-            if batch_num < total_batches:
-                logger.debug(
-                    f"Adding inter-batch delay of {INTER_BATCH_DELAY_SECONDS} seconds")
-                await asyncio.sleep(INTER_BATCH_DELAY_SECONDS)
+            # Log rate limiter status for all models
+            logger.info(f"Rate limiter status before cooling period:")
+            for model_name in gemini_client.ALL_MODEL_RPMS.keys():
+                if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
+                    current_rpm = gemini_client.rate_limiter.get_current_rpm(
+                        model_name)
+                    wait_time = gemini_client.rate_limiter.get_wait_time(
+                        model_name)
+                    logger.info(
+                        f"  Model: {model_name}, Current RPM: {current_rpm}, Wait time: {wait_time:.2f}s")
+
+            # Add cooling period between batches
+            logger.info(
+                f"Adding cooling period of {INTER_BATCH_DELAY_SECONDS} seconds between batches")
+            await asyncio.sleep(INTER_BATCH_DELAY_SECONDS)
 
         # Prepare final status report
         status = {
@@ -253,48 +301,73 @@ def _get_domain_goodness_scores(db_client: ReaderDBClient) -> Dict[str, float]:
         raise
 
 
-def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, float]) -> List[Dict[str, Any]]:
+def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, float] = None) -> List[Dict[str, Any]]:
     """
-    Fetch recent unprocessed articles and prioritize them based on combined score.
+    Fetch unprocessed articles from yesterday and today and prioritize them based on combined score.
+
+    Calculates the Combined_Priority_Score = (0.65 * cluster_hotness_score) + (0.35 * goodness_score)
+    and assigns articles to processing tiers based on their ranking:
+    - Tier 0: Top ~30%
+    - Tier 1: Next ~50%
+    - Tier 2: Remainder ~20%
 
     Args:
         db_client: Database client instance
-        domain_scores: Dictionary mapping domains to their goodness scores
+        domain_scores: Optional pre-loaded dictionary mapping domains to their goodness scores
 
     Returns:
         List of prioritized article dictionaries with processing tier assigned
     """
     try:
-        # Get recent unprocessed articles
+        # Get unprocessed articles from yesterday and today only
         try:
-            # This function needs to be implemented in reader_db_client.py
+            articles = db_client.get_recent_day_unprocessed_articles()
+            logger.info("Fetching articles published yesterday and today only")
+        except Exception as e:
+            logger.error(
+                f"Error fetching articles from yesterday and today: {e}")
+            # Fallback to recent unprocessed articles with days limit
+            logger.info("Falling back to recent unprocessed articles")
             articles = db_client.get_recent_unprocessed_articles(
                 days=DAYS_LOOKBACK, limit=ARTICLE_LIMIT)
-        except Exception as e:
-            logger.error(f"Error fetching recent unprocessed articles: {e}")
-            return []
 
         if not articles:
-            logger.info("No recent unprocessed articles found.")
+            logger.info(
+                "No unprocessed articles found for yesterday and today.")
             return []
 
-        # Fetch cluster hotness scores
-        try:
-            # Get all clusters
-            clusters = db_client.get_all_clusters()
-            # Create mapping from cluster_id to hotness_score
-            cluster_hotness = {c.get('id'): c.get(
-                'hotness_score', 0.0) for c in clusters}
-        except Exception as e:
-            logger.warning(
-                f"Error fetching clusters: {e}. Using default hotness scores.")
-            cluster_hotness = {}
+        logger.info(
+            f"Found {len(articles)} unprocessed articles from yesterday and today for prioritization")
 
-        # Calculate scores for each article
+        # Get all domain scores if not provided
+        if domain_scores is None:
+            domain_scores = db_client.get_all_domain_goodness_scores()
+
+        # Extract unique domains and cluster_ids for batch lookups
+        domains_to_lookup = list(set(article.get('domain', '')
+                                 for article in articles if article.get('domain')))
+        cluster_ids_to_lookup = list(set(article.get('cluster_id') for article in articles
+                                         if article.get('cluster_id') is not None))
+
+        # Batch lookup domain goodness scores
+        if domains_to_lookup and not domain_scores:
+            domain_scores = db_client.get_domain_goodness_scores(
+                domains_to_lookup)
+
+        # Batch lookup cluster hotness scores
+        cluster_hotness = {}
+        if cluster_ids_to_lookup:
+            cluster_hotness = db_client.get_cluster_hotness_scores(
+                cluster_ids_to_lookup)
+
+        # Calculate scores for each article using the specified weights
+        CLUSTER_WEIGHT = 0.65  # Weight for cluster hotness (65%)
+        DOMAIN_WEIGHT = 0.35   # Weight for domain goodness (35%)
+
         for article in articles:
-            # Get domain goodness score (default 0.0 if missing)
+            # Get domain goodness score (default 0.5 if missing)
             domain = article.get('domain', '')
-            domain_goodness_score = domain_scores.get(domain, 0.0)
+            domain_goodness_score = domain_scores.get(domain, 0.5)
 
             # Get cluster hotness score (default 0.0 if missing)
             cluster_id = article.get('cluster_id')
@@ -302,10 +375,10 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
                 cluster_id, 0.0) if cluster_id else 0.0
 
             # Calculate combined score
-            combined_score = (CLUSTER_HOTNESS_WEIGHT * cluster_hotness_score +
-                              DOMAIN_GOODNESS_WEIGHT * domain_goodness_score)
+            combined_score = (CLUSTER_WEIGHT * cluster_hotness_score +
+                              DOMAIN_WEIGHT * domain_goodness_score)
 
-            # Store scores in article dict for debugging
+            # Store scores in article dict for debugging and future use
             article['domain_goodness_score'] = domain_goodness_score
             article['cluster_hotness_score'] = cluster_hotness_score
             article['combined_score'] = combined_score
@@ -314,19 +387,32 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
         sorted_articles = sorted(
             articles, key=lambda x: x.get('combined_score', 0.0), reverse=True)
 
-        # Assign processing tiers based on position in sorted list
+        # Assign processing tiers based on percentages of the sorted list
+        total_articles = len(sorted_articles)
+        # Calculate tier cutoffs based on percentages
+        tier0_cutoff = int(total_articles * 0.3)  # Top 30%
+        # Top 80% (so next 50% after tier0)
+        tier1_cutoff = int(total_articles * 0.8)
+
         for i, article in enumerate(sorted_articles):
-            if i < TIER0_COUNT:
-                article['processing_tier'] = 0  # Highest quality
-            elif i < TIER0_COUNT + TIER1_COUNT:
-                article['processing_tier'] = 1  # Medium quality
+            if i < tier0_cutoff:
+                article['processing_tier'] = 0  # Top 30% - Highest quality
+            elif i < tier1_cutoff:
+                article['processing_tier'] = 1  # Next 50% - Medium quality
             else:
-                article['processing_tier'] = 2  # Standard quality
+                article['processing_tier'] = 2  # Bottom 20% - Standard quality
+
+        # Count articles in each tier for logging
+        tier0_count = sum(
+            1 for a in sorted_articles if a.get('processing_tier') == 0)
+        tier1_count = sum(
+            1 for a in sorted_articles if a.get('processing_tier') == 1)
+        tier2_count = sum(
+            1 for a in sorted_articles if a.get('processing_tier') == 2)
 
         logger.info(
-            f"Prioritized {len(sorted_articles)} articles: {TIER0_COUNT} in tier 0, "
-            f"{min(TIER1_COUNT, max(0, len(sorted_articles) - TIER0_COUNT))} in tier 1, "
-            f"{max(0, len(sorted_articles) - TIER0_COUNT - TIER1_COUNT)} in tier 2.")
+            f"Prioritized {len(sorted_articles)} articles: {tier0_count} in tier 0 (30%), "
+            f"{tier1_count} in tier 1 (50%), {tier2_count} in tier 2 (20%)")
 
         return sorted_articles
 
@@ -358,7 +444,10 @@ async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Di
         article_id = article.get('id')
         content = article.get('content')
         tier = article.get('processing_tier')
-        model_to_use = TIER_MODEL_MAP.get(tier, FALLBACK_MODEL)
+        model_to_use = article.get(
+            'model_to_use', TIER_MODELS[tier]['primary'])
+        fallback_model = article.get(
+            'fallback_model', TIER_MODELS[tier]['fallback'])
 
         if not article_id or not content:
             logger.warning(
@@ -371,7 +460,8 @@ async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Di
             'article_id': article_id,
             'content': content,
             'processing_tier': tier,
-            'model_to_use': model_to_use
+            'model_to_use': model_to_use,
+            'fallback_model': fallback_model
         }
         tasks_definitions.append(task_definition)
 

@@ -16,7 +16,8 @@ Related files:
 import logging
 import asyncio
 import json
-from typing import List, Dict, Any, Tuple
+import time
+from typing import List, Dict, Any, Tuple, Set
 
 # For type hints
 from src.gemini.gemini_client import GeminiClient
@@ -36,6 +37,35 @@ class TaskManager:
         self.logger = logging.getLogger(__name__)
         self.logger.debug("TaskManager initialized")
 
+        # Model coordination - Track model usage across tasks
+        self.model_usage_counter = {
+            'models/gemini-2.0-flash-thinking-exp-01-21': 0,
+            'models/gemini-2.0-flash-exp': 0,
+            'models/gemini-2.0-flash': 0,
+            'models/gemini-2.0-flash-lite': 0
+        }
+
+        # Track which models are in cooldown due to rate limits
+        self.models_in_cooldown: Set[str] = set()
+
+        # Add lock to prevent race conditions when updating model statuses
+        self.model_lock = asyncio.Lock()
+
+    async def _remove_from_cooldown(self, model_name: str, wait_time: float) -> None:
+        """
+        Asynchronously remove a model from cooldown after the wait time has elapsed.
+
+        Args:
+            model_name: Name of the model to remove from cooldown
+            wait_time: Time in seconds to wait before removing from cooldown
+        """
+        await asyncio.sleep(wait_time)
+        async with self.model_lock:
+            if model_name in self.models_in_cooldown:
+                self.models_in_cooldown.remove(model_name)
+                self.logger.info(
+                    f"Model {model_name} removed from cooldown after {wait_time:.2f}s wait")
+
     async def _run_single_task(self, gemini_client: GeminiClient, task_data: Dict[str, Any]) -> Tuple[int, Any]:
         """
         Execute a single Gemini API call for one article.
@@ -51,7 +81,32 @@ class TaskManager:
         article_id = task_data.get('article_id')
         content = task_data.get('content', '')
         tier = task_data.get('processing_tier', 0)
-        model_to_use = task_data.get('model_to_use', 'No model specified')
+        primary_model = task_data.get('model_to_use', 'No model specified')
+        fallback_model = task_data.get(
+            'fallback_model', gemini_client.FALLBACK_MODEL)
+
+        # Smart model selection - Check if primary model is in cooldown
+        async with self.model_lock:
+            if primary_model in self.models_in_cooldown:
+                # Check wait time for primary model
+                wait_time = 0
+                if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
+                    wait_time = await gemini_client.rate_limiter.get_wait_time_async(primary_model)
+
+                # If wait time is ≤ 40 seconds, wait and use primary model
+                if 0 < wait_time <= 40:
+                    self.logger.info(
+                        f"Primary model {primary_model} in cooldown but wait time is only {wait_time:.2f}s. Waiting to use better model for article {article_id}")
+                    await asyncio.sleep(wait_time)
+                    # Remove from cooldown since we're waiting
+                    self.models_in_cooldown.remove(primary_model)
+                    model_to_use = primary_model
+                else:
+                    self.logger.info(
+                        f"Primary model {primary_model} in cooldown with wait time > 40s, using fallback model {fallback_model} for article {article_id}")
+                    model_to_use = fallback_model
+            else:
+                model_to_use = primary_model
 
         content_length = len(content) if content else 0
         self.logger.debug(
@@ -66,17 +121,53 @@ class TaskManager:
             self.logger.debug(
                 f"Starting API call for article {article_id} using tier {tier} model: {model_to_use}")
 
-            # Add timeout to each individual API call as well
+            # Add timeout to each individual API call
             try:
-                # Already has timeout inside but let's add another layer of safety
-                extraction_result = await asyncio.wait_for(
-                    gemini_client.generate_text_with_prompt_async(
-                        article_content=content,
-                        processing_tier=tier,
-                        model_override=model_to_use
-                    ),
-                    timeout=180  # 3 minute timeout for individual call
-                )
+                # Handle rate limit hits by adding to cooldown set
+                try:
+                    # Already has timeout inside but let's add another layer of safety
+                    extraction_result = await asyncio.wait_for(
+                        gemini_client.generate_text_with_prompt_async(
+                            article_content=content,
+                            processing_tier=tier,
+                            model_override=model_to_use,
+                            fallback_model=fallback_model  # Pass the tier-specific fallback model
+                        ),
+                        timeout=180  # 3 minute timeout for individual call
+                    )
+
+                    # Increment usage counter on successful call
+                    async with self.model_lock:
+                        if model_to_use in self.model_usage_counter:
+                            self.model_usage_counter[model_to_use] += 1
+
+                except Exception as api_err:
+                    # Check if the error is a rate limit error
+                    error_str = str(api_err).lower()
+                    is_rate_limit_error = "rate limit" in error_str or "quota" in error_str or "resource has been exhausted" in error_str
+
+                    if is_rate_limit_error:
+                        # Add model to cooldown
+                        async with self.model_lock:
+                            self.models_in_cooldown.add(model_to_use)
+
+                        # Calculate wait time, default to a reasonable value if rate limiter not available
+                        wait_time = 40  # Default to max wait of 40 seconds
+                        if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
+                            wait_time = await gemini_client.rate_limiter.get_wait_time_async(model_to_use)
+                            # Cap wait time at 40 seconds
+                            # Between 10-40 seconds
+                            wait_time = min(max(wait_time, 10), 40)
+
+                        self.logger.warning(
+                            f"Rate limit hit for model {model_to_use}. Adding to cooldown for {wait_time:.2f}s")
+
+                        # Schedule removal after wait time
+                        asyncio.create_task(
+                            self._remove_from_cooldown(model_to_use, wait_time))
+
+                    # Re-raise the exception to be caught by the outer try-except
+                    raise api_err
 
                 if extraction_result:
                     # Client now returns the already parsed dictionary
@@ -144,59 +235,60 @@ class TaskManager:
             self.logger.warning("No valid tasks to run")
             return {}
 
-        # Run all tasks concurrently
-        self.logger.info(f"Running {len(awaitables)} tasks concurrently")
-        try:
+        # Staggered task execution
+        self.logger.info(
+            f"Running {len(awaitables)} tasks with staggered execution")
+        results = []
+        for i, task in enumerate(awaitables):
+            # Add small delay between task starts to prevent concurrent rate limit hits
+            if i > 0:
+                await asyncio.sleep(0.5)  # 500ms stagger between task starts
+
             self.logger.debug(
-                "About to call asyncio.gather with timeout of 300 seconds")
-            # Add a global timeout to the gather operation
-            results = await asyncio.wait_for(
-                asyncio.gather(*awaitables, return_exceptions=True),
-                timeout=300  # 5 minutes timeout for the entire batch
-            )
-            self.logger.info("Concurrent task execution completed")
-        except asyncio.TimeoutError:
-            self.logger.error(
-                "Global timeout reached for the entire batch of tasks")
-            return {}  # Return empty result on timeout
-        except Exception as e:
-            self.logger.error(
-                f"Unexpected error in gather operation: {e}", exc_info=True)
-            return {}  # Return empty result on error
+                f"Starting task {i+1}/{len(awaitables)} for article {task_article_ids[i]}")
+            try:
+                # Wait for the task with timeout
+                result = await asyncio.wait_for(task, timeout=180)
+                results.append(result)
+            except asyncio.TimeoutError:
+                # Handle timeout for individual task
+                self.logger.error(
+                    f"Task {i+1} for article {task_article_ids[i]} timed out")
+                results.append(
+                    (task_article_ids[i], {"error": "Task timeout"}))
+            except Exception as e:
+                # Handle other exceptions
+                self.logger.error(
+                    f"Task {i+1} for article {task_article_ids[i]} failed: {e}")
+                results.append(
+                    (task_article_ids[i], {"error": f"Task failed: {str(e)}"}))
 
         # Process results
         final_results = {}
         error_count = 0
-        for i, result in enumerate(results):
-            # Handle exceptions from gather if return_exceptions=True
-            if isinstance(result, Exception):
-                article_id = task_article_ids[i] if i < len(
-                    task_article_ids) else f"unknown-{i}"
-                self.logger.error(
-                    f"Task for article {article_id} failed with exception: {result}")
-                error_count += 1
-                # Add an error entry instead of skipping
-                final_results[article_id] = {
-                    "error": f"API call failed: {str(result)}"}
-                continue
 
+        for result in results:
             # Process normal result
             if isinstance(result, tuple) and len(result) == 2:
                 article_id, data = result
                 self.logger.debug(f"Processed result for article {article_id}")
                 final_results[article_id] = data
+
+                # Check if this is an error
+                if isinstance(data, dict) and 'error' in data:
+                    error_count += 1
             else:
-                self.logger.error(
-                    f"Unexpected result format for task {i+1}: {result}")
-                # Try to identify the article ID if possible
-                if i < len(task_article_ids):
-                    article_id = task_article_ids[i]
-                    final_results[article_id] = {
-                        "error": "Unexpected result format"}
+                self.logger.error(f"Unexpected result format: {result}")
+                # We can't identify the article ID for this result
+                continue
 
         success_count = len(final_results) - error_count
         self.logger.info(
-            f"Processed {len(final_results)} results out of {len(awaitables)} tasks: {success_count} successful, {error_count} errors")
+            f"Processed {len(final_results)} results: {success_count} successful, {error_count} errors")
+
+        # Log the model usage stats
+        self.logger.info(f"Model usage statistics: {self.model_usage_counter}")
+        self.logger.info(f"Models in cooldown: {self.models_in_cooldown}")
 
         # Return any results we have, even if some failed
         return final_results

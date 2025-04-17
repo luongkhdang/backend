@@ -1235,3 +1235,88 @@ class ReaderDBClient:
             finally:
                 self.release_connection(conn)
         return []
+
+    def get_all_unprocessed_articles(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get all unprocessed articles without date limitation.
+
+        Args:
+            limit: Optional maximum number of articles to return (returns all if None)
+
+        Returns:
+            List of article dictionaries
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return articles.get_all_unprocessed_articles(conn, limit)
+            except Exception as e:
+                logger.error(f"Error fetching all unprocessed articles: {e}")
+                return []
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_domain_goodness_scores(self, domains: List[str]) -> Dict[str, float]:
+        """
+        Get goodness scores for specific domains by name.
+
+        Args:
+            domains: List of domain names to fetch scores for
+
+        Returns:
+            Dict[str, float]: Dictionary mapping domains to their goodness scores (defaults to 0.5 if not found)
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return domains.get_domain_goodness_scores(conn, domains)
+            except Exception as e:
+                logger.error(f"Error fetching domain goodness scores: {e}")
+                return {domain: 0.5 for domain in domains if domain is not None}
+            finally:
+                self.release_connection(conn)
+        return {domain: 0.5 for domain in domains if domain is not None}
+
+    def get_cluster_hotness_scores(self, cluster_ids: List[int]) -> Dict[int, float]:
+        """
+        Get hotness scores for multiple clusters by their IDs.
+
+        Args:
+            cluster_ids: List of cluster IDs to fetch scores for
+
+        Returns:
+            Dict[int, float]: Dictionary mapping cluster IDs to their hotness scores (defaults to 0.0 if no score)
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return clusters.get_cluster_hotness_scores(conn, cluster_ids)
+            except Exception as e:
+                logger.error(f"Error fetching cluster hotness scores: {e}")
+                return {cluster_id: 0.0 for cluster_id in cluster_ids if cluster_id is not None}
+            finally:
+                self.release_connection(conn)
+        return {cluster_id: 0.0 for cluster_id in cluster_ids if cluster_id is not None}
+
+    def get_recent_day_unprocessed_articles(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get unprocessed articles published yesterday and today only.
+
+        Args:
+            limit: Optional maximum number of articles to return (returns all if None)
+
+        Returns:
+            List of article dictionaries
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return articles.get_recent_day_unprocessed_articles(conn, limit)
+            except Exception as e:
+                logger.error(
+                    f"Error fetching recent day unprocessed articles: {e}")
+                return []
+            finally:
+                self.release_connection(conn)
+        return []

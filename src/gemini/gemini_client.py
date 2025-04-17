@@ -15,7 +15,7 @@ Exported functions/classes:
   - __init__(self): Initializes the client with API key and creates an internal rate limiter.
   - generate_embedding(text, task_type, retries, initial_delay): Generates embeddings for text with retry logic.
   - generate_text_with_prompt(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Generates text based on article content and a prompt, using model selection logic.
-  - generate_text_with_prompt_async(self, article_content: str, processing_tier: int, retries: int = 6, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Async version of text generation method.
+  - generate_text_with_prompt_async(self, article_content: str, processing_tier: int, retries: int = 6, initial_delay: float = 1.0, model_override: Optional[str] = None, fallback_model: Optional[str] = None) -> Optional[Dict[str, Any]]: Async version of text generation method.
 
 Related files:
 - src/steps/step1.py: Uses this client for embedding generation.
@@ -483,7 +483,8 @@ class GeminiClient:
 
     async def generate_text_with_prompt_async(self, article_content: str, processing_tier: int,
                                               retries: int = 6, initial_delay: float = 1.0,
-                                              model_override: Optional[str] = None) -> Optional[Dict[str, Any]]:
+                                              model_override: Optional[str] = None,
+                                              fallback_model: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Async version of text generation method.
 
@@ -493,6 +494,7 @@ class GeminiClient:
             retries (int): Maximum number of retry attempts for the entire process (across models).
             initial_delay (float): Initial delay for retries in seconds.
             model_override (Optional[str]): Optional specific model to use instead of tier-based selection.
+            fallback_model (Optional[str]): Tier-specific fallback model to try before the global fallback.
 
         Returns:
             Optional[Dict[str, Any]]: The parsed JSON response as a dictionary, or None if failed.
@@ -506,33 +508,55 @@ class GeminiClient:
                 "Invalid article content provided for text generation.")
             return None
 
+        # Set maximum wait time to 40 seconds to prefer waiting for better models
+        self.max_rate_limit_wait_seconds = 40
+
         # Construct the full prompt
         full_prompt = self.prompt_template.replace(
             "{ARTICLE_CONTENT_HERE}", article_content)
 
-        # Define model preference order, handling model_override if provided
+        # Define model preference order, handling model_override and fallback_model
         if model_override and model_override.startswith("models/"):
-            # Use specified model first, then fall back to defaults if needed
+            # Use specified model first, then tier-specific fallback if provided, then default fallbacks
             preferred_models = [model_override]
+
+            # Add tier-specific fallback if provided
+            if fallback_model and fallback_model.startswith("models/"):
+                if fallback_model not in preferred_models:
+                    preferred_models.append(fallback_model)
+
+            # Then add default models as final fallbacks
             all_models_to_try = preferred_models + \
                 list(self.GENERATION_MODELS_CONFIG.keys()) + \
                 [self.FALLBACK_MODEL]
             # Remove duplicates while preserving order
             all_models_to_try = list(dict.fromkeys(all_models_to_try))
             logger.info(
-                f"Using overridden model selection with primary model: {model_override}")
+                f"Using tiered model selection: Primary={model_override}, Tier-fallback={fallback_model or 'None'}")
         else:
             # Use default tier-based selection
             preferred_models = list(self.GENERATION_MODELS_CONFIG.keys())
+
+            # Insert tier-specific fallback if provided and not already in list
+            if fallback_model and fallback_model.startswith("models/"):
+                # If fallback isn't already in the preferred models, add it at the beginning
+                if fallback_model not in preferred_models:
+                    preferred_models.insert(0, fallback_model)
+
             all_models_to_try = preferred_models + [self.FALLBACK_MODEL]
+            # Remove duplicates while preserving order
+            all_models_to_try = list(dict.fromkeys(all_models_to_try))
             logger.info(
-                f"Using default model selection with tier {processing_tier}")
+                f"Using default model selection with tier {processing_tier}, fallback={fallback_model or 'None'}")
 
         current_delay = initial_delay
         total_attempts = 0
 
         # Track which models we've tried and failed due to rate limits
         rate_limited_models = set()
+
+        # Log the model sequence we'll be trying
+        logger.debug(f"Model sequence to try: {all_models_to_try}")
 
         for model_name in all_models_to_try:
             logger.debug(

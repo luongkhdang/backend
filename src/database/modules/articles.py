@@ -35,10 +35,14 @@ Exported functions:
   Gets publication dates for a list of article IDs
 - get_recent_unprocessed_articles(conn, days: int = 2, limit: int = 2000) -> List[Dict[str, Any]]
   Gets recent unprocessed articles
+- get_all_unprocessed_articles(conn, limit: int = None) -> List[Dict[str, Any]]
+  Gets all unprocessed articles without date limitation
 - mark_article_processed(conn, article_id: int) -> bool
   Marks an article as having had its entities extracted
 - update_article_frames_and_mark_processed(conn, article_id: int, frame_phrases: Optional[List[str]]) -> bool
   Updates an article's frame_phrases and marks it as having had its entities extracted
+- get_recent_day_unprocessed_articles(conn, limit: Optional[int] = None) -> List[Dict[str, Any]]
+  Gets unprocessed articles published yesterday and today only
 
 Related modules:
 - Connection management from connection.py
@@ -678,6 +682,48 @@ def get_recent_unprocessed_articles(conn, days: int = 2, limit: int = 2000) -> L
         return []
 
 
+def get_all_unprocessed_articles(conn, limit: int = None) -> List[Dict[str, Any]]:
+    """
+    Get all unprocessed articles without date limitation.
+
+    Args:
+        conn: Database connection
+        limit: Optional maximum number of articles to return (returns all if None)
+
+    Returns:
+        List of article dictionaries
+    """
+    try:
+        cursor = conn.cursor()
+
+        # Base query to get all unprocessed articles
+        query = """
+            SELECT id, domain, cluster_id, content, pub_date
+            FROM articles
+            WHERE extracted_entities = FALSE
+            AND content IS NOT NULL
+            AND content != 'ERROR'
+            ORDER BY pub_date DESC
+        """
+
+        # Add limit if specified
+        if limit is not None:
+            query += " LIMIT %s"
+            cursor.execute(query, (limit,))
+        else:
+            cursor.execute(query)
+
+        columns = [desc[0] for desc in cursor.description]
+        articles = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        cursor.close()
+
+        logger.info(f"Fetched {len(articles)} unprocessed articles")
+        return articles
+    except Exception as e:
+        logger.error(f"Error fetching all unprocessed articles: {e}")
+        return []
+
+
 def mark_article_processed(conn, article_id: int) -> bool:
     """
     Mark an article as having had its entities extracted.
@@ -748,3 +794,48 @@ def update_article_frames_and_mark_processed(conn, article_id: int, frame_phrase
         logger.error(f"Error updating frames for article {article_id}: {e}")
         conn.rollback()
         return False
+
+
+def get_recent_day_unprocessed_articles(conn, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Get unprocessed articles published yesterday and today only.
+
+    Args:
+        conn: Database connection
+        limit: Optional maximum number of articles to return (returns all if None)
+
+    Returns:
+        List of article dictionaries
+    """
+    try:
+        cursor = conn.cursor()
+
+        # Query to get unprocessed articles from yesterday and today only
+        query = """
+            SELECT id, domain, cluster_id, content, pub_date
+            FROM articles
+            WHERE extracted_entities = FALSE
+            AND content IS NOT NULL
+            AND content != 'ERROR'
+            AND pub_date >= (CURRENT_DATE - INTERVAL '1 DAY')
+            AND pub_date <= CURRENT_DATE
+            ORDER BY pub_date DESC
+        """
+
+        # Add limit if specified
+        if limit is not None:
+            query += " LIMIT %s"
+            cursor.execute(query, (limit,))
+        else:
+            cursor.execute(query)
+
+        columns = [desc[0] for desc in cursor.description]
+        articles = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        cursor.close()
+
+        logger.info(
+            f"Fetched {len(articles)} unprocessed articles from yesterday and today")
+        return articles
+    except Exception as e:
+        logger.error(f"Error fetching recent day unprocessed articles: {e}")
+        return []
