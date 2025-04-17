@@ -5,17 +5,22 @@ gemini_client.py - Client for Google's Gemini API
 This module provides a client for Google's Gemini API, supporting both text embeddings
 and text generation with model selection and rate limiting.
 
+The client now supports extracting both entities and narrative frame phrases,
+which helps identify the dominant perspective or framing used in news articles.
+These frame phrases are short descriptors (2-4 words) representing how stories
+are presented (e.g., "economic impact", "national security", "moral obligation").
+
 Exported functions/classes:
 - GeminiClient: Class for interacting with the Gemini API
   - __init__(self): Initializes the client with API key and creates an internal rate limiter.
   - generate_embedding(text, task_type, retries, initial_delay): Generates embeddings for text with retry logic.
-  - generate_text_with_prompt(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[str]: Generates text based on article content and a prompt, using model selection logic.
-  - generate_text_with_prompt_async(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[str]: Async version of text generation method.
+  - generate_text_with_prompt(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Generates text based on article content and a prompt, using model selection logic.
+  - generate_text_with_prompt_async(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Async version of text generation method.
 
 Related files:
 - src/steps/step1.py: Uses this client for embedding generation.
-- src/steps/step3.py: Uses this client for text generation (entity extraction).
-- src/database/reader_db_client.py: Stores generated embeddings and potentially extracted entities.
+- src/steps/step3.py: Uses this client for text generation (entity and frame phrase extraction).
+- src/database/reader_db_client.py: Stores generated embeddings, extracted entities, and frame phrases.
 - src/utils/rate_limit.py: Provides the RateLimiter class used by this client.
 - src/prompts/entity_extraction_prompt.txt: Contains the prompt template for text generation.
 """
@@ -193,6 +198,10 @@ class GeminiClient:
                     task_type=task_type
                 )
 
+                # Log the raw API response for debugging
+                logger.info(
+                    f"Gemini API raw embedding response for model {model_to_use}: {result}")
+
                 # Register this call with the rate limiter if provided
                 if self.rate_limiter:
                     self.rate_limiter.register_call(model_to_use)
@@ -248,7 +257,7 @@ class GeminiClient:
 
     def generate_text_with_prompt(self, article_content: str, processing_tier: int,
                                   retries: int = 3, initial_delay: float = 1.0,
-                                  model_override: Optional[str] = None) -> Optional[str]:
+                                  model_override: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Generates text (e.g., entity extraction JSON) based on article content and a prompt.
 
@@ -262,7 +271,7 @@ class GeminiClient:
             model_override (Optional[str]): Optional specific model to use instead of tier-based selection.
 
         Returns:
-            Optional[str]: The generated text (expected to be JSON string), or None if failed.
+            Optional[Dict[str, Any]]: The parsed JSON response as a dictionary, or None if failed.
         """
         if not self.prompt_template:
             logger.error(
@@ -363,6 +372,10 @@ class GeminiClient:
                         # safety_settings=... # Add safety settings if required
                     )
 
+                    # Log the raw API response for debugging
+                    logger.info(
+                        f"Gemini API raw generation response for model {model_name}: {response}")
+
                     # Register the successful call *after* it completes
                     if self.rate_limiter:
                         self.rate_limiter.register_call(model_name)
@@ -390,8 +403,16 @@ class GeminiClient:
                         end_index = generated_text.rfind('}')
                         if start_index != -1 and end_index != -1 and start_index < end_index:
                             json_part = generated_text[start_index:end_index+1]
-                            # Further validation could be done here (e.g., json.loads)
-                            return json_part.strip()  # Return cleaned JSON string
+                            # Try to parse the JSON
+                            try:
+                                parsed_json = json.loads(json_part.strip())
+                                logger.info(
+                                    f"Successfully parsed JSON response from {model_name}")
+                                return parsed_json  # Return the parsed JSON dictionary
+                            except json.JSONDecodeError as json_err:
+                                logger.warning(
+                                    f"JSON parsing error from {model_name}: {json_err}. Raw JSON: {json_part[:100]}...")
+                                # Continue with retries or model switches
                         else:
                             logger.warning(
                                 f"Generated text from {model_name} does not appear to be valid JSON: {generated_text[:100]}...")
@@ -406,24 +427,35 @@ class GeminiClient:
                     # Check if it's a rate limit error - this might trigger skipping the model
                     error_str = str(e).lower()
                     # More robust check for rate limit / quota errors
-                    if "rate limit" in error_str or "quota" in error_str or "resource has been exhausted" in error_str:
-                        logger.error(
-                            f"Rate limit/Quota error encountered with {model_name}: {e}. Switching model if possible.")
-                        break  # Exit inner loop to try next model
+                    is_rate_limit_error = "rate limit" in error_str or "quota" in error_str or "resource has been exhausted" in error_str
 
-                    # If not rate limit, apply backoff and retry with the *same* model (if attempts left)
-                    if model_attempt < max_model_retries and total_attempts < retries:
-                        jitter = random.random() * 0.5 + 0.5
-                        sleep_time = current_delay * jitter
-                        logger.debug(
-                            f"Waiting {sleep_time:.2f} seconds before retrying {model_name}.")
-                        time.sleep(sleep_time)
-                        current_delay *= 1.5  # Increase delay slightly for model-specific retries
+                    if is_rate_limit_error:
+                        # Check if we should retry this model after a sleep
+                        if model_attempt < max_model_retries and total_attempts < retries:
+                            logger.warning(
+                                f"Rate limit/Quota error on {model_name} (Attempt {model_attempt}/{max_model_retries}). Sleeping 10s and retrying...")
+                            time.sleep(10)  # Sleep for 10 seconds
+                            continue  # Retry the same model
+                        else:
+                            # Exhausted retries for this model or global retries, force switch
+                            logger.error(
+                                f"Rate limit/Quota error encountered with {model_name}: {e}. Retries exhausted for this model. Switching model if possible.")
+                            break  # Exit inner loop to try next model
                     else:
-                        # Exhausted retries for this model or global retries
-                        logger.error(
-                            f"Failed to generate text with {model_name} after {model_attempt} attempts.")
-                        break  # Exit inner loop
+                        # Handle non-rate-limit errors
+                        if model_attempt < max_model_retries and total_attempts < retries:
+                            jitter = random.random() * 0.5 + 0.5
+                            sleep_time = current_delay * jitter
+                            logger.debug(
+                                f"Non-rate-limit error. Waiting {sleep_time:.2f} seconds before retrying {model_name}.")
+                            time.sleep(sleep_time)
+                            current_delay *= 1.5  # Increase delay slightly for model-specific retries
+                            continue  # Retry the same model
+                        else:
+                            # Exhausted retries for this model or global retries
+                            logger.error(
+                                f"Failed to generate text with {model_name} after {model_attempt} attempts due to non-rate-limit error: {e}")
+                            break  # Exit inner loop
 
                 # If successful (returned above), this part is skipped
                 # If failed but retries remain for this model, loop continues
@@ -440,7 +472,7 @@ class GeminiClient:
 
     async def generate_text_with_prompt_async(self, article_content: str, processing_tier: int,
                                               retries: int = 3, initial_delay: float = 1.0,
-                                              model_override: Optional[str] = None) -> Optional[str]:
+                                              model_override: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Async version of text generation method.
 
@@ -452,7 +484,7 @@ class GeminiClient:
             model_override (Optional[str]): Optional specific model to use instead of tier-based selection.
 
         Returns:
-            Optional[str]: The generated text (expected to be JSON string), or None if failed.
+            Optional[Dict[str, Any]]: The parsed JSON response as a dictionary, or None if failed.
         """
         if not self.prompt_template:
             logger.error(
@@ -553,6 +585,10 @@ class GeminiClient:
                         # safety_settings=... # Add safety settings if required
                     )
 
+                    # Log the raw API response for debugging
+                    logger.info(
+                        f"Gemini API raw async generation response for model {model_name}: {response}")
+
                     # Register the successful call *after* it completes
                     if self.rate_limiter:
                         await self.rate_limiter.register_call_async(model_name)
@@ -580,8 +616,16 @@ class GeminiClient:
                         end_index = generated_text.rfind('}')
                         if start_index != -1 and end_index != -1 and start_index < end_index:
                             json_part = generated_text[start_index:end_index+1]
-                            # Further validation could be done here (e.g., json.loads)
-                            return json_part.strip()  # Return cleaned JSON string
+                            # Try to parse the JSON
+                            try:
+                                parsed_json = json.loads(json_part.strip())
+                                logger.info(
+                                    f"Successfully parsed JSON response from {model_name}")
+                                return parsed_json  # Return the parsed JSON dictionary
+                            except json.JSONDecodeError as json_err:
+                                logger.warning(
+                                    f"JSON parsing error from {model_name}: {json_err}. Raw JSON: {json_part[:100]}...")
+                                # Continue with retries or model switches
                         else:
                             logger.warning(
                                 f"Generated text from {model_name} does not appear to be valid JSON: {generated_text[:100]}...")
@@ -596,24 +640,36 @@ class GeminiClient:
                     # Check if it's a rate limit error - this might trigger skipping the model
                     error_str = str(e).lower()
                     # More robust check for rate limit / quota errors
-                    if "rate limit" in error_str or "quota" in error_str or "resource has been exhausted" in error_str:
-                        logger.error(
-                            f"Rate limit/Quota error encountered with {model_name}: {e}. Switching model if possible.")
-                        break  # Exit inner loop to try next model
+                    is_rate_limit_error = "rate limit" in error_str or "quota" in error_str or "resource has been exhausted" in error_str
 
-                    # If not rate limit, apply backoff and retry with the *same* model (if attempts left)
-                    if model_attempt < max_model_retries and total_attempts < retries:
-                        jitter = random.random() * 0.5 + 0.5
-                        sleep_time = current_delay * jitter
-                        logger.debug(
-                            f"Waiting {sleep_time:.2f} seconds before retrying {model_name}.")
-                        await asyncio.sleep(sleep_time)
-                        current_delay *= 1.5  # Increase delay slightly for model-specific retries
+                    if is_rate_limit_error:
+                        # Check if we should retry this model after a sleep
+                        if model_attempt < max_model_retries and total_attempts < retries:
+                            logger.warning(
+                                f"Rate limit/Quota error on {model_name} (Attempt {model_attempt}/{max_model_retries}). Sleeping 10s and retrying...")
+                            # Async sleep for 10 seconds
+                            await asyncio.sleep(10)
+                            continue  # Retry the same model
+                        else:
+                            # Exhausted retries for this model or global retries, force switch
+                            logger.error(
+                                f"Rate limit/Quota error encountered with {model_name}: {e}. Retries exhausted for this model. Switching model if possible.")
+                            break  # Exit inner loop to try next model
                     else:
-                        # Exhausted retries for this model or global retries
-                        logger.error(
-                            f"Failed to generate text with {model_name} after {model_attempt} attempts.")
-                        break  # Exit inner loop
+                        # Handle non-rate-limit errors
+                        if model_attempt < max_model_retries and total_attempts < retries:
+                            jitter = random.random() * 0.5 + 0.5
+                            sleep_time = current_delay * jitter
+                            logger.debug(
+                                f"Non-rate-limit error. Waiting {sleep_time:.2f} seconds before retrying {model_name}.")
+                            await asyncio.sleep(sleep_time)
+                            current_delay *= 1.5  # Increase delay slightly for model-specific retries
+                            continue  # Retry the same model
+                        else:
+                            # Exhausted retries for this model or global retries
+                            logger.error(
+                                f"Failed to generate text with {model_name} after {model_attempt} attempts due to non-rate-limit error: {e}")
+                            break  # Exit inner loop
 
                 # If successful (returned above), this part is skipped
                 # If failed but retries remain for this model, loop continues

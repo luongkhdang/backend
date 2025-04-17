@@ -4,6 +4,10 @@ schema.py - Database schema management
 This module provides functions for initializing and managing the database schema,
 including tables, indexes, and extensions.
 
+The articles table includes a frame_phrases TEXT[] column which stores narrative framing phrases
+extracted during entity extraction (Step 3). These represent the dominant narrative frames
+present in each article.
+
 Exported functions:
 - initialize_tables(conn) -> None
   Creates tables if they don't exist
@@ -49,7 +53,8 @@ def initialize_tables(conn) -> bool:
             processed_at TIMESTAMP,
             extracted_entities BOOLEAN DEFAULT FALSE,
             is_hot BOOLEAN DEFAULT FALSE,
-            cluster_id INTEGER
+            cluster_id INTEGER,
+            frame_phrases TEXT[] NULL
             -- Note: Foreign key to clusters cannot be added here due to potential cyclic dependency
             -- or if clusters table might not exist yet. It could be added separately if needed.
         );
@@ -84,6 +89,11 @@ def initialize_tables(conn) -> bool:
         # Add is_influential_context column to article_entities if it doesn't exist
         cursor.execute("""
         ALTER TABLE article_entities ADD COLUMN IF NOT EXISTS is_influential_context BOOLEAN DEFAULT FALSE;
+        """)
+
+        # Add frame_phrases column to articles table if it doesn't exist
+        cursor.execute("""
+        ALTER TABLE articles ADD COLUMN IF NOT EXISTS frame_phrases TEXT[] NULL;
         """)
 
         # Create embeddings table

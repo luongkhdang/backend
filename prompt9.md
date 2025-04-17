@@ -1,3 +1,6 @@
+**Revised Gemini API Prompt (Incorporating Simple Optimizations):**
+
+````text
 ## Role:
 You are an expert AI analyst specializing in identifying entities, their influence, and the narrative framing within geopolitical and economic news. Your task contributes to a system designed to help users trace power and recognize framing in the news.
 
@@ -41,14 +44,18 @@ Respond **only** with a single, **compact JSON object** with no unnecessary whit
     "string"
   ]
 }
-```
+````
 
 ## Article Text:
 
+```text
 {ARTICLE_CONTENT_HERE}
+```
 
 ## Analysis Output:
 
 ```json
 
-``` 
+```
+
+---

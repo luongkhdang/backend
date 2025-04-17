@@ -64,19 +64,10 @@ class TaskManager:
             )
 
             if extraction_result:
-                # Attempt to parse the JSON string response
-                try:
-                    parsed_entities = json.loads(extraction_result)
-                    self.logger.debug(
-                        f"Successfully extracted entities for article {article_id}")
-                    return (article_id, parsed_entities)
-                except json.JSONDecodeError as json_err:
-                    self.logger.warning(
-                        f"Failed to parse JSON from Gemini for article {article_id}: {json_err}")
-                    return (article_id, {
-                        "error": "Invalid JSON response",
-                        "raw_response": extraction_result
-                    })
+                # Client now returns the already parsed dictionary
+                self.logger.debug(
+                    f"Successfully extracted entities for article {article_id}")
+                return (article_id, extraction_result)
             else:
                 self.logger.warning(
                     f"No entity extraction result from Gemini for article {article_id}")

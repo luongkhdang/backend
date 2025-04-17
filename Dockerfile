@@ -38,6 +38,12 @@ ENV INTERPRET_CLUSTERS=true
 ENV MAX_CLUSTERS_TO_INTERPRET=10
 ENV CLUSTER_SAMPLE_SIZE=10
 
+# Step 3: Entity Extraction Settings
+ENV RUN_STEP3=true
+ENV ENTITY_EXTRACTION_BATCH_SIZE=10
+ENV ENTITY_MAX_PRIORITY_ARTICLES=100
+ENV CALCULATE_INFLUENCE_SCORES=true
+
 # Verify only application modules - faster than verifying all dependencies
 RUN python -c "import sys; print(sys.path)" && \
     python -c "import src.gemini.gemini_client; print('Verified gemini_client')" && \

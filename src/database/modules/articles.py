@@ -4,6 +4,10 @@ articles.py - Article-related database operations
 This module provides functions for article-related database operations,
 including inserting, updating, and querying articles.
 
+The module now supports storing narrative frame phrases (frame_phrases) for articles,
+which are extracted during entity processing in Step 3 of the data refinery pipeline.
+These frame phrases represent the dominant narrative framing used in each article.
+
 Exported functions:
 - insert_article(conn, article: Dict[str, Any]) -> Optional[int]
   Inserts an article into the database
@@ -33,6 +37,8 @@ Exported functions:
   Gets recent unprocessed articles
 - mark_article_processed(conn, article_id: int) -> bool
   Marks an article as having had its entities extracted
+- update_article_frames_and_mark_processed(conn, article_id: int, frame_phrases: Optional[List[str]]) -> bool
+  Updates an article's frame_phrases and marks it as having had its entities extracted
 
 Related modules:
 - Connection management from connection.py
@@ -698,5 +704,47 @@ def mark_article_processed(conn, article_id: int) -> bool:
         return success
     except Exception as e:
         logger.error(f"Error marking article {article_id} as processed: {e}")
+        conn.rollback()
+        return False
+
+
+def update_article_frames_and_mark_processed(conn, article_id: int, frame_phrases: Optional[List[str]]) -> bool:
+    """
+    Update an article's frame_phrases and mark it as having had its entities extracted.
+
+    Args:
+        conn: Database connection
+        article_id: ID of the article to update
+        frame_phrases: List of narrative frame phrases extracted from the article, or None
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        cursor = conn.cursor()
+
+        # If frame_phrases is None, only mark as processed
+        if frame_phrases is None:
+            cursor.execute("""
+                UPDATE articles
+                SET extracted_entities = TRUE,
+                    processed_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (article_id,))
+        else:
+            cursor.execute("""
+                UPDATE articles
+                SET extracted_entities = TRUE,
+                    processed_at = CURRENT_TIMESTAMP,
+                    frame_phrases = %s
+                WHERE id = %s
+            """, (frame_phrases, article_id))
+
+        success = cursor.rowcount > 0
+        conn.commit()
+        cursor.close()
+        return success
+    except Exception as e:
+        logger.error(f"Error updating frames for article {article_id}: {e}")
         conn.rollback()
         return False

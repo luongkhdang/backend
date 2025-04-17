@@ -6,6 +6,11 @@ entities, store entity relationships, and update basic entity statistics. It pri
 based on combined domain goodness and cluster hotness scores, then calls Gemini API for entity
 extraction with tier-based model selection.
 
+The module now also extracts narrative frame phrases from articles, which are short descriptors 
+(2-4 words) that represent how stories are presented (e.g., "economic impact", "national security", 
+"moral obligation"). These frame phrases are stored in the articles table and provide insight into 
+the dominant perspectives used in news coverage.
+
 Exported functions:
 - run(): Main function that orchestrates the entity extraction process
   - Returns Dict[str, Any]: Status report of entity extraction operation
@@ -440,15 +445,28 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
                     batch_errors += 1
                     continue
 
-                # Process extracted entities - Check for dict with 'extracted_entities' list or just a list
+                # Extract frame phrases if they exist - new feature
+                frame_phrases = None
+                if isinstance(extracted_data, dict) and 'fr' in extracted_data and isinstance(extracted_data['fr'], list):
+                    frame_phrases = extracted_data['fr']
+                    logger.info(
+                        f"Found {len(frame_phrases)} frame phrases for article {article_id}")
+
+                # Process extracted entities - Check for new format with 'ents' or legacy format
                 entity_list_to_process = None
-                if isinstance(extracted_data, dict) and 'extracted_entities' in extracted_data and isinstance(extracted_data['extracted_entities'], list):
-                    # Handle successful dictionary response containing the list
+                if isinstance(extracted_data, dict) and 'ents' in extracted_data and isinstance(extracted_data['ents'], list):
+                    # Handle new format with 'ents' key
+                    entity_list_to_process = extracted_data['ents']
+                elif isinstance(extracted_data, dict) and 'entities' in extracted_data and isinstance(extracted_data['entities'], list):
+                    # Handle previous format with 'entities' key
+                    entity_list_to_process = extracted_data['entities']
+                elif isinstance(extracted_data, dict) and 'extracted_entities' in extracted_data and isinstance(extracted_data['extracted_entities'], list):
+                    # Handle legacy format with 'extracted_entities' key
                     entity_list_to_process = extracted_data['extracted_entities']
                 elif isinstance(extracted_data, list):
-                    # Handle case where the response is directly the list (legacy or alternative format)
+                    # Handle case where the response is directly the list (very old format)
                     logger.warning(
-                        f"Received direct list for article {article_id}, expected dict with 'extracted_entities' key.")
+                        f"Received direct list for article {article_id}, expected dict with 'ents' key.")
                     entity_list_to_process = extracted_data
 
                 if entity_list_to_process is not None:  # Proceed if we found a valid list of entities
@@ -456,10 +474,14 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
                     if not entity_list_to_process:
                         logger.info(
                             f"No entities extracted for article {article_id} (empty list).")
-                        # Mark article as processed even if no entities were found
+                        # Mark article as processed even if no entities were found, include frame phrases if any
                         try:
-                            db_client.mark_article_processed(
-                                article_id=article_id)
+                            if frame_phrases:
+                                db_client.update_article_frames_and_mark_processed(
+                                    article_id=article_id, frame_phrases=frame_phrases)
+                            else:
+                                db_client.mark_article_processed(
+                                    article_id=article_id)
                             batch_processed += 1  # Count as processed
                         except Exception as e:
                             logger.error(
@@ -469,17 +491,25 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
 
                     # Process the non-empty list of entities
                     for entity_data in entity_list_to_process:
-                        # Extract entity info
-                        entity_name = entity_data.get('entity_name')
-                        entity_type = entity_data.get('entity_type')
-                        # CORRECTED MENTION KEY: Use 'mention_count_article' from prompt
-                        mention_count = entity_data.get(
-                            'mention_count_article', 1)  # Default to 1 if missing
-                        # Get supporting snippets if available
+                        # Extract entity info based on whether it's using short keys (new format) or long keys (old format)
+                        entity_name = entity_data.get(
+                            'en') or entity_data.get('entity_name')
+                        entity_type = entity_data.get(
+                            'et') or entity_data.get('entity_type')
+                        # Handle mention count - support both formats
+                        mention_count = (entity_data.get('mc') or entity_data.get(
+                            'mention_count_article') or 1)
+
+                        # Handle influential context - support both boolean and integer formats
+                        is_influential_raw = entity_data.get(
+                            'ic') if 'ic' in entity_data else entity_data.get('is_influential_context')
+                        # Convert to boolean if it's an integer in the new format
+                        is_influential = bool(
+                            is_influential_raw) if is_influential_raw is not None else False
+
+                        # Handle supporting snippets - support both formats
                         supporting_snippets = entity_data.get(
-                            'supporting_snippets', [])
-                        is_influential = entity_data.get(
-                            'is_influential_context', False)
+                            'ss') or entity_data.get('supporting_snippets') or []
 
                         if not entity_name or not entity_type:
                             logger.warning(
@@ -536,18 +566,36 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
                                 f"Error storing entity '{entity_name}' for article {article_id}: {e}", exc_info=True)
                             # Consider incrementing batch_errors here?
 
-                    # Mark article as processed (after processing all its entities)
+                    # Mark article as processed (after processing all its entities), include frame phrases if any
                     try:
-                        db_client.mark_article_processed(article_id=article_id)
+                        if frame_phrases:
+                            db_client.update_article_frames_and_mark_processed(
+                                article_id=article_id, frame_phrases=frame_phrases)
+                        else:
+                            db_client.mark_article_processed(
+                                article_id=article_id)
                         batch_processed += 1
                     except Exception as e:
                         logger.error(
                             f"Error marking article {article_id} as processed: {e}")
                         batch_errors += 1  # Error during marking processed
-                else:  # Neither dict with 'extracted_entities' nor list found
+                else:  # No valid entity list found
                     logger.warning(
                         f"Unexpected data format for article {article_id}: {type(extracted_data)}")
-                    batch_errors += 1
+                    # Still try to save frame phrases if they exist
+                    if frame_phrases:
+                        try:
+                            db_client.update_article_frames_and_mark_processed(
+                                article_id=article_id, frame_phrases=frame_phrases)
+                            batch_processed += 1
+                            logger.info(
+                                f"Saved only frame phrases for article {article_id}")
+                        except Exception as e:
+                            logger.error(
+                                f"Error saving frame phrases for article {article_id}: {e}")
+                            batch_errors += 1
+                    else:
+                        batch_errors += 1
 
             except Exception as e:
                 logger.error(

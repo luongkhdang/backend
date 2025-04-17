@@ -242,7 +242,7 @@ class RateLimiter:
             with self.lock:
                 timestamps = self.call_timestamps[model_name]
                 if not timestamps:  # Should not happen if is_allowed is False, but safe check
-                    self.logger.debug(
+                    logger.debug(
                         f"RateLimiter [{model_name}]: No timestamps found while waiting, breaking wait loop.")
                     break
                 # Calculate how long to wait until the oldest call expires
@@ -253,7 +253,7 @@ class RateLimiter:
 
                 # Recalculate inside lock scope if needed, or pass value
                 current_rpm = self.get_current_rpm(model_name)
-                self.logger.debug(
+                logger.debug(
                     f"RateLimiter [{model_name}]: Limit reached ({current_rpm} RPM). Waiting for {max(0, wait_time):.2f} seconds (until {oldest_call_time + 60:.2f}).")
                 await asyncio.sleep(max(0, wait_time))
                 # Re-check is_allowed in the next loop iteration

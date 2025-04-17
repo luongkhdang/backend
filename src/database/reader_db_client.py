@@ -4,6 +4,10 @@ reader_db_client.py - Client for interacting with the Reader database
 This module provides a client class for interacting with the Reader database,
 which stores articles, embeddings, clusters, and related data.
 
+The client now supports storing narrative frame phrases (frame_phrases) for articles,
+which are extracted during entity processing in Step 3 of the data refinery pipeline.
+These frame phrases represent the dominant narrative framing used in each article.
+
 Exported classes:
 - ReaderDBClient: Main client class for database operations
   - __init__(self, host, port, dbname, user, password, max_retries, retry_delay)
@@ -18,6 +22,7 @@ Related files:
 - All modules in src/database/modules/ for specific operation implementations
 - src/steps/step1.py: Uses this client for article processing
 - src/steps/step2.py: Uses this client for clustering operations
+- src/steps/step3.py: Uses this client for entity extraction and frame phrase storage
 """
 
 import logging
@@ -976,6 +981,29 @@ class ReaderDBClient:
             except Exception as e:
                 logger.error(
                     f"Error marking article {article_id} as processed: {e}")
+                return False
+            finally:
+                self.release_connection(conn)
+        return False
+
+    def update_article_frames_and_mark_processed(self, article_id: int, frame_phrases: Optional[List[str]]) -> bool:
+        """
+        Update an article's frame_phrases and mark it as processed.
+
+        Args:
+            article_id: ID of the article to update
+            frame_phrases: List of narrative frame phrases extracted from the article, or None
+
+        Returns:
+            True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return articles.update_article_frames_and_mark_processed(conn, article_id, frame_phrases)
+            except Exception as e:
+                logger.error(
+                    f"Error updating frames for article {article_id}: {e}")
                 return False
             finally:
                 self.release_connection(conn)
