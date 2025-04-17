@@ -15,7 +15,7 @@ Exported functions/classes:
   - __init__(self): Initializes the client with API key and creates an internal rate limiter.
   - generate_embedding(text, task_type, retries, initial_delay): Generates embeddings for text with retry logic.
   - generate_text_with_prompt(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Generates text based on article content and a prompt, using model selection logic.
-  - generate_text_with_prompt_async(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Async version of text generation method.
+  - generate_text_with_prompt_async(self, article_content: str, processing_tier: int, retries: int = 6, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Async version of text generation method.
 
 Related files:
 - src/steps/step1.py: Uses this client for embedding generation.
@@ -199,7 +199,7 @@ class GeminiClient:
                 )
 
                 # Log the raw API response for debugging
-                logger.info(
+                logger.debug(
                     f"Gemini API raw embedding response for model {model_to_use}: {result}")
 
                 # Register this call with the rate limiter if provided
@@ -308,7 +308,8 @@ class GeminiClient:
         total_attempts = 0
 
         for model_name in all_models_to_try:
-            logger.info(f"Attempting text generation with model: {model_name}")
+            logger.debug(
+                f"Attempting text generation with model: {model_name}")
 
             # Check rate limit *before* attempting the call
             if self.rate_limiter:
@@ -321,7 +322,7 @@ class GeminiClient:
 
                     # If wait time is within acceptable threshold, wait and continue with this model
                     if 0 < wait_time <= self.max_rate_limit_wait_seconds:
-                        logger.info(
+                        logger.debug(
                             f"Rate limit hit for {model_name}. Waiting {wait_time:.2f}s...")
                         self.rate_limiter.wait_if_needed(model_name)
                         # Proceed with this model after waiting
@@ -329,6 +330,16 @@ class GeminiClient:
                         # Wait time is too long, skip to next model
                         logger.warning(
                             f"Rate limit wait for {model_name} ({wait_time:.2f}s) > threshold ({self.max_rate_limit_wait_seconds}s). Skipping.")
+                        # Add this crucial log to track the model fallback
+                        next_model_index = all_models_to_try.index(
+                            model_name) + 1
+                        if next_model_index < len(all_models_to_try):
+                            next_model = all_models_to_try[next_model_index]
+                            logger.info(
+                                f"Will try fallback model: {next_model} next")
+                        else:
+                            logger.error(
+                                f"No more fallback models available after {model_name}! All models exhausted.")
                         continue  # Skip this model and try the next one
                 else:
                     logger.debug(f"Rate limit check passed for {model_name}.")
@@ -373,7 +384,7 @@ class GeminiClient:
                     )
 
                     # Log the raw API response for debugging
-                    logger.info(
+                    logger.debug(
                         f"Gemini API raw generation response for model {model_name}: {response}")
 
                     # Register the successful call *after* it completes
@@ -471,7 +482,7 @@ class GeminiClient:
         return None
 
     async def generate_text_with_prompt_async(self, article_content: str, processing_tier: int,
-                                              retries: int = 3, initial_delay: float = 1.0,
+                                              retries: int = 6, initial_delay: float = 1.0,
                                               model_override: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Async version of text generation method.
@@ -520,8 +531,37 @@ class GeminiClient:
         current_delay = initial_delay
         total_attempts = 0
 
+        # Track which models we've tried and failed due to rate limits
+        rate_limited_models = set()
+
         for model_name in all_models_to_try:
-            logger.info(f"Attempting text generation with model: {model_name}")
+            logger.debug(
+                f"Attempting text generation with model: {model_name}")
+
+            # Emergency bailout - if all models are rate limited except fallback, force use of fallback
+            if len(rate_limited_models) >= len(all_models_to_try) - 1 and model_name == self.FALLBACK_MODEL:
+                logger.warning(
+                    f"All models except fallback are rate limited. Forcing use of fallback model {self.FALLBACK_MODEL} with forced waiting")
+                # We will wait however long needed for the fallback model
+                if self.rate_limiter:
+                    logger.info(
+                        f"Waiting up to 120 seconds for fallback model {self.FALLBACK_MODEL} to be available...")
+                    # Wait up to 2 minutes for the fallback model
+                    max_wait = 120
+                    start_time = time.monotonic()
+                    while time.monotonic() - start_time < max_wait:
+                        wait_time = await self.rate_limiter.get_wait_time_async(self.FALLBACK_MODEL)
+                        if wait_time <= 0:
+                            logger.info(
+                                f"Fallback model {self.FALLBACK_MODEL} is now available after waiting")
+                            break
+                        logger.debug(
+                            f"Fallback still rate limited, waiting {min(wait_time, 5)}s...")
+                        # Wait the lesser of wait_time or 5s
+                        await asyncio.sleep(min(wait_time, 5))
+
+                    # Even if we're still rate limited, we'll try anyway since this is our last resort
+                    await self.rate_limiter.wait_if_needed_async(self.FALLBACK_MODEL)
 
             # Check rate limit *before* attempting the call
             if self.rate_limiter:
@@ -534,7 +574,7 @@ class GeminiClient:
 
                     # If wait time is within acceptable threshold, wait and continue with this model
                     if 0 < wait_time <= self.max_rate_limit_wait_seconds:
-                        logger.info(
+                        logger.debug(
                             f"Rate limit hit for {model_name}. Waiting {wait_time:.2f}s...")
                         await self.rate_limiter.wait_if_needed_async(model_name)
                         # Proceed with this model after waiting
@@ -542,6 +582,19 @@ class GeminiClient:
                         # Wait time is too long, skip to next model
                         logger.warning(
                             f"Rate limit wait for {model_name} ({wait_time:.2f}s) > threshold ({self.max_rate_limit_wait_seconds}s). Skipping.")
+                        # Add this crucial log to track the model fallback
+                        next_model_index = all_models_to_try.index(
+                            model_name) + 1
+                        if next_model_index < len(all_models_to_try):
+                            next_model = all_models_to_try[next_model_index]
+                            logger.info(
+                                f"Will try fallback model: {next_model} next")
+                        else:
+                            logger.error(
+                                f"No more fallback models available after {model_name}! All models exhausted.")
+
+                        # Track this model as rate limited
+                        rate_limited_models.add(model_name)
                         continue  # Skip this model and try the next one
                 else:
                     logger.debug(f"Rate limit check passed for {model_name}.")
@@ -557,41 +610,78 @@ class GeminiClient:
             while model_attempt < max_model_retries and total_attempts < retries:
                 total_attempts += 1
                 model_attempt += 1
+                task_start_time = time.monotonic()  # Add timer start
+                # Add attempt log
+                logger.debug(
+                    f"Attempt {model_attempt}/{max_model_retries} for model {model_name}, total attempt {total_attempts}/{retries}")
 
                 try:
                     # Wait if needed (should be rare if is_allowed check passed, but safety)
                     if self.rate_limiter:
+                        # Added logging
                         logger.debug(
-                            f"Calling wait_if_needed_async for {model_name} (safety check)...")
+                            f"[{model_name}] Attempt {model_attempt}: Checking/Waiting for rate limit...")
                         await self.rate_limiter.wait_if_needed_async(model_name)
+                        # Added logging
+                        logger.debug(
+                            f"[{model_name}] Attempt {model_attempt}: Rate limit check passed/wait finished.")
 
                     # Configure the generative model instance
                     # Note: genai.GenerativeModel configuration might need adjustment based on API version
                     model = genai.GenerativeModel(model_name)
 
-                    # Make the API call
-                    # Adjust parameters (temperature, top_p, etc.) if needed
-                    # Ensure the response MIME type is set for JSON output if applicable/possible
-                    response = await model.generate_content_async(
-                        full_prompt,
-                        generation_config=genai.types.GenerationConfig(
-                            # candidate_count=1, # Default is 1
-                            # stop_sequences=['...'], # If needed
-                            # max_output_tokens=8192, # Use model default unless specific need
-                            temperature=0.1,  # Low temperature for deterministic JSON
-                            # top_p=1.0, # Defaults
-                            # top_k=1, # Defaults
+                    # --- Add Logging and Timeout ---
+                    api_call_timeout_seconds = 120  # Define timeout duration
+                    # Added logging
+                    logger.debug(
+                        f"[{model_name}] Attempt {model_attempt}: Calling generate_content_async (timeout={api_call_timeout_seconds}s)...")
+                    try:
+                        # Make the API call WITH TIMEOUT
+                        # Adjust parameters (temperature, top_p, etc.) if needed
+                        # Ensure the response MIME type is set for JSON output if applicable/possible
+                        response = await asyncio.wait_for(
+                            model.generate_content_async(
+                                full_prompt,
+                                generation_config=genai.types.GenerationConfig(
+                                    temperature=0.1,  # Low temperature for deterministic JSON
+                                )
+                                # safety_settings=... # Add safety settings if required
+                            ),
+                            timeout=api_call_timeout_seconds
                         )
-                        # safety_settings=... # Add safety settings if required
-                    )
+                        call_duration = time.monotonic() - task_start_time
+                        # Added logging
+                        logger.debug(
+                            f"[{model_name}] Attempt {model_attempt}: generate_content_async call succeeded in {call_duration:.2f}s.")
+                    except asyncio.TimeoutError:
+                        call_duration = time.monotonic() - task_start_time
+                        # Added logging
+                        logger.error(
+                            f"[{model_name}] Attempt {model_attempt}: API call timed out after {call_duration:.2f} seconds (limit: {api_call_timeout_seconds}s).")
+                        # Re-raise or handle timeout as a specific failure case
+                        raise asyncio.TimeoutError(
+                            f"{model_name} API call timed out")
+                    except Exception as api_err:
+                        call_duration = time.monotonic() - task_start_time
+                        # Added logging
+                        logger.error(
+                            f"[{model_name}] Attempt {model_attempt}: API call failed after {call_duration:.2f}s: {api_err}")
+                        raise api_err  # Re-raise other API errors
+                    # --- End Logging and Timeout ---
 
                     # Log the raw API response for debugging
-                    logger.info(
+                    logger.debug(
                         f"Gemini API raw async generation response for model {model_name}: {response}")
 
                     # Register the successful call *after* it completes
                     if self.rate_limiter:
+                        # Added logging
+                        logger.debug(
+                            f"[{model_name}] Attempt {model_attempt}: Registering successful call...")
                         await self.rate_limiter.register_call_async(model_name)
+                        # Added logging
+                        logger.debug(
+                            f"[{model_name}] Attempt {model_attempt}: Call registered.")
                         # Add a debug log after registration if desired
                         # logger.debug(f"Call registered for {model_name} in GeminiClient.")
 
@@ -634,6 +724,11 @@ class GeminiClient:
                         logger.warning(
                             f"Received empty or invalid response structure from {model_name}. Response: {response}")
 
+                except asyncio.TimeoutError:
+                    # Handle timeout specifically if needed (e.g., break inner loop, switch model faster)
+                    logger.warning(
+                        f"Timeout error caught for {model_name} Attempt {model_attempt}. Breaking inner loop for this model.")
+                    break  # Exit the inner retry loop for this model after a timeout
                 except Exception as e:
                     logger.warning(
                         f"Text generation error (Attempt {model_attempt}/{max_model_retries}) using {model_name}: {e}")
@@ -645,11 +740,19 @@ class GeminiClient:
                     if is_rate_limit_error:
                         # Check if we should retry this model after a sleep
                         if model_attempt < max_model_retries and total_attempts < retries:
-                            logger.warning(
-                                f"Rate limit/Quota error on {model_name} (Attempt {model_attempt}/{max_model_retries}). Sleeping 10s and retrying...")
-                            # Async sleep for 10 seconds
-                            await asyncio.sleep(10)
-                            continue  # Retry the same model
+                            # Use rate limiter's wait logic instead of fixed sleep
+                            if self.rate_limiter:
+                                logger.warning(
+                                    f"Rate limit/Quota error on {model_name} (Attempt {model_attempt}/{max_model_retries}). Waiting using rate limiter logic...")
+                                await self.rate_limiter.wait_if_needed_async(model_name)
+                                logger.info(
+                                    f"Finished rate limit wait for {model_name}. Retrying...")
+                                continue  # Retry the same model
+                            else:
+                                logger.warning(
+                                    f"Rate limit/Quota error on {model_name} but no rate limiter available. Sleeping 10s as fallback.")
+                                await asyncio.sleep(10)  # Fallback sleep
+                                continue  # Retry the same model
                         else:
                             # Exhausted retries for this model or global retries, force switch
                             logger.error(

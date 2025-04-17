@@ -28,14 +28,25 @@ Related modules:
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
+import time
+import random
+
+# Import specific exception for deadlock detection if using psycopg2
+try:
+    # Standard psycopg2 error
+    from psycopg2.errors import DeadlockDetected
+except ImportError:
+    # Fallback for other DB drivers or if psycopg2 isn't directly used here
+    # Note: This might require adjusting the exception type in the except block
+    DeadlockDetected = None
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
-def store_entity_snippet(conn, entity_id: int, article_id: int, snippet: str, is_influential: bool = False) -> bool:
+def store_entity_snippet(conn, entity_id: int, article_id: int, snippet: str, is_influential: bool = False, max_retries: int = 3) -> bool:
     """
-    Store a text snippet associated with an entity and article.
+    Store a text snippet associated with an entity and article, with deadlock retry logic.
 
     Args:
         conn: Database connection
@@ -43,45 +54,64 @@ def store_entity_snippet(conn, entity_id: int, article_id: int, snippet: str, is
         article_id: ID of the article
         snippet: Text snippet containing or related to the entity
         is_influential: Whether this snippet is considered influential for the entity
+        max_retries: Maximum number of retry attempts for deadlocks (default: 3)
 
     Returns:
         bool: True if successful, False otherwise
     """
-    try:
-        cursor = conn.cursor()
-
-        # Validate snippet
-        if not snippet or len(snippet.strip()) == 0:
-            logger.warning(
-                f"Empty snippet for entity {entity_id} in article {article_id}")
-            return False
-
-        # Insert the snippet
-        cursor.execute("""
-            INSERT INTO entity_snippets (
-                entity_id, article_id, snippet, is_influential, created_at
-            )
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id;
-        """, (
-            entity_id,
-            article_id,
-            snippet,
-            is_influential,
-            datetime.now()
-        ))
-
-        result = cursor.fetchone() is not None
-        conn.commit()
-        cursor.close()
-
-        return result
-
-    except Exception as e:
-        logger.error(
-            f"Error storing snippet for entity {entity_id} in article {article_id}: {e}")
-        conn.rollback()
+    # Validate snippet outside the loop
+    if not snippet or len(snippet.strip()) == 0:
+        logger.warning(
+            f"Empty snippet for entity {entity_id} in article {article_id}")
         return False
+
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            cursor = conn.cursor()
+            # Insert the snippet
+            cursor.execute("""
+                INSERT INTO entity_snippets (
+                    entity_id, article_id, snippet, is_influential, created_at
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id;
+            """, (
+                entity_id,
+                article_id,
+                snippet,
+                is_influential,
+                datetime.now()
+            ))
+
+            result = cursor.fetchone() is not None
+            conn.commit()  # Commit successful transaction
+            cursor.close()
+            return result  # Success, exit loop and function
+
+        except DeadlockDetected as deadlock_err:
+            conn.rollback()  # Rollback the failed transaction
+            attempt += 1
+            if attempt >= max_retries:
+                logger.error(
+                    f"Deadlock detected storing snippet for entity {entity_id}, article {article_id} after {max_retries} attempts. Giving up. Error: {deadlock_err}")
+                return False  # Give up after max retries
+            else:
+                wait_time = (2 ** attempt) * 0.1 + random.uniform(0.05, 0.1)
+                logger.warning(
+                    f"Deadlock detected storing snippet for entity {entity_id}, article {article_id}. Attempt {attempt}/{max_retries}. Retrying after {wait_time:.2f}s... Error: {deadlock_err}")
+                time.sleep(wait_time)
+                # Continue to next iteration of the while loop
+
+        except Exception as e:
+            # Handle other unexpected errors
+            logger.error(
+                f"Unexpected error storing snippet for entity {entity_id} in article {article_id} on attempt {attempt+1}: {e}")
+            conn.rollback()  # Rollback on other errors too
+            return False  # Exit on other errors
+
+    # Should not be reached if successful or max retries hit, but safety return
+    return False
 
 
 def get_entity_snippets(conn, entity_id: int, limit: int = 30) -> List[Dict[str, Any]]:

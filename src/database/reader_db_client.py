@@ -42,6 +42,7 @@ from src.database.modules import clusters
 from src.database.modules import essays
 from src.database.modules import domains
 from src.database.modules import entity_snippets
+from src.database.modules import influence
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -1177,3 +1178,60 @@ class ReaderDBClient:
             finally:
                 self.release_connection(conn)
         return {}
+
+    def get_all_entity_types(self):
+        """
+        Get all entity types from the database.
+
+        Returns:
+            List[Dict[str, Any]]: List of entity types 
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT DISTINCT entity_type
+                    FROM entities
+                    WHERE entity_type IS NOT NULL
+                    ORDER BY entity_type
+                """)
+                entity_types = [{"type": row[0]} for row in cursor.fetchall()]
+                cursor.close()
+                return entity_types
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def populate_default_entity_type_weights(self) -> bool:
+        """
+        Populates default weights for common entity types.
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return influence.populate_default_entity_type_weights(conn)
+            finally:
+                self.release_connection(conn)
+        return False
+
+    def get_linked_entities(self, entity_id):
+        """
+        Get entities that are frequently linked to the given entity.
+
+        Args:
+            entity_id: ID of the entity to find related entities for
+
+        Returns:
+            List[Dict[str, Any]]: List of related entities
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entities.get_related_entities(conn, entity_id)
+            finally:
+                self.release_connection(conn)
+        return []

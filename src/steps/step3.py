@@ -52,7 +52,19 @@ async def run() -> Dict[str, Any]:
     # Simply delegate to the modularized implementation, which is now async
     logger.debug(
         "Redirecting to modularized async implementation in src/steps/step3/")
-    return await modular_run()
+    try:
+        return await modular_run()
+    except Exception as e:
+        logger.critical(
+            f"Critical error in step3 processing: {e}", exc_info=True)
+        # Return error status
+        return {
+            "success": False,
+            "error": f"Critical error: {str(e)}",
+            "processed": 0,
+            "entity_links_created": 0,
+            "runtime_seconds": 0
+        }
 
 
 # For backward compatibility with synchronous code

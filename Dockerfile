@@ -2,6 +2,10 @@ FROM article-transfer-base:latest
 
 WORKDIR /app
 
+# Use build arg to track when image was built
+ARG BUILD_VERSION=1.0.0
+ENV BUILD_VERSION=${BUILD_VERSION}
+
 # Copy application code - AFTER dependencies are installed in the base image
 COPY . .
 
@@ -13,7 +17,10 @@ ENV READER_DB_USER=postgres
 ENV READER_DB_PASSWORD=postgres
 ENV WAIT_FOR_DB=true
 ENV WAIT_SECONDS=10
-ENV LOG_LEVEL=INFO
+# Set to DEBUG level by default
+ENV LOG_LEVEL=DEBUG
+# Enable debug output for Gemini client
+ENV DEBUG_GEMINI_CLIENT=true
 
 # Gemini API settings (values will be overridden by docker-compose)
 ENV GEMINI_API_KEY="YOUR_API_KEY_HERE"
@@ -43,7 +50,10 @@ ENV RUN_STEP3=true
 ENV ENTITY_EXTRACTION_BATCH_SIZE=10
 ENV ENTITY_MAX_PRIORITY_ARTICLES=100
 ENV CALCULATE_INFLUENCE_SCORES=true
-
+# Allow longer wait times for fallback model in emergency case
+ENV GEMINI_MAX_WAIT_SECONDS=60
+ENV EMERGENCY_FALLBACK_WAIT_SECONDS=120
+ENV CALCULATE_DOMAIN_GOODNESS=true
 # Verify only application modules - faster than verifying all dependencies
 RUN python -c "import sys; print(sys.path)" && \
     python -c "import src.gemini.gemini_client; print('Verified gemini_client')" && \

@@ -141,9 +141,9 @@ def run() -> Dict[str, Any]:
 
         # Add logging for embeddings list before conversion
         if embeddings:
-            logger.info(
+            logger.debug(
                 f"Shape of embeddings list before conversion: ({len(embeddings)}, {len(embeddings[0]) if embeddings else 0})")
-            logger.info(
+            logger.debug(
                 f"Type of 'embeddings': {type(embeddings)}, Type of first element: {type(embeddings[0]) if embeddings else 'N/A'}")
 
             # Log the first few values of the first embedding for debugging
@@ -151,17 +151,17 @@ def run() -> Dict[str, Any]:
                 first_embedding = embeddings[0]
                 sample_values = first_embedding[:5] if len(
                     first_embedding) >= 5 else first_embedding
-                logger.info(
+                logger.debug(
                     f"Sample values from first embedding: {sample_values}")
-                logger.info(
+                logger.debug(
                     f"Types of sample values: {[type(v) for v in sample_values]}")
         else:
             logger.warning("Embeddings list is empty before conversion.")
 
         # Convert list of embeddings to numpy array
         X = np.array(embeddings)
-        logger.info(f"Shape of X after np.array conversion: {X.shape}")
-        logger.info(f"Data type of X array: {X.dtype}")
+        logger.debug(f"Shape of X after np.array conversion: {X.shape}")
+        logger.debug(f"Data type of X array: {X.dtype}")
 
         # Check if we have string or object dtype and convert if needed
         if X.dtype == 'O' or np.issubdtype(X.dtype, np.string_) or np.issubdtype(X.dtype, np.unicode_):
@@ -187,7 +187,7 @@ def run() -> Dict[str, Any]:
                 if isinstance(embeddings[0], (list, np.ndarray)):
                     # Manually create a 2D array - probably needed if embeddings are different lengths
                     embedding_length = len(embeddings[0])
-                    logger.info(
+                    logger.debug(
                         f"First embedding has length {embedding_length}, creating uniform 2D array")
                     # Create a new 2D array with the right dimensions
                     new_X = np.zeros((len(embeddings), embedding_length))
@@ -195,7 +195,7 @@ def run() -> Dict[str, Any]:
                         if len(emb) == embedding_length:  # Skip malformed embeddings
                             new_X[i] = emb
                     X = new_X
-                    logger.info(f"Successfully reshaped to {X.shape}")
+                    logger.debug(f"Successfully reshaped to {X.shape}")
                 else:
                     # If X is a flat array, reshape it into a 2D array with 1 feature
                     X = X.reshape(-1, 1)
@@ -227,7 +227,7 @@ def run() -> Dict[str, Any]:
             # each entry (i,j) is the cosine distance between vectors i and j
             distance_matrix = cosine_distances(X_normalized)
 
-            logger.info(f"Distance matrix shape: {distance_matrix.shape}")
+            logger.debug(f"Distance matrix shape: {distance_matrix.shape}")
 
             # Initialize HDBSCAN with precomputed distance matrix
             # Note: HDBSCAN does not support GPU acceleration, all computation is CPU-based

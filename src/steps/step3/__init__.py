@@ -52,6 +52,12 @@ TIER0_COUNT = 150
 TIER1_COUNT = 350
 CLUSTER_HOTNESS_WEIGHT = 0.65
 DOMAIN_GOODNESS_WEIGHT = 0.35
+# Add inter-batch delay constant
+INTER_BATCH_DELAY_SECONDS = float(
+    os.getenv("ENTITY_BATCH_DELAY_SECONDS", "2.0"))
+# Add circuit breaker settings
+MAX_CONSECUTIVE_FAILURES = int(os.getenv("MAX_CONSECUTIVE_FAILURES", "3"))
+FAILURE_COOLDOWN_SECONDS = int(os.getenv("FAILURE_COOLDOWN_SECONDS", "30"))
 
 # Tier-to-Model mapping for Gemini API
 TIER_MODEL_MAP = {
@@ -86,7 +92,11 @@ async def run() -> Dict[str, Any]:
         # Initialize clients
         db_client = ReaderDBClient()
         gemini_client = GeminiClient()
-        task_manager = TaskManager()  # Initialize the TaskManager
+        # Initialize a single TaskManager instance for the entire process
+        task_manager = TaskManager()
+
+        # For circuit breaker pattern
+        consecutive_failures = 0
 
         # Step 1: Get domain goodness scores
         domain_scores = _get_domain_goodness_scores(db_client)
@@ -119,36 +129,76 @@ async def run() -> Dict[str, Any]:
         total_snippets = 0
         total_errors = 0
 
+        # Add heartbeat logging
+        last_heartbeat = time.time()
+        heartbeat_interval = 60  # Log a heartbeat every minute
+
         # Process each batch
         for batch_index in range(0, len(prioritized_articles), batch_size):
+            # Heartbeat logging
+            current_time = time.time()
+            if current_time - last_heartbeat >= heartbeat_interval:
+                logger.info(
+                    f"Heartbeat: Still processing. Current progress: {batch_index // batch_size}/{total_batches} batches")
+                last_heartbeat = current_time
+
             batch_num = batch_index // batch_size + 1
             batch = prioritized_articles[batch_index:batch_index + batch_size]
 
             logger.info(
                 f"Processing batch {batch_num}/{total_batches} ({len(batch)} articles)")
 
-            # Step 3: Extract entities for this batch (use await)
-            batch_entity_results = await _extract_entities_batch(
-                gemini_client, batch)
-            logger.info(
-                f"Entity extraction complete for batch {batch_num}. Found data for {len(batch_entity_results)} articles.")
+            # If we've hit consecutive failures, implement circuit breaker pattern
+            if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                logger.warning(
+                    f"Circuit breaker triggered after {consecutive_failures} failures. Cooling down for {FAILURE_COOLDOWN_SECONDS} seconds")
+                await asyncio.sleep(FAILURE_COOLDOWN_SECONDS)
+                consecutive_failures = 0  # Reset counter after cooldown
 
-            # Step 4: Store entity data for this batch immediately
-            if batch_entity_results:
-                logger.info(
-                    f"Storing entity results for batch {batch_num} ({len(batch_entity_results)} articles)")
-                batch_store_results = _store_results(
-                    db_client, batch_entity_results)
+            try:
+                # Step 3: Extract entities for this batch (use await)
+                batch_entity_results = await _extract_entities_batch(
+                    gemini_client, batch, task_manager)  # Pass the task_manager instance
 
-                # Update counters
-                total_processed += batch_store_results.get("processed", 0)
-                total_entity_links += batch_store_results.get("links", 0)
-                total_snippets += batch_store_results.get("snippets", 0)
-                total_errors += batch_store_results.get("errors", 0)
+                if batch_entity_results:
+                    # Reset failure counter on success
+                    consecutive_failures = 0
+                    logger.info(
+                        f"Entity extraction complete for batch {batch_num}. Found data for {len(batch_entity_results)} articles.")
 
-                logger.info(f"Batch {batch_num} complete: Processed {batch_store_results.get('processed', 0)} articles, "
-                            f"created {batch_store_results.get('links', 0)} entity links, "
-                            f"stored {batch_store_results.get('snippets', 0)} snippets.")
+                    # Step 4: Store entity data for this batch immediately
+                    logger.info(
+                        f"Storing entity results for batch {batch_num} ({len(batch_entity_results)} articles)")
+                    batch_store_results = _store_results(
+                        db_client, batch_entity_results)
+
+                    # Update counters
+                    total_processed += batch_store_results.get("processed", 0)
+                    total_entity_links += batch_store_results.get("links", 0)
+                    total_snippets += batch_store_results.get("snippets", 0)
+                    total_errors += batch_store_results.get("errors", 0)
+
+                    logger.info(f"Batch {batch_num} complete: Processed {batch_store_results.get('processed', 0)} articles, "
+                                f"created {batch_store_results.get('links', 0)} entity links, "
+                                f"stored {batch_store_results.get('snippets', 0)} snippets.")
+                else:
+                    # Increment failure counter on empty results
+                    consecutive_failures += 1
+                    logger.warning(
+                        f"Batch {batch_num} returned no results. Consecutive failures: {consecutive_failures}")
+            except Exception as e:
+                # Increment failure counter on exception
+                consecutive_failures += 1
+                logger.error(
+                    f"Error processing batch {batch_num}: {e}", exc_info=True)
+                logger.warning(f"Consecutive failures: {consecutive_failures}")
+
+            # Add a delay between batches to allow rate limits to reset
+            # Only add delay if not the last batch
+            if batch_num < total_batches:
+                logger.debug(
+                    f"Adding inter-batch delay of {INTER_BATCH_DELAY_SECONDS} seconds")
+                await asyncio.sleep(INTER_BATCH_DELAY_SECONDS)
 
         # Prepare final status report
         status = {
@@ -190,7 +240,7 @@ def _get_domain_goodness_scores(db_client: ReaderDBClient) -> Dict[str, float]:
         # Fetch existing domain goodness scores
         domain_scores = db_client.get_all_domain_goodness_scores()
         if domain_scores:
-            logger.info(f"Found {len(domain_scores)} domain goodness scores.")
+            logger.debug(f"Found {len(domain_scores)} domain goodness scores.")
             return domain_scores
 
         # If no scores found, return empty dictionary - no fallbacks
@@ -251,69 +301,54 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
             cluster_hotness_score = cluster_hotness.get(
                 cluster_id, 0.0) if cluster_id else 0.0
 
-            # Add scores to article dict for debugging/transparency
+            # Calculate combined score
+            combined_score = (CLUSTER_HOTNESS_WEIGHT * cluster_hotness_score +
+                              DOMAIN_GOODNESS_WEIGHT * domain_goodness_score)
+
+            # Store scores in article dict for debugging
             article['domain_goodness_score'] = domain_goodness_score
             article['cluster_hotness_score'] = cluster_hotness_score
-
-            # Store raw scores for normalization
-            article['raw_combined_score'] = (
-                CLUSTER_HOTNESS_WEIGHT * cluster_hotness_score +
-                DOMAIN_GOODNESS_WEIGHT * domain_goodness_score
-            )
-
-        # Find max scores for normalization (prevent division by zero)
-        max_score = max((a.get('raw_combined_score', 0.0)
-                        for a in articles), default=1.0)
-        if max_score == 0.0:
-            max_score = 1.0  # Avoid division by zero
-
-        # Normalize scores and calculate final combined score
-        for article in articles:
-            article['combined_priority_score'] = article.get(
-                'raw_combined_score', 0.0) / max_score
+            article['combined_score'] = combined_score
 
         # Sort articles by combined score (descending)
-        prioritized_articles = sorted(
-            articles,
-            key=lambda a: a.get('combined_priority_score', 0.0),
-            reverse=True
-        )
+        sorted_articles = sorted(
+            articles, key=lambda x: x.get('combined_score', 0.0), reverse=True)
 
-        # Assign priority rank and processing tier
-        for i, article in enumerate(prioritized_articles):
-            rank = i + 1  # 1-based ranking
-            article['priority_rank'] = rank
-
-            # Assign tier based on rank
-            if rank <= TIER0_COUNT:
-                article['processing_tier'] = 0
-            elif rank <= TIER0_COUNT + TIER1_COUNT:
-                article['processing_tier'] = 1
+        # Assign processing tiers based on position in sorted list
+        for i, article in enumerate(sorted_articles):
+            if i < TIER0_COUNT:
+                article['processing_tier'] = 0  # Highest quality
+            elif i < TIER0_COUNT + TIER1_COUNT:
+                article['processing_tier'] = 1  # Medium quality
             else:
-                article['processing_tier'] = 2
+                article['processing_tier'] = 2  # Standard quality
 
-        logger.info(f"Prioritized {len(prioritized_articles)} articles into tiers (0: {TIER0_COUNT}, "
-                    f"1: {TIER1_COUNT}, 2: {len(prioritized_articles) - TIER0_COUNT - TIER1_COUNT})")
+        logger.info(
+            f"Prioritized {len(sorted_articles)} articles: {TIER0_COUNT} in tier 0, "
+            f"{min(TIER1_COUNT, max(0, len(sorted_articles) - TIER0_COUNT))} in tier 1, "
+            f"{max(0, len(sorted_articles) - TIER0_COUNT - TIER1_COUNT)} in tier 2.")
 
-        return prioritized_articles
+        return sorted_articles
 
     except Exception as e:
         logger.error(f"Error prioritizing articles: {e}", exc_info=True)
         return []
 
 
-async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Dict[str, Any]]) -> Dict[int, Any]:
+async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Dict[str, Any]],
+                                  task_manager: TaskManager) -> Dict[int, Any]:
     """
     Extract entities from a batch of articles using Gemini API concurrently.
 
     Args:
         gemini_client: Initialized GeminiClient instance
         articles: Batch of article dictionaries to process
+        task_manager: TaskManager instance to use for concurrent processing
 
     Returns:
         Dictionary mapping article IDs to their extracted entity data (or error dict)
     """
-    logger.info(
+    logger.debug(
         f"Preparing to extract entities for {len(articles)} articles using TaskManager")
 
     # Create task definitions for each article
@@ -349,9 +384,16 @@ async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Di
 
     # Use TaskManager to run the tasks concurrently
     if tasks_definitions:
-        # Get a reference to the TaskManager instance created in run()
-        task_manager = TaskManager()  # Create a new instance for this batch
+        # Use the provided TaskManager instance
         extraction_results = await task_manager.run_tasks(gemini_client, tasks_definitions)
+
+        # Log rate limiter status after batch completion
+        if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
+            for model in gemini_client.ALL_MODEL_RPMS.keys():
+                current_rpm = gemini_client.rate_limiter.get_current_rpm(model)
+                wait_time = gemini_client.rate_limiter.get_wait_time(model)
+                logger.info(
+                    f"Rate limiter status - Model: {model}, Current RPM: {current_rpm}, Wait time: {wait_time:.2f}s")
 
         # Merge with skipped results
         extraction_results.update(skipped_results)
@@ -418,7 +460,7 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
     batch_size = 10  # Process 10 articles at a time for DB operations
     total_batches = (len(article_ids) + batch_size - 1) // batch_size
 
-    logger.info(
+    logger.debug(
         f"Storing entity results for {len(entity_results)} articles in batches of {batch_size}...")
 
     # Process articles in batches to provide incremental commits
@@ -426,7 +468,7 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
         batch_article_ids = article_ids[batch_index:batch_index + batch_size]
         batch_num = batch_index // batch_size + 1
 
-        logger.info(
+        logger.debug(
             f"Processing storage batch {batch_num}/{total_batches} ({len(batch_article_ids)} articles)")
 
         # Track batch metrics for reporting
@@ -449,7 +491,7 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
                 frame_phrases = None
                 if isinstance(extracted_data, dict) and 'fr' in extracted_data and isinstance(extracted_data['fr'], list):
                     frame_phrases = extracted_data['fr']
-                    logger.info(
+                    logger.debug(
                         f"Found {len(frame_phrases)} frame phrases for article {article_id}")
 
                 # Process extracted entities - Check for new format with 'ents' or legacy format
@@ -472,7 +514,7 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
                 if entity_list_to_process is not None:  # Proceed if we found a valid list of entities
                     # Check if the list is empty
                     if not entity_list_to_process:
-                        logger.info(
+                        logger.debug(
                             f"No entities extracted for article {article_id} (empty list).")
                         # Mark article as processed even if no entities were found, include frame phrases if any
                         try:
@@ -588,7 +630,7 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
                             db_client.update_article_frames_and_mark_processed(
                                 article_id=article_id, frame_phrases=frame_phrases)
                             batch_processed += 1
-                            logger.info(
+                            logger.debug(
                                 f"Saved only frame phrases for article {article_id}")
                         except Exception as e:
                             logger.error(
@@ -628,6 +670,6 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
         except Exception as e:
             logger.warning(f"Error during explicit batch commit: {e}")
 
-    logger.info(
+    logger.debug(
         f"Storage complete. Total: {processed_count} articles processed, {entity_links_created} entity links created, {snippets_stored} snippets stored, {errors} errors.")
     return {"processed": processed_count, "links": entity_links_created, "snippets": snippets_stored, "errors": errors}

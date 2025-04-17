@@ -239,7 +239,12 @@ class RateLimiter:
             model_name (str): The name of the model to check.
         """
         while not self.is_allowed(model_name):
+            # Added logging
+            logger.debug(
+                f"RateLimiter [{model_name}]: Acquiring lock for wait check...")
             with self.lock:
+                logger.debug(
+                    f"RateLimiter [{model_name}]: Acquired lock for wait check.")
                 timestamps = self.call_timestamps[model_name]
                 if not timestamps:  # Should not happen if is_allowed is False, but safe check
                     logger.debug(
@@ -250,10 +255,26 @@ class RateLimiter:
                 current_time_in_wait = time.monotonic()
                 wait_time = (oldest_call_time + 60) - \
                     current_time_in_wait + 0.1  # Add small buffer
+                wait_time = max(0, wait_time)  # Ensure non-negative
 
                 # Recalculate inside lock scope if needed, or pass value
+                # Note: get_current_rpm also uses the lock
                 current_rpm = self.get_current_rpm(model_name)
+                # Added logging
                 logger.debug(
-                    f"RateLimiter [{model_name}]: Limit reached ({current_rpm} RPM). Waiting for {max(0, wait_time):.2f} seconds (until {oldest_call_time + 60:.2f}).")
-                await asyncio.sleep(max(0, wait_time))
+                    f"RateLimiter [{model_name}]: Limit reached ({current_rpm} RPM). Calculated wait: {wait_time:.2f}s (until {oldest_call_time + 60:.2f}). Releasing lock and sleeping...")
+
+            # Sleep outside the lock
+            if wait_time > 0:
+                await asyncio.sleep(wait_time)
+                # Added logging
+                logger.debug(
+                    f"RateLimiter [{model_name}]: Finished sleep of {wait_time:.2f}s. Re-checking limit...")
+            else:
+                # If wait_time is 0, yield control briefly to avoid busy-waiting in edge cases
+                logger.debug(
+                    f"RateLimiter [{model_name}]: Calculated wait time is 0. Yielding control before re-checking.")
+                await asyncio.sleep(0.01)
                 # Re-check is_allowed in the next loop iteration
+        # Added final log when wait is no longer needed
+        logger.debug(f"RateLimiter [{model_name}]: Wait no longer needed.")

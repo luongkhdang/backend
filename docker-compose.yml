@@ -117,7 +117,8 @@ services:
       W_RELEVANCE: ${W_RELEVANCE:-0.25}
       TARGET_HOT_CLUSTERS: ${TARGET_HOT_CLUSTERS:-8}
       # Debugging options
-      LOG_LEVEL: INFO
+      LOG_LEVEL: DEBUG
+      DEBUG_GEMINI_CLIENT: "true"
       # Polling interval
       POLLING_INTERVAL: 300
       WAIT_SECONDS: 10

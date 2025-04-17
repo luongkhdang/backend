@@ -49,30 +49,52 @@ class TaskManager:
         """
         # Extract necessary data
         article_id = task_data.get('article_id')
-        content = task_data.get('content')
-        tier = task_data.get('processing_tier')
-        model_to_use = task_data.get('model_to_use')
+        content = task_data.get('content', '')
+        tier = task_data.get('processing_tier', 0)
+        model_to_use = task_data.get('model_to_use', 'No model specified')
+
+        content_length = len(content) if content else 0
+        self.logger.debug(
+            f"Task for article {article_id}: Using {model_to_use}, tier {tier}, content length {content_length}")
+
+        if not content or content_length == 0:
+            self.logger.warning(f"Empty content for article {article_id}")
+            return (article_id, {"error": "Empty content"})
 
         try:
             # Use GeminiClient's async method
             self.logger.debug(
                 f"Starting API call for article {article_id} using tier {tier} model: {model_to_use}")
-            extraction_result = await gemini_client.generate_text_with_prompt_async(
-                article_content=content,
-                processing_tier=tier,
-                model_override=model_to_use
-            )
 
-            if extraction_result:
-                # Client now returns the already parsed dictionary
-                self.logger.debug(
-                    f"Successfully extracted entities for article {article_id}")
-                return (article_id, extraction_result)
-            else:
-                self.logger.warning(
-                    f"No entity extraction result from Gemini for article {article_id}")
+            # Add timeout to each individual API call as well
+            try:
+                # Already has timeout inside but let's add another layer of safety
+                extraction_result = await asyncio.wait_for(
+                    gemini_client.generate_text_with_prompt_async(
+                        article_content=content,
+                        processing_tier=tier,
+                        model_override=model_to_use
+                    ),
+                    timeout=180  # 3 minute timeout for individual call
+                )
+
+                if extraction_result:
+                    # Client now returns the already parsed dictionary
+                    entity_count = len(extraction_result.get('entities', []))
+                    self.logger.debug(
+                        f"Successfully extracted {entity_count} entities for article {article_id}")
+                    return (article_id, extraction_result)
+                else:
+                    self.logger.warning(
+                        f"No entity extraction result from Gemini for article {article_id}")
+                    return (article_id, {
+                        "error": "No response from API"
+                    })
+            except asyncio.TimeoutError:
+                self.logger.error(
+                    f"Task timeout for article {article_id} using model {model_to_use}")
                 return (article_id, {
-                    "error": "No response from API"
+                    "error": f"Task timeout after 180 seconds"
                 })
 
         except Exception as api_err:
@@ -103,10 +125,17 @@ class TaskManager:
 
         # Create list of coroutines
         awaitables = []
-        for task_data in tasks_definitions:
+        task_article_ids = []  # Track article_ids in the same order as awaitables
+        for i, task_data in enumerate(tasks_definitions):
             if not task_data.get('article_id'):
                 self.logger.warning("Skipping task without article_id")
                 continue
+
+            article_id = task_data.get('article_id')
+            task_article_ids.append(article_id)  # Store article_id
+            model = task_data.get('model_to_use', 'default')
+            self.logger.debug(
+                f"Creating task {i+1}/{len(tasks_definitions)} for article {article_id} with model {model}")
 
             # Create coroutine for each task
             awaitables.append(self._run_single_task(gemini_client, task_data))
@@ -117,24 +146,57 @@ class TaskManager:
 
         # Run all tasks concurrently
         self.logger.info(f"Running {len(awaitables)} tasks concurrently")
-        results = await asyncio.gather(*awaitables, return_exceptions=True)
-        self.logger.info("Concurrent task execution completed")
+        try:
+            self.logger.debug(
+                "About to call asyncio.gather with timeout of 300 seconds")
+            # Add a global timeout to the gather operation
+            results = await asyncio.wait_for(
+                asyncio.gather(*awaitables, return_exceptions=True),
+                timeout=300  # 5 minutes timeout for the entire batch
+            )
+            self.logger.info("Concurrent task execution completed")
+        except asyncio.TimeoutError:
+            self.logger.error(
+                "Global timeout reached for the entire batch of tasks")
+            return {}  # Return empty result on timeout
+        except Exception as e:
+            self.logger.error(
+                f"Unexpected error in gather operation: {e}", exc_info=True)
+            return {}  # Return empty result on error
 
         # Process results
         final_results = {}
-        for result in results:
+        error_count = 0
+        for i, result in enumerate(results):
             # Handle exceptions from gather if return_exceptions=True
             if isinstance(result, Exception):
-                self.logger.error(f"Task failed with exception: {result}")
+                article_id = task_article_ids[i] if i < len(
+                    task_article_ids) else f"unknown-{i}"
+                self.logger.error(
+                    f"Task for article {article_id} failed with exception: {result}")
+                error_count += 1
+                # Add an error entry instead of skipping
+                final_results[article_id] = {
+                    "error": f"API call failed: {str(result)}"}
                 continue
 
             # Process normal result
             if isinstance(result, tuple) and len(result) == 2:
                 article_id, data = result
+                self.logger.debug(f"Processed result for article {article_id}")
                 final_results[article_id] = data
             else:
-                self.logger.error(f"Unexpected result format: {result}")
+                self.logger.error(
+                    f"Unexpected result format for task {i+1}: {result}")
+                # Try to identify the article ID if possible
+                if i < len(task_article_ids):
+                    article_id = task_article_ids[i]
+                    final_results[article_id] = {
+                        "error": "Unexpected result format"}
 
+        success_count = len(final_results) - error_count
         self.logger.info(
-            f"Processed {len(final_results)} results out of {len(awaitables)} tasks")
+            f"Processed {len(final_results)} results out of {len(awaitables)} tasks: {success_count} successful, {error_count} errors")
+
+        # Return any results we have, even if some failed
         return final_results

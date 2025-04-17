@@ -48,7 +48,11 @@ from src.utils.network_checker import check_network_connectivity, print_results
 from src.utils.gpu_client import check_gpu_availability
 
 # Configure logging
-logging.basicConfig(level=logging.INFO,
+# Get log level from environment variable, default to INFO
+log_level_name = os.getenv('LOG_LEVEL', 'INFO').upper()
+log_level = getattr(logging, log_level_name, logging.INFO)
+
+logging.basicConfig(level=log_level,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
