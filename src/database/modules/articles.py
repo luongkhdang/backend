@@ -43,6 +43,8 @@ Exported functions:
   Updates an article's frame_phrases and marks it as having had its entities extracted
 - get_recent_day_unprocessed_articles(conn, limit: Optional[int] = None) -> List[Dict[str, Any]]
   Gets unprocessed articles published yesterday and today only
+- get_recent_day_processed_articles_with_details(conn, limit: Optional[int] = None) -> List[Dict[str, Any]]
+  Gets processed articles published yesterday or today with domain goodness scores
 
 Related modules:
 - Connection management from connection.py
@@ -838,4 +840,64 @@ def get_recent_day_unprocessed_articles(conn, limit: Optional[int] = None) -> Li
         return articles
     except Exception as e:
         logger.error(f"Error fetching recent day unprocessed articles: {e}")
+        return []
+
+
+def get_recent_day_processed_articles_with_details(conn, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Get processed articles published yesterday or today with domain goodness scores.
+
+    Args:
+        conn: Database connection
+        limit: Optional maximum number of articles to return (returns all if None)
+
+    Returns:
+        List of article dictionaries with domain goodness scores
+    """
+    try:
+        cursor = conn.cursor()
+
+        # Query to get processed articles from yesterday and today
+        # with domain goodness scores from domain_statistics
+        query = """
+            SELECT 
+                a.id AS article_id, 
+                a.title, 
+                a.domain, 
+                a.pub_date, 
+                a.cluster_id,
+                ds.goodness_score
+            FROM articles a
+            LEFT JOIN domain_statistics ds ON a.domain = ds.domain
+            WHERE a.extracted_entities = TRUE
+            AND a.pub_date >= (CURRENT_DATE - INTERVAL '1 DAY')
+            AND a.pub_date <= CURRENT_DATE
+            ORDER BY a.pub_date DESC
+        """
+
+        # Add limit if specified
+        if limit is not None:
+            query += " LIMIT %s"
+            cursor.execute(query, (limit,))
+        else:
+            cursor.execute(query)
+
+        columns = [desc[0] for desc in cursor.description]
+        articles = []
+
+        for row in cursor.fetchall():
+            article_dict = dict(zip(columns, row))
+            # Provide default goodness_score if NULL
+            if article_dict.get('goodness_score') is None:
+                article_dict['goodness_score'] = 0.5
+            articles.append(article_dict)
+
+        cursor.close()
+
+        logger.info(
+            f"Fetched {len(articles)} processed articles with details from yesterday and today")
+        return articles
+    except Exception as e:
+        logger.error(
+            f"Error fetching recent day processed articles with details: {e}", exc_info=True)
         return []

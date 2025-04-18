@@ -29,6 +29,8 @@ Exported functions:
   Retrieves entities filtered by a specific type
 - get_related_entities(conn, entity_id: int, limit: int = 20) -> List[Dict[str, Any]]
   Retrieves entities that frequently appear in articles with the given entity
+- get_top_entities_for_article(conn, article_id: int, limit: int = 10) -> List[str]
+  Retrieves the top entities for a specific article based on influence score and mentions
 
 Related modules:
 - Connection management from connection.py
@@ -528,33 +530,54 @@ def get_entities_by_type(conn, entity_type: str, limit: int = 50) -> List[Dict[s
 
 def get_related_entities(conn, entity_id: int, limit: int = 20) -> List[Dict[str, Any]]:
     """
-    Retrieves entities that frequently appear in the same articles
-    as the given entity.
+    Retrieve entities that frequently appear in articles with the given entity.
 
     Args:
         conn: Database connection
-        entity_id: ID of the primary entity
-        limit: Maximum number of related entities to return
+        entity_id: ID of the entity to find related entities for
+        limit: Maximum number of entities to return
 
     Returns:
-        List[Dict[str, Any]]: List of related entities with co-occurrence count
-                              and core entity details.
+        List[Dict[str, Any]]: List of related entities with correlation score
     """
     try:
         cursor = conn.cursor()
-        # Update selected fields, remove metadata
-        cursor.execute("""
-            SELECT e2.id, e2.name, e2.entity_type, e2.influence_score, e2.mentions,
-                   COUNT(ae1.article_id) as co_occurrence_count
-            FROM article_entities ae1
-            JOIN article_entities ae2 ON ae1.article_id = ae2.article_id AND ae1.entity_id != ae2.entity_id
-            JOIN entities e2 ON ae2.entity_id = e2.id
-            WHERE ae1.entity_id = %s
-            GROUP BY e2.id, e2.name, e2.entity_type, e2.influence_score, e2.mentions
-            ORDER BY co_occurrence_count DESC, e2.name ASC
-            LIMIT %s;
-        """, (entity_id, limit))
 
+        # Find articles containing this entity
+        cursor.execute("""
+            SELECT article_id 
+            FROM article_entities 
+            WHERE entity_id = %s
+        """, (entity_id,))
+        article_ids = [row[0] for row in cursor.fetchall()]
+
+        if not article_ids:
+            logger.debug(f"No articles found for entity ID {entity_id}")
+            return []
+
+        # Find entities that appear in these articles (not including the original entity)
+        # Use placeholders for query with article_ids
+        placeholders = ','.join(['%s'] * len(article_ids))
+        query = f"""
+            SELECT 
+                e.id, 
+                e.name, 
+                e.entity_type, 
+                e.influence_score,
+                COUNT(ae.article_id) as shared_articles
+            FROM article_entities ae
+            JOIN entities e ON ae.entity_id = e.id
+            WHERE ae.article_id IN ({placeholders})
+            AND ae.entity_id != %s
+            GROUP BY e.id, e.name, e.entity_type, e.influence_score
+            ORDER BY shared_articles DESC, e.influence_score DESC
+            LIMIT %s
+        """
+
+        params = article_ids + [entity_id, limit]
+        cursor.execute(query, params)
+
+        # Create result dictionaries
         columns = [desc[0] for desc in cursor.description]
         related_entities = [dict(zip(columns, row))
                             for row in cursor.fetchall()]
@@ -565,4 +588,40 @@ def get_related_entities(conn, entity_id: int, limit: int = 20) -> List[Dict[str
     except Exception as e:
         logger.error(
             f"Error retrieving related entities for entity {entity_id}: {e}", exc_info=True)
+        return []
+
+
+def get_top_entities_for_article(conn, article_id: int, limit: int = 10) -> List[str]:
+    """
+    Retrieve the top entities for a specific article based on influence score and mentions.
+
+    Args:
+        conn: Database connection
+        article_id: ID of the article
+        limit: Maximum number of entities to return
+
+    Returns:
+        List[str]: List of entity names (not full entity objects)
+    """
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT e.name
+            FROM article_entities ae
+            JOIN entities e ON ae.entity_id = e.id
+            WHERE ae.article_id = %s
+            ORDER BY e.influence_score DESC, e.mentions DESC, ae.mention_count DESC
+            LIMIT %s
+        """, (article_id, limit))
+
+        # Extract just the entity names
+        entity_names = [row[0] for row in cursor.fetchall()]
+
+        cursor.close()
+        return entity_names
+
+    except Exception as e:
+        logger.error(
+            f"Error retrieving top entities for article {article_id}: {e}", exc_info=True)
         return []

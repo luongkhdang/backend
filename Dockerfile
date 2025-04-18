@@ -9,6 +9,9 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 # Copy application code - AFTER dependencies are installed in the base image
 COPY . .
 
+# Create output directory for Step 4
+RUN mkdir -p /app/src/output && chmod 777 /app/src/output
+
 # Set environment variables
 ENV READER_DB_HOST=postgres
 ENV READER_DB_PORT=5432

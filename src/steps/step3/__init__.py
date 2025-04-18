@@ -133,24 +133,61 @@ async def run() -> Dict[str, Any]:
 
             # Compose a balanced batch with the defined ratio (4/5/1)
             current_batch = []
+            target_batch_size = 10
+
+            # Initialize counters for original and rebalanced tier counts
+            original_tier_counts = {0: 0, 1: 0, 2: 0}
+            rebalanced_tier_counts = {0: 0, 1: 0, 2: 0}
 
             # Add up to 4 articles from tier 0
             tier0_to_add = min(4, len(tier0_articles))
             if tier0_to_add > 0:
                 current_batch.extend(tier0_articles[:tier0_to_add])
                 tier0_articles = tier0_articles[tier0_to_add:]
+                original_tier_counts[0] = tier0_to_add
 
             # Add up to 5 articles from tier 1
             tier1_to_add = min(5, len(tier1_articles))
             if tier1_to_add > 0:
                 current_batch.extend(tier1_articles[:tier1_to_add])
                 tier1_articles = tier1_articles[tier1_to_add:]
+                original_tier_counts[1] = tier1_to_add
 
             # Add up to 1 article from tier 2
             tier2_to_add = min(1, len(tier2_articles))
             if tier2_to_add > 0:
                 current_batch.extend(tier2_articles[:tier2_to_add])
                 tier2_articles = tier2_articles[tier2_to_add:]
+                original_tier_counts[2] = tier2_to_add
+
+            # Smart rebalancing logic
+            remaining_slots = target_batch_size - len(current_batch)
+            if remaining_slots > 0:
+                # First, try to fill with tier 0 (highest priority)
+                if len(tier0_articles) > 0:
+                    additional_tier0 = min(
+                        remaining_slots, len(tier0_articles))
+                    current_batch.extend(tier0_articles[:additional_tier0])
+                    tier0_articles = tier0_articles[additional_tier0:]
+                    remaining_slots -= additional_tier0
+                    rebalanced_tier_counts[0] = additional_tier0
+
+                # Then, try to fill with tier 1 (medium priority)
+                if remaining_slots > 0 and len(tier1_articles) > 0:
+                    additional_tier1 = min(
+                        remaining_slots, len(tier1_articles))
+                    current_batch.extend(tier1_articles[:additional_tier1])
+                    tier1_articles = tier1_articles[additional_tier1:]
+                    remaining_slots -= additional_tier1
+                    rebalanced_tier_counts[1] = additional_tier1
+
+                # Finally, try to fill with tier 2 (lowest priority)
+                if remaining_slots > 0 and len(tier2_articles) > 0:
+                    additional_tier2 = min(
+                        remaining_slots, len(tier2_articles))
+                    current_batch.extend(tier2_articles[:additional_tier2])
+                    tier2_articles = tier2_articles[additional_tier2:]
+                    rebalanced_tier_counts[2] = additional_tier2
 
             # If no articles were added to the batch, we're done
             if not current_batch:
@@ -165,14 +202,24 @@ async def run() -> Dict[str, Any]:
                 article['model_to_use'] = TIER_MODELS[tier]['primary']
                 article['fallback_model'] = TIER_MODELS[tier]['fallback']
 
-            # Log batch composition
-            tier_counts = {}
-            for article in current_batch:
-                tier = article.get('processing_tier', 0)
-                tier_counts[tier] = tier_counts.get(tier, 0) + 1
+            # Log detailed information about tier distribution
+            was_rebalanced = any(
+                count > 0 for count in rebalanced_tier_counts.values())
 
-            logger.info(f"Processing batch {batch_index} with {len(current_batch)} articles "
-                        f"(T0: {tier_counts.get(0, 0)}, T1: {tier_counts.get(1, 0)}, T2: {tier_counts.get(2, 0)})")
+            if was_rebalanced:
+                logger.info(
+                    f"Processing batch {batch_index} with {len(current_batch)} articles | "
+                    f"Original distribution: Tier 0: {original_tier_counts[0]}, "
+                    f"Tier 1: {original_tier_counts[1]}, Tier 2: {original_tier_counts[2]} | "
+                    f"Added during rebalancing: Tier 0: {rebalanced_tier_counts[0]}, "
+                    f"Tier 1: {rebalanced_tier_counts[1]}, Tier 2: {rebalanced_tier_counts[2]}"
+                )
+            else:
+                logger.info(
+                    f"Processing batch {batch_index} with {len(current_batch)} articles | "
+                    f"Standard distribution: Tier 0: {original_tier_counts[0]}, "
+                    f"Tier 1: {original_tier_counts[1]}, Tier 2: {original_tier_counts[2]}"
+                )
 
             # Heartbeat logging
             current_time = time.time()

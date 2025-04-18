@@ -39,6 +39,7 @@ import asyncio  # Add asyncio import
 from src.steps.step1 import run as run_step1
 from src.steps.step2 import run as run_step2
 from src.steps.step3 import run as run_step3  # run_step3 is now async
+from src.steps.step4 import run as run_step4
 from src.steps.domain_goodness import calculate_domain_goodness_scores
 
 # Import network checker
@@ -242,6 +243,27 @@ async def main():  # Make main async
             logger.info("========= STEP 3 COMPLETE =========")
     else:
         logger.info("Skipping Step 3: Entity Extraction (RUN_STEP3 not true)")
+
+    # Execute Step 4: Data Export (only if enabled via environment variable)
+    if os.getenv("RUN_STEP4", "false").lower() == "true":
+        logger.info("========= STARTING STEP 4: DATA EXPORT =========")
+        try:
+            step4_status = run_step4()  # Synchronous function
+            logger.info("Step 4 Summary:")
+            logger.debug(json.dumps(step4_status, indent=2))
+
+            if step4_status.get("success", False):
+                logger.info(
+                    f"Data export successful: Exported {step4_status.get('articles_processed', 0)} articles to {step4_status.get('output_file')}")
+            else:
+                logger.warning(
+                    f"Data export completed with issues: {step4_status.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.error(f"Step 4 failed with error: {e}", exc_info=True)
+        finally:
+            logger.info("========= STEP 4 COMPLETE =========")
+    else:
+        logger.info("Skipping Step 4: Data Export (RUN_STEP4 not true)")
 
     # Weekly domain goodness calculation (can be triggered separately or scheduled)
     if os.getenv("CALCULATE_DOMAIN_GOODNESS", "false").lower() == "true":

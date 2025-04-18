@@ -1320,3 +1320,48 @@ class ReaderDBClient:
             finally:
                 self.release_connection(conn)
         return []
+
+    def get_recent_day_processed_articles_with_details(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get processed articles published yesterday or today with domain goodness scores.
+
+        Args:
+            limit: Optional maximum number of articles to return (returns all if None)
+
+        Returns:
+            List of article dictionaries with domain goodness scores
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return articles.get_recent_day_processed_articles_with_details(conn, limit)
+            except Exception as e:
+                logger.error(
+                    f"Error fetching recent day processed articles with details: {e}")
+                return []
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_top_entities_for_article(self, article_id: int, limit: int = 10) -> List[str]:
+        """
+        Retrieve the top entities for a specific article based on influence score and mentions.
+
+        Args:
+            article_id: ID of the article
+            limit: Maximum number of entities to return
+
+        Returns:
+            List[str]: List of entity names (not full entity objects)
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entities.get_top_entities_for_article(conn, article_id, limit)
+            except Exception as e:
+                logger.error(
+                    f"Error retrieving top entities for article {article_id}: {e}")
+                return []
+            finally:
+                self.release_connection(conn)
+        return []

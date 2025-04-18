@@ -202,6 +202,14 @@ class GeminiClient:
                 logger.debug(
                     f"Gemini API raw embedding response for model {model_to_use}: {result}")
 
+                # Log usage metadata if available
+                if hasattr(result, 'usage_metadata'):
+                    logger.info(
+                        f"[USAGE] Embedding usage metadata: {result.usage_metadata}")
+                elif isinstance(result, dict) and 'usage_metadata' in result:
+                    logger.info(
+                        f"[USAGE] Embedding usage metadata: {result['usage_metadata']}")
+
                 # Register this call with the rate limiter if provided
                 if self.rate_limiter:
                     self.rate_limiter.register_call(model_to_use)
@@ -383,9 +391,17 @@ class GeminiClient:
                         # safety_settings=... # Add safety settings if required
                     )
 
-                    # Log the raw API response for debugging
-                    logger.debug(
-                        f"Gemini API raw generation response for model {model_name}: {response}")
+                    # Log the full response object for debugging
+                    logger.info(
+                        f"[RESPONSE] Full response from {model_name}: {response}")
+
+                    # Log usage metadata if available
+                    if hasattr(response, 'usage_metadata'):
+                        logger.info(
+                            f"[USAGE] {model_name} usage metadata: {response.usage_metadata}")
+                    elif isinstance(response, dict) and 'usage_metadata' in response:
+                        logger.info(
+                            f"[USAGE] {model_name} usage metadata: {response['usage_metadata']}")
 
                     # Register the successful call *after* it completes
                     if self.rate_limiter:
@@ -677,6 +693,18 @@ class GeminiClient:
                         # Added logging
                         logger.debug(
                             f"[{model_name}] Attempt {model_attempt}: generate_content_async call succeeded in {call_duration:.2f}s.")
+
+                        # Log the full response
+                        logger.info(
+                            f"[RESPONSE] Full response from {model_name}: {response}")
+
+                        # Log usage metadata if available
+                        if hasattr(response, 'usage_metadata'):
+                            logger.info(
+                                f"[USAGE] {model_name} usage metadata: {response.usage_metadata}")
+                        elif isinstance(response, dict) and 'usage_metadata' in response:
+                            logger.info(
+                                f"[USAGE] {model_name} usage metadata: {response['usage_metadata']}")
                     except asyncio.TimeoutError:
                         call_duration = time.monotonic() - task_start_time
                         # Added logging

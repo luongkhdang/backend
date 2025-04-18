@@ -107,6 +107,10 @@ services:
       ENTITY_EXTRACTION_BATCH_SIZE: ${ENTITY_EXTRACTION_BATCH_SIZE:-10}
       ENTITY_MAX_PRIORITY_ARTICLES: ${ENTITY_MAX_PRIORITY_ARTICLES:-100}
       CALCULATE_INFLUENCE_SCORES: ${CALCULATE_INFLUENCE_SCORES:-true}
+      # Step 4: Data Export settings
+      RUN_STEP4: ${RUN_STEP4:-true}
+      EMERGENCY_FALLBACK_WAIT_SECONDS: ${EMERGENCY_FALLBACK_WAIT_SECONDS:-120}
+      CALCULATE_DOMAIN_GOODNESS: ${CALCULATE_DOMAIN_GOODNESS:-true}
       # Hotness calculation factors
       RECENCY_DAYS: ${RECENCY_DAYS:-3}
       CALCULATE_TOPIC_RELEVANCE: ${CALCULATE_TOPIC_RELEVANCE:-true}
@@ -138,6 +142,7 @@ services:
       - ./src:/app/src # Mount source code for easier development
       - ./logs:/app/logs # Mount logs directory for error reports
       - huggingface_cache:/root/.cache/huggingface # Mount cache volume for HuggingFace models
+      - ./src/output:/app/src/output # Mount output directory for persisting exported data
     networks:
       - reader_network
     dns:
