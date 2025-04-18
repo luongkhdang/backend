@@ -22,21 +22,22 @@
 | `extracted_entities` | `BOOLEAN`   |                                         | `FALSE` | Flag indicating if entities have been extracted    |
 | `is_hot`             | `BOOLEAN`   |                                         | `FALSE` | Flag indicating if the article is considered 'hot' |
 | `cluster_id`         | `INTEGER`   | (Implicit FK to `clusters.id` SET NULL) |         | ID of the cluster the article belongs to           |
+| `frame_phrases`      | `TEXT[]`    |                                         | `NULL`  | Array of narrative frame phrases, can be NULL      |
 
 ### `entities`
 
-| Column                    | Type        | Constraints            | Default             | Description                                        |
-| ------------------------- | ----------- | ---------------------- | ------------------- | -------------------------------------------------- |
-| `id`                      | `SERIAL`    | `PRIMARY KEY`          |                     | Unique identifier for the entity                   |
-| `name`                    | `TEXT`      | `UNIQUE`               |                     | Name of the entity                                 |
-| `entity_type`             | `TEXT`      |                        |                     | Type of the entity (e.g., PERSON, ORG)             |
-| `influence_score`         | `FLOAT`     |                        | `0.0`               | Calculated influence score                         |
-| `mentions`                | `INTEGER`   |                        | `0`                 | Global mention count across all articles           |
-| `first_seen`              | `TIMESTAMP` |                        |                     | Timestamp when the entity was first seen           |
-| `last_seen`               | `TIMESTAMP` |                        |                     | Timestamp when the entity was last seen            |
-| `created_at`              | `TIMESTAMP` |                        | `CURRENT_TIMESTAMP` | Timestamp when the entity record was created       |
-| `updated_at`              | `TIMESTAMP` |                        | `CURRENT_TIMESTAMP` | Timestamp when the entity record was last updated  |
-| `influence_calculated_at` | `TIMESTAMP` | (Added by ALTER TABLE) |                     | Timestamp when influence score was last calculated |
+| Column                    | Type        | Constraints           | Default             | Description                                        |
+| ------------------------- | ----------- | --------------------- | ------------------- | -------------------------------------------------- |
+| `id`                      | `SERIAL`    | `PRIMARY KEY`         |                     | Unique identifier for the entity                   |
+| `name`                    | `TEXT`      | `UNIQUE`              |                     | Name of the entity                                 |
+| `entity_type`             | `TEXT`      |                       |                     | Type of the entity (e.g., PERSON, ORG)             |
+| `influence_score`         | `FLOAT`     |                       | `0.0`               | Calculated influence score                         |
+| `mentions`                | `INTEGER`   |                       | `0`                 | Global mention count across all articles           |
+| `first_seen`              | `TIMESTAMP` |                       |                     | Timestamp when the entity was first seen           |
+| `last_seen`               | `TIMESTAMP` |                       |                     | Timestamp when the entity was last seen            |
+| `created_at`              | `TIMESTAMP` |                       | `CURRENT_TIMESTAMP` | Timestamp when the entity record was created       |
+| `updated_at`              | `TIMESTAMP` |                       | `CURRENT_TIMESTAMP` | Timestamp when the entity record was last updated  |
+| `influence_calculated_at` | `TIMESTAMP` | (Added if not exists) |                     | Timestamp when influence score was last calculated |
 
 ### `article_entities` (Junction Table)
 
@@ -46,7 +47,7 @@
 | `entity_id`              | `INTEGER`   | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE` |                     | ID of the entity                                       |
 | `mention_count`          | `INTEGER`   |                                                       | `1`                 | Number of times the entity is mentioned in the article |
 | `created_at`             | `TIMESTAMP` |                                                       | `CURRENT_TIMESTAMP` | Timestamp when the link was created                    |
-| `is_influential_context` | `BOOLEAN`   | (Added by ALTER TABLE)                                | `FALSE`             | Flag indicating if the mention context was influential |
+| `is_influential_context` | `BOOLEAN`   | (Added if not exists)                                 | `FALSE`             | Flag indicating if the mention context was influential |
 
 ### `embeddings`
 
