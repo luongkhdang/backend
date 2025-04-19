@@ -31,6 +31,8 @@ Exported functions:
   Retrieves entities that frequently appear in articles with the given entity
 - get_top_entities_for_article(conn, article_id: int, limit: int = 10) -> List[str]
   Retrieves the top entities for a specific article based on influence score and mentions
+- get_top_entities_with_influence_flag(conn, article_id: int, limit: int = 10) -> List[Dict[str, Any]]
+  Retrieves the top entities for a specific article with entity_id, name, and influence context flag
 
 Related modules:
 - Connection management from connection.py
@@ -624,4 +626,53 @@ def get_top_entities_for_article(conn, article_id: int, limit: int = 10) -> List
     except Exception as e:
         logger.error(
             f"Error retrieving top entities for article {article_id}: {e}", exc_info=True)
+        return []
+
+
+def get_top_entities_with_influence_flag(conn, article_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Retrieve the top entities for a specific article with entity_id, name, and influence context flag.
+
+    Args:
+        conn: Database connection
+        article_id: ID of the article
+        limit: Maximum number of entities to return
+
+    Returns:
+        List[Dict[str, Any]]: List of entity dictionaries with keys:
+            - entity_id: The entity ID
+            - name: The entity name
+            - entity_type: The entity type
+            - is_influential_context: Boolean flag indicating if the entity appears in an influential context
+            - influence_score: The global influence score of the entity
+            - mention_count: Number of times the entity is mentioned in the article
+    """
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                e.id AS entity_id, 
+                e.name, 
+                e.entity_type,
+                ae.is_influential_context,
+                e.influence_score,
+                ae.mention_count
+            FROM article_entities ae
+            JOIN entities e ON ae.entity_id = e.id
+            WHERE ae.article_id = %s
+            ORDER BY e.influence_score DESC, e.mentions DESC, ae.mention_count DESC
+            LIMIT %s
+        """, (article_id, limit))
+
+        # Fetch all rows and convert to dictionaries
+        columns = [desc[0] for desc in cursor.description]
+        entity_dicts = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        cursor.close()
+        return entity_dicts
+
+    except Exception as e:
+        logger.error(
+            f"Error retrieving top entities with influence flag for article {article_id}: {e}", exc_info=True)
         return []

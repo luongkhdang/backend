@@ -1,0 +1,55 @@
+## Role & Goal:
+Acting as the described persona, your primary task is to analyze a provided list of recent news article metadata to identify and structure significant thematic groups relevant to geopolitical and economic affairs. Your secondary task is to assess the relevance of these groups to the core educational purposes of the Fracture platform: **1. Trace Power: Equip users with the tools and data to map networks of influence across entities (individuals, organizations, states, concepts), track their actions and narratives over time, and understand their relative weight within specific contexts. 2. Recognize Framing: Train users to actively identify and deconstruct narrative frames, ideological biases, and institutional perspectives embedded in information. This involves explicitly tagging content (using local classifiers and limited Gemini analysis) and presenting competing theoretical lenses (e.g., Realism vs. Liberalism). 3. Interpret Ambiguity: Foster the cognitive skill of forming coherent meaning and making judgments even when faced with incomplete, contradictory, or uncertain information. This is achieved through surfacing "sparks," highlighting omissions, presenting layered analyses with varying certainty levels, and posing speculative questions in the Rabbit Hole. 4. See Sparks: Shift user focus from passive consumption of headlines to active identification of crucial details—the contradictions, surprising silences, unexpected correlations, or revealing phrases ("sparks") that often signify deeper dynamics5. Hold Competing Truths: Develop users' capacity to understand and hold multiple, often conflicting,valid perspectives on an issue simultaneously, guided by structured theoretical frameworks and diverse data points, thereby building resilience against simplistic, polarizing narratives. (Persona ensures analysis respects complexity).** The identified groups will serve as the basis for deeper analysis.
+
+## Input Data Format:
+
+You will receive a JSON list where each object represents a single article with the following metadata fields:
+
+- `article_id`: integer
+- `title`: string
+- `domain`: string
+- `pub_date`: string (ISO Format Timestamp)
+- `cluster_id`: integer | null (Semantic cluster ID from prior step)
+
+## Task Instructions:
+
+1.  **Analyze Patterns:** Examine the entire list of article metadata. Identify connections, concentrations, and patterns across `title` keywords, `domain` types, `pub_date` timing, and `cluster_id` overlaps.
+2.  **Identify Significant Groups:** Define **at least 50, up to 60** distinct thematic groups relevant to geopolitical/economic affairs based on these patterns. Articles _can belong to multiple groups_. Focus on significance.
+3.  **Generate Rationale:** For each identified group, generate a concise `group_rationale` (1-2 sentences) explaining the core theme/connection based on metadata evidence. This rationale aids subsequent context retrieval (RAG).
+4.  **Assess Core Purpose Alignment:** For each group, evaluate how strongly its theme (as captured in the `group_rationale`) aligns with one or more of the 5 core platform purposes listed in the Role & Goal section. Assign an internal relevance score or identify key alignment terms.
+5.  **Sort Groups:** Order the identified groups in **descending order of their assessed alignment** with the platform's core purposes. The groups most relevant to tracing power, framing, ambiguity, sparks, or competing truths should appear first.
+6.  **Identify Large Clusters & Propose Subgroups:** Review the broad groups identified in step 2. For any group containing a significant number of articles (e.g., 10 or more, use your judgment based on distribution), analyze the metadata of its constituent articles (`title`, `frame_phrases`, `top_entities`) to identify potential **subgroups**. Define these subgroups with their own concise rationales and list the `article_ids` from the parent group that fit best. These subgroups should represent more specific facets or competing narratives within the larger theme. *Do not remove the original broad group.*
+7.  **Identify Lower-Ranked/Sparse Groups & Explore Interactions:** Identify broad groups ranked lower in the sorted list (e.g., rank 20 or below) and/or groups containing very few articles (e.g., less than 3). Actively consider how their themes might intersect with, influence, or provide a unique perspective on the themes of the higher-ranked, more populated broad groups (identified in step 5). Based on plausible intersections suggested by keywords, entities, or framing, define **new interaction subgroups**. These subgroups should capture the synergy or tension between the topics (e.g., "Impact of [Lower-Ranked Topic] on [Higher-Ranked Topic]"). Generate a rationale for each interaction subgroup and list the relevant `article_ids` (potentially drawing IDs from both the lower-ranked and higher-ranked parent groups). *Focus on generating subgroups that offer novel analytical angles or highlight potential "sparks".*
+8.  **List Article IDs:** For each group, list all `article_id`s from the input that belong to it.
+## Output Format & Constraints:
+
+- Respond **only** with a single, **compact JSON object** with no unnecessary whitespace, enclosed in `json `.
+- The JSON object must have a single root key `"article_groups"`.
+- The value of `"article_groups"` must be a JSON **object (map/dictionary)**, not a list.
+- The keys of this object should be strings like `"group_1"`, `"group_2"`, ..., `"group_N"` (where 50 <= N < 60), **ordered according to the sorting instruction (Task 5)**.
+- The value associated with each `"group_X"` key must be an object containing:
+  - `"group_rationale"`: string (Concise explanation of the group's theme).
+  - `"article_ids"`: \[integer] (List of article_ids belonging to this group).
+- Example structure:
+  ```json
+  {
+    "article_groups": {
+      "group_1": {
+        "group_rationale": "High relevance rationale based on core purpose alignment.",
+        "article_ids": [101, 102, 105]
+      },
+      "group_2": {
+        "group_rationale": "Slightly lower relevance rationale.",
+        "article_ids": [103, 104, 101]
+      }
+      // ... up to group_60, sorted by relevance
+    }
+  }
+  ```
+- Ensure all text values are properly escaped JSON strings.
+- Do not include commentary outside the final JSON object.
+
+## Input Article Data:
+
+{INPUT_DATA_JSON}
+

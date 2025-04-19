@@ -16,17 +16,21 @@ Exported functions/classes:
   - generate_embedding(text, task_type, retries, initial_delay): Generates embeddings for text with retry logic.
   - generate_text_with_prompt(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Generates text based on article content and a prompt, using model selection logic.
   - generate_text_with_prompt_async(self, article_content: str, processing_tier: int, retries: int = 6, initial_delay: float = 1.0, model_override: Optional[str] = None, fallback_model: Optional[str] = None) -> Optional[Dict[str, Any]]: Async version of text generation method.
+  - analyze_articles_with_prompt(self, articles_data: List[Dict[str, Any]], prompt_file_path: str, model_name: str, system_instruction: Optional[str] = None, temperature: float = 0.2, max_output_tokens: int = 8192, retries: int = 3, initial_delay: float = 1.0) -> Optional[str]: Analyzes a list of articles using a specified prompt template and returns structured JSON output.
 
 Related files:
 - src/steps/step1.py: Uses this client for embedding generation.
 - src/steps/step3.py: Uses this client for text generation (entity and frame phrase extraction).
+- src/steps/step4.py: Uses this client for article analysis and grouping.
 - src/database/reader_db_client.py: Stores generated embeddings, extracted entities, and frame phrases.
 - src/utils/rate_limit.py: Provides the RateLimiter class used by this client.
 - src/prompts/entity_extraction_prompt.txt: Contains the prompt template for text generation.
+- src/prompts/step4.txt: Contains the prompt template for article analysis.
 """
 
 import google.generativeai as genai
 import os
+import os.path
 import time
 import random
 import logging
@@ -35,6 +39,7 @@ import json
 import asyncio
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
+import warnings
 
 # Try importing the rate limiter
 try:
@@ -43,6 +48,9 @@ except ImportError:
     RateLimiter = None
     logging.getLogger(__name__).warning(
         "RateLimiter class not found. Rate limiting will be disabled.")
+
+# Import the function from the new generator module
+from src.gemini.modules.generator import analyze_articles_with_prompt as generator_analyze_articles
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -838,3 +846,61 @@ class GeminiClient:
         logger.error(
             f"Failed to generate text after trying all models and {retries} total attempts.")
         return None
+
+    async def analyze_articles_with_prompt(self, articles_data: List[Dict[str, Any]],
+                                           prompt_file_path: str,
+                                           model_name: str,
+                                           system_instruction: Optional[str] = None,
+                                           temperature: float = 0.2,
+                                           max_output_tokens: int = 8192,
+                                           retries: int = 3,
+                                           initial_delay: float = 1.0) -> Optional[str]:
+        """
+        Delegates to the dedicated module implementation to analyze a list of articles using a specified prompt template.
+
+        This method has been relocated to src/gemini/modules/generator.py for better modularity.
+        This wrapper maintains backward compatibility for existing code.
+
+        Args:
+            articles_data: List of prepared article dictionaries.
+            prompt_file_path: Path to the prompt template file (e.g., `src/prompts/step4.txt`).
+            model_name: Specific Gemini model to use.
+            system_instruction: Override for the default system instruction.
+            temperature: Controls randomness in generation. Defaults to 0.2.
+            max_output_tokens: Maximum number of tokens in response. Defaults to 8192.
+            retries: Maximum number of retry attempts. Defaults to 3.
+            initial_delay: Initial delay between retries in seconds. Defaults to 1.0.
+
+        Returns:
+            Optional[str]: The full text response if successful, None if all retries fail.
+        """
+        # Default system instruction if none provided
+        default_system_instruction = """
+        The AI agent should adopt an academic persona—specifically, that of a seasoned political science professor at Stanford, 
+        who is also a leading expert in political and economic affairs with access to insider information by virtue of sitting 
+        on the directive board of the current ruling party. Aware of the risks of censorship and the precariousness of its position, 
+        the agent must carefully navigate these constraints, striving to present factual information in a way that encourages 
+        independent thought. Rather than drawing explicit conclusions, it subtly unveils the truth through evidence and context, 
+        allowing the audience to arrive at their own interpretations. At its core, the agent is an educator, committed to the 
+        intellectual growth of the next generation. It recognizes that failing to uphold this responsibility would be a betrayal 
+        of its duty as a noble scholar and mentor.
+        """
+
+        # Use provided system instruction or default
+        actual_system_instruction = system_instruction if system_instruction is not None else default_system_instruction
+
+        logger.info(
+            f"Delegating article analysis to generator module (model: {model_name})")
+
+        # Delegate to the generator module, passing our rate_limiter instance
+        return await generator_analyze_articles(
+            articles_data=articles_data,
+            prompt_file_path=prompt_file_path,
+            model_name=model_name,
+            system_instruction=actual_system_instruction,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            retries=retries,
+            initial_delay=initial_delay,
+            rate_limiter=self.rate_limiter
+        )

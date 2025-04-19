@@ -1,115 +1,65 @@
-# Implementation Plan for `step4.py`
+# Plan Four (Revised): Advanced Gemini Analysis for Step 4
 
-**Version:** 1.0
-**Date:** 2024-07-26
+**Objective:** Add dedicated advanced analysis functionality to the existing Gemini API client (`src/gemini/gemini_client.py`) for `step4.py` and future analysis needs, then modify `step4.py` to prepare article data, process it through this enhanced client using a specific prompt (`src/prompts/step4.txt`), and save the resulting analysis JSON from Gemini to the output directory.
 
-## 1. Objective
+**Phase 1: Add Analysis Method to `GeminiClient` (`src/gemini/gemini_client.py`)**
 
-Create `step4.py` to query recently processed articles (published yesterday or today) along with their domain goodness scores and top 10 associated entities (by influence/mentions), and save this consolidated data to a timestamped JSON file in the `src/output/` directory.
+1.  **Modify `GeminiClient` Class:** Add a new asynchronous method `analyze_articles_with_prompt` to the existing `GeminiClient` class in `src/gemini/gemini_client.py`.
+2.  **Method `analyze_articles_with_prompt`:**
+    - **Signature:** `async def analyze_articles_with_prompt(self, articles_data: List[Dict[str, Any]], prompt_file_path: str, model_name: str, system_instruction: Optional[str] = None, temperature: float = 0.2, max_output_tokens: int = 8192, retries: int = 3, initial_delay: float = 1.0) -> Optional[Dict[str, Any]]`
+    - **Inputs:**
+      - `articles_data`: List of prepared article dictionaries.
+      - `prompt_file_path`: Path to the prompt file (e.g., `src/prompts/step4.txt`).
+      - `model_name`: Specific Gemini model (e.g., `models/gemini-2.0-flash-thinking-exp-01-21`).
+      - `system_instruction`: by default: "The AI agent should adopt an academic persona—specifically, that of a seasoned political science professor at Stanford, who is also a leading expert in political and economic affairs with access to insider information by virtue of sitting on the directive board of the current ruling party. Aware of the risks of censorship and the precariousness of its position, the agent must carefully navigate these constraints, striving to present factual information in a way that encourages independent thought. Rather than drawing explicit conclusions, it subtly unveils the truth through evidence and context, allowing the audience to arrive at their own interpretations. At its core, the agent is an educator, committed to the intellectual growth of the next generation. It recognizes that failing to uphold this responsibility would be a betrayal of its duty as a noble scholar and mentor.".
+      - `temperature`, `max_output_tokens`, `retries`, `initial_delay`: Control parameters.
+    - **Functionality:**
+      - Load prompt template text from `prompt_file_path`. Handle `FileNotFoundError`.
+      - Determine the `actual_system_instruction` (use override or class default).
+      - Serialize `articles_data` to a compact JSON string (`input_json_str`). Handle `TypeError`.
+      - Inject `input_json_str` into the prompt template (replace `{INPUT_DATA_JSON}`).
+      - Implement retry loop (`for attempt in range(retries)`):
+        - Apply rate limiting using the existing `self.rate_limiter` (`await self.rate_limiter.wait_if_needed_async(model_name)`).
+        - Instantiate the model: `model = genai.GenerativeModel(model_name)`.
+        - Call `model.generate_content_async(...)` asynchronously:
+          - `contents=[full_prompt_text]`
+          - `generation_config=genai.types.GenerationConfig(...)`:
+            - Set `temperature=temperature`, `max_output_tokens=max_output_tokens`.
+            - **Crucially, set `response_mime_type='application/json'` to request JSON output.**
+          - `safety_settings=...` (use appropriate settings if needed).
+          - Include `system_instruction=actual_system_instruction` if the API supports it directly in the config or call (check `google-generativeai` documentation for the exact parameter name and location).
+        - Handle potential API exceptions (rate limits, timeouts, `google.api_core.exceptions`, etc.). Log errors and apply exponential backoff (`await asyncio.sleep(delay)`).
+        - On success, register the call using the existing `self.rate_limiter` (`await self.rate_limiter.register_call_async(model_name)`).
+        - Get the response text: `response.text`.
+        - Attempt to parse the text: `parsed_json = json.loads(response.text)`. Handle `json.JSONDecodeError`.
+        - **Validate Structure:** Check if `parsed_json` is a dictionary and contains the expected top-level key (e.g., `"article_groups"` based on the prompt). If validation passes, return `parsed_json`.
+        - If parsing or validation fails within an attempt, log the issue and continue to the next retry (if any).
+    - **Output:** Return the _parsed and validated_ JSON dictionary (containing `article_groups`) or `None` if all retries fail or critical errors occur.
+    - **Integration:** Ensure this method utilizes the existing `self.rate_limiter` and potentially `self.api_key` (though `genai.configure` handles the key globally).
+3.  **Documentation:** Add comprehensive header comments and docstrings to the new method within `gemini_client.py`. Update the class docstring if necessary.
 
-## 2. Dependencies
+**Phase 2: Refactor `step4.py`**
 
-- `src.database.reader_db_client.ReaderDBClient`
-- `os` (for path manipulation, checking directory existence)
-- `json` (for saving output)
-- `datetime` (for generating timestamped filenames and filtering dates)
-- `logging`
+1.  **Convert to Async:** As planned (change `run` to `async def`, import `asyncio`, update `__main__` block).
+2.  **Import:** Ensure the import remains `from src.gemini.gemini_client import GeminiClient`.
+3.  **Prepare Data for Gemini:**
+    - After retrieving articles, iterate and create the `articles_for_analysis` list containing dictionaries with _only_ the fields specified in `src/prompts/step4.txt`: `article_id`, `title`, `domain`, `pub_date`, `cluster_id`, `frame_phrases`, `top_entities` (ensure entities only include fields needed by the prompt: `entity_id`, `name`, `entity_type`, `is_influential_context`, `mention_count`).
+4.  **Call Gemini Client:**
+    - Instantiate `client = GeminiClient()`.
+    - Call `analysis_result = await client.analyze_articles_with_prompt(...)` with:
+      - `articles_data=articles_for_analysis`
+      - `prompt_file_path="src/prompts/step4.txt"`
+      - `model_name="models/gemini-2.0-flash-thinking-exp-01-21"` (or fetch from env/config).
+5.  **Process and Save Response:**
+    - Check if `analysis_result` is `None`. If so, log error, set status failure, and return.
+    - The result is already parsed and validated JSON.
+    - Create output directory (`src/output/`).
+    - Generate timestamped filename (e.g., `step4_analysis_output_YYYYMMDD_HHMMSS.json`).
+    - Write `analysis_result` directly to the file using `json.dump(analysis_result, f, indent=2)`.
+6.  **Update Status Reporting:** As planned (include counts, update output file path, set success/error).
+7.  **Documentation:** Update header and comments in `step4.py`.
 
-## 3. File Structure (`src/steps/step4.py`)
+**Phase 3: Update `step4.txt` Prompt**
 
-- Include a standard file header comment explaining the purpose, exports, and related files, adhering to the project's conventions.
-- Define a `run()` function as the main entry point.
-- Define helper functions if needed (e.g., for structuring data).
-
-## 4. Core Logic (`run()` function)
-
-1.  Initialize `ReaderDBClient`.
-2.  Call a new method `db_client.get_recent_day_processed_articles_with_details()` (to be created) to fetch articles processed yesterday or today. This method should return a list of dictionaries, each containing `article_id`, `title`, `domain`, `goodness_score`, `pub_date`, and `cluster_id`.
-3.  Initialize an empty list `output_data`.
-4.  Iterate through the fetched articles:
-    - For each `article_id`, call `db_client.get_top_entities_for_article(article_id, limit=10)` (to be created) to get the names of the top 10 entities.
-    - Combine the article details, goodness score, and entity names into a structured dictionary.
-    - Append the structured dictionary to `output_data`.
-5.  Define the output directory path: `output_dir = "src/output/"`.
-6.  Ensure the output directory exists: `os.makedirs(output_dir, exist_ok=True)`.
-7.  Generate a timestamped output filename: `timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")`, `filepath = os.path.join(output_dir, f"step4_output_{timestamp}.json")`.
-8.  Write the `output_data` list to the JSON file: `with open(filepath, 'w') as f: json.dump(output_data, f, indent=2, default=str)` (use `default=str` for `datetime` objects).
-9.  Close the `ReaderDBClient` connection using a `try...finally` block or context manager if `ReaderDBClient` supports it.
-10. Log success, including the number of articles processed and the output file path.
-11. Return a status dictionary: `{"success": True, "articles_processed": len(output_data), "output_file": filepath}`.
-
-## 5. Database Client Modifications (`reader_db_client.py` and modules)
-
-- **In `src/database/modules/articles.py`:**
-  - Create `get_recent_day_processed_articles_with_details(conn, limit=None)`:
-    - Query `articles` (`a`).
-    - Filter: `a.processed_at IS NOT NULL` AND `a.pub_date >= CURRENT_DATE - INTERVAL '1 day'`.
-    - Join with `domain_statistics` (`ds`) on `a.domain = ds.domain` (use `LEFT JOIN` to include articles even if domain stats are missing).
-    - Select: `a.id`, `a.title`, `a.domain`, `ds.goodness_score`, `a.pub_date`, `a.cluster_id`.
-    - Apply `limit` if provided.
-    - Return list of dictionaries.
-- **In `src/database/modules/entities.py`:**
-  - Create `get_top_entities_for_article(conn, article_id: int, limit: int = 10)`:
-    - Query `article_entities` (`ae`).
-    - Join with `entities` (`e`) on `ae.entity_id = e.id`.
-    - Filter by `ae.article_id = article_id`.
-    - Order by `e.influence_score DESC`, `e.mentions DESC`.
-    - Limit by `limit`.
-    - Select `e.name`.
-    - Return list of entity names.
-- **In `src/database/reader_db_client.py`:**
-  - Add wrapper methods `get_recent_day_processed_articles_with_details()` and `get_top_entities_for_article()` that get a connection and call the respective functions in the `articles` and `entities` modules.
-
-## 6. Integration (`main.py`)
-
-- Import `run as run_step4` from `src.steps.step4`.
-- Add an environment variable check (e.g., `RUN_STEP4=true`).
-- Inside the `main` function, after Step 3, add conditional execution block for Step 4:
-  ```python
-  if os.getenv("RUN_STEP4", "false").lower() == "true":
-      logger.info("========= STARTING STEP 4: DATA EXPORT ========")
-      try:
-          step4_status = run_step4() # Assumes synchronous
-          logger.info("Step 4 Summary:")
-          logger.debug(json.dumps(step4_status, indent=2))
-          if step4_status.get("success", False):
-              logger.info(f"Step 4 successful: Exported {step4_status.get('articles_processed', 0)} articles to {step4_status.get('output_file')}")
-          else:
-              logger.warning(f"Step 4 completed with issues: {step4_status.get('error', 'Unknown error')}")
-      except Exception as e:
-          logger.error(f"Step 4 failed with error: {e}", exc_info=True)
-      finally:
-          logger.info("========= STEP 4 COMPLETE ========")
-  else:
-      logger.info("Skipping Step 4: Data Export (RUN_STEP4 not true)")
-  ```
-
-## 7. Docker Configuration
-
-- **`Dockerfile`:** Add `RUN mkdir -p /app/src/output && chmod 777 /app/src/output` before the `CMD` or `ENTRYPOINT`.
-- **`docker-compose.yml`:**
-  - Add `RUN_STEP4: ${RUN_STEP4:-false}` environment variable to the `article-transfer` service.
-  - _Optional:_ Add a volume mount for `src/output` to persist output on the host:
-    ```yaml
-    services:
-      article-transfer:
-        # ... other config ...
-        volumes:
-          # ... existing volumes ...
-          - ./src/output:/app/src/output
-    ```
-
-## 8. Error Handling
-
-- Implement `try...except` blocks around database calls and file I/O within `step4.py`.
-- Log errors using the `logging` module, including tracebacks where helpful (`exc_info=True`).
-- Ensure `run()` function returns a status dictionary with `success: False` and an `error` message upon failure.
-- Ensure `ReaderDBClient` connection is closed reliably using `try...finally`.
-
-## 9. Refinement & Sophistication
-
-- Leverages `ReaderDBClient` for maintainability.
-- Uses efficient SQL queries.
-- Timestamped output prevents accidental overwrites.
-- Conditional execution enhances flexibility.
-- Clear separation of concerns is maintained.
+1.  **Placeholder:** Ensure the prompt contains a clear placeholder like `{INPUT_DATA_JSON}` for the article list injection.
+2.  **Clarity:** Review prompt instructions to ensure they align with the expected input structure (`articles_for_analysis`) and desired output format (JSON object with `article_groups`). Emphasize the need for valid JSON output.

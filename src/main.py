@@ -39,7 +39,7 @@ import asyncio  # Add asyncio import
 from src.steps.step1 import run as run_step1
 from src.steps.step2 import run as run_step2
 from src.steps.step3 import run as run_step3  # run_step3 is now async
-from src.steps.step4 import run as run_step4
+from src.steps.step4 import run as run_step4  # run_step4 is now async
 from src.steps.domain_goodness import calculate_domain_goodness_scores
 
 # Import network checker
@@ -229,7 +229,9 @@ async def main():  # Make main async
                     try:
                         # Note: calculate_entities_influence_scores is currently synchronous
                         # If it becomes async later, it would need await here.
-                        influence_status = db_client.calculate_entities_influence_scores()
+                        influence_status = db_client.calculate_entities_influence_scores(
+                            force_recalculate=False  # Skip recalculation if done within 24 hours
+                        )
                         logger.info(
                             f"Influence score calculation: {influence_status}")
                     finally:
@@ -248,7 +250,7 @@ async def main():  # Make main async
     if os.getenv("RUN_STEP4", "false").lower() == "true":
         logger.info("========= STARTING STEP 4: DATA EXPORT =========")
         try:
-            step4_status = run_step4()  # Synchronous function
+            step4_status = await run_step4()  # Now properly awaits the async function
             logger.info("Step 4 Summary:")
             logger.debug(json.dumps(step4_status, indent=2))
 

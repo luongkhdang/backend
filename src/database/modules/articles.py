@@ -852,7 +852,7 @@ def get_recent_day_processed_articles_with_details(conn, limit: Optional[int] = 
         limit: Optional maximum number of articles to return (returns all if None)
 
     Returns:
-        List of article dictionaries with domain goodness scores
+        List of article dictionaries with domain goodness scores, is_hot flag, content, and frame_phrases
     """
     try:
         cursor = conn.cursor()
@@ -866,11 +866,14 @@ def get_recent_day_processed_articles_with_details(conn, limit: Optional[int] = 
                 a.domain, 
                 a.pub_date, 
                 a.cluster_id,
-                ds.goodness_score
+                ds.goodness_score,
+                a.is_hot,
+                a.content,
+                a.frame_phrases
             FROM articles a
             LEFT JOIN domain_statistics ds ON a.domain = ds.domain
             WHERE a.extracted_entities = TRUE
-            AND a.pub_date >= (CURRENT_DATE - INTERVAL '1 DAY')
+            AND a.pub_date >= (CURRENT_DATE - INTERVAL '2 DAY')
             AND a.pub_date <= CURRENT_DATE
             ORDER BY a.pub_date DESC
         """

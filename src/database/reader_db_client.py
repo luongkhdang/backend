@@ -1011,23 +1011,24 @@ class ReaderDBClient:
         return False
 
     def calculate_entities_influence_scores(self, entity_ids: Optional[List[int]] = None,
-                                            recency_days: int = 30) -> Dict[str, Any]:
+                                            recency_days: int = 30, force_recalculate: bool = False) -> Dict[str, Any]:
         """
         Calculate influence scores for specified entities or all entities.
 
         Args:
             entity_ids: Optional list of entity IDs to calculate for. If None, calculates for all recently updated entities.
             recency_days: Number of days to prioritize for recency calculation
+            force_recalculate: If True, recalculate all scores regardless of last calculation time
 
         Returns:
-            Dict with success count, error count, and calculation summary
+            Dict with success count, error count, skipped count, and calculation summary
         """
         try:
             from src.database.modules.influence import update_all_influence_scores
 
             with self.get_connection() as conn:
                 result = update_all_influence_scores(
-                    conn, entity_ids, recency_days)
+                    conn, entity_ids, recency_days, force_recalculate)
                 return result
 
         except Exception as e:
@@ -1035,17 +1036,19 @@ class ReaderDBClient:
             return {
                 "success_count": 0,
                 "error_count": 0,
+                "skipped_count": 0,
                 "total_entities": 0,
                 "error": str(e)
             }
 
-    def calculate_entity_influence_score(self, entity_id: int, recency_days: int = 30) -> float:
+    def calculate_entity_influence_score(self, entity_id: int, recency_days: int = 30, force_recalculate: bool = False) -> float:
         """
         Calculate comprehensive influence score for a single entity.
 
         Args:
             entity_id: Entity ID to calculate score for
             recency_days: Number of days to prioritize for recency calculation
+            force_recalculate: If True, recalculate regardless of last calculation time
 
         Returns:
             Calculated influence score
@@ -1055,7 +1058,7 @@ class ReaderDBClient:
 
             with self.get_connection() as conn:
                 score = calculate_entity_influence_score(
-                    conn, entity_id, recency_days)
+                    conn, entity_id, recency_days, force_recalculate)
                 return score
 
         except Exception as e:
@@ -1218,6 +1221,26 @@ class ReaderDBClient:
                 self.release_connection(conn)
         return False
 
+    def add_entity_type_weight(self, entity_type: str, weight: float = 1.0) -> bool:
+        """
+        Add a specific entity type with a custom weight to the database.
+
+        Args:
+            entity_type: The entity type to add
+            weight: Weight value to assign (default: 1.0)
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                from src.database.modules.influence import _add_entity_type_weight
+                return _add_entity_type_weight(conn, entity_type, weight)
+            finally:
+                self.release_connection(conn)
+        return False
+
     def get_linked_entities(self, entity_id):
         """
         Get entities that are frequently linked to the given entity.
@@ -1361,6 +1384,35 @@ class ReaderDBClient:
             except Exception as e:
                 logger.error(
                     f"Error retrieving top entities for article {article_id}: {e}")
+                return []
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_top_entities_with_influence_flag(self, article_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Retrieve detailed information about top entities for a specific article including the influence context flag.
+
+        Args:
+            article_id: ID of the article
+            limit: Maximum number of entities to return
+
+        Returns:
+            List[Dict[str, Any]]: List of entity dictionaries with keys:
+                - entity_id: The entity ID
+                - name: The entity name
+                - entity_type: The entity type
+                - is_influential_context: Boolean flag indicating if the entity appears in an influential context
+                - influence_score: The global influence score of the entity
+                - mention_count: Number of times the entity is mentioned in the article
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return entities.get_top_entities_with_influence_flag(conn, article_id, limit)
+            except Exception as e:
+                logger.error(
+                    f"Error retrieving top entities with influence flag for article {article_id}: {e}")
                 return []
             finally:
                 self.release_connection(conn)

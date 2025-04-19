@@ -592,6 +592,42 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
     if not entity_results:
         return {"processed": 0, "links": 0, "snippets": 0, "errors": 0}
 
+    # First, collect all unique entity types from the results to add them to the database
+    unique_entity_types = set()
+
+    # Extract all entity types from the results
+    for article_id, extracted_data in entity_results.items():
+        # Skip if error or not a dict
+        if not isinstance(extracted_data, dict) or 'error' in extracted_data:
+            continue
+
+        # Find entity list in various formats
+        entity_list = None
+        if 'ents' in extracted_data and isinstance(extracted_data['ents'], list):
+            entity_list = extracted_data['ents']
+        elif 'entities' in extracted_data and isinstance(extracted_data['entities'], list):
+            entity_list = extracted_data['entities']
+        elif 'extracted_entities' in extracted_data and isinstance(extracted_data['extracted_entities'], list):
+            entity_list = extracted_data['extracted_entities']
+        elif isinstance(extracted_data, list):
+            entity_list = extracted_data
+
+        if entity_list:
+            for entity in entity_list:
+                # Get entity type from either short or long format
+                entity_type = entity.get('et') or entity.get('entity_type')
+                if entity_type:
+                    unique_entity_types.add(entity_type)
+
+    # Add all unique entity types to the database with default weights
+    logger.info(
+        f"Adding {len(unique_entity_types)} unique entity types to the database")
+    for entity_type in unique_entity_types:
+        try:
+            db_client.add_entity_type_weight(entity_type)
+        except Exception as e:
+            logger.warning(f"Could not add entity type {entity_type}: {e}")
+
     # Get list of article IDs to process in batches
     article_ids = list(entity_results.keys())
     batch_size = 10  # Process 10 articles at a time for DB operations

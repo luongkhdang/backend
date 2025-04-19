@@ -13,12 +13,13 @@ Exported functions:
     - entity_id (int): ID of the entity to calculate score for.
     - recency_days (int): Number of days to prioritize for recency (default: 30).
   - Returns (float): Calculated influence score (0.0 if error or entity not found).
-- update_all_influence_scores(conn: Any, entity_ids: Optional[List[int]], recency_days: int) -> Dict[str, Any]: Updates influence scores for multiple entities.
+- update_all_influence_scores(conn: Any, entity_ids: Optional[List[int]], recency_days: int, force_recalculate: bool = False) -> Dict[str, Any]: Updates influence scores for multiple entities.
   - Parameters:
     - conn: Database connection object.
     - entity_ids (Optional[List[int]]): List of entity IDs to update (if None, uses entities from recent articles).
     - recency_days (int): Number of days to prioritize for recency (default: 30).
-  - Returns (Dict[str, Any]): Dictionary with success count, error count, and total entities processed.
+    - force_recalculate (bool): If True, recalculate all scores regardless of last calculation time.
+  - Returns (Dict[str, Any]): Dictionary with success count, error count, skipped count, recalculated count, and total entities processed.
 - populate_default_entity_type_weights(conn: Any) -> bool: Populates default weights for common entity types.
   - Parameters:
     - conn: Database connection object.
@@ -80,19 +81,105 @@ class DateTimeEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-def calculate_entity_influence_score(conn, entity_id: int, recency_days: int = 30) -> float:
+def _get_last_calculation_timestamp(conn, entity_id: int) -> Optional[datetime]:
+    """
+    Get the timestamp of the most recent influence calculation for an entity.
+
+    Args:
+        conn: Database connection
+        entity_id: Entity ID to check
+
+    Returns:
+        datetime object of last calculation or None if not found
+    """
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT calculation_timestamp 
+            FROM entity_influence_factors 
+            WHERE entity_id = %s 
+            ORDER BY calculation_timestamp DESC 
+            LIMIT 1
+        """, (entity_id,))
+
+        result = cursor.fetchone()
+        cursor.close()
+
+        if result:
+            return result[0]
+        return None
+    except Exception as e:
+        logger.error(
+            f"Error retrieving last calculation timestamp for entity {entity_id}: {e}")
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        return None
+
+
+def _get_current_influence_score(conn, entity_id: int) -> Optional[float]:
+    """
+    Get the current influence score for an entity.
+
+    Args:
+        conn: Database connection
+        entity_id: Entity ID to check
+
+    Returns:
+        Current influence score or None if not found
+    """
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT influence_score 
+            FROM entities 
+            WHERE id = %s
+        """, (entity_id,))
+
+        result = cursor.fetchone()
+        cursor.close()
+
+        if result:
+            return float(result[0]) if result[0] is not None else None
+        return None
+    except Exception as e:
+        logger.error(
+            f"Error retrieving current influence score for entity {entity_id}: {e}")
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        return None
+
+
+def calculate_entity_influence_score(conn, entity_id: int, recency_days: int = 30, force_recalculate: bool = False) -> float:
     """
     Calculate comprehensive influence score for an entity based on multiple factors.
+    If the score was calculated within the last 24 hours, return the existing score
+    unless force_recalculate is True.
 
     Args:
         conn: Database connection
         entity_id: Entity ID to calculate score for
         recency_days: Number of days to prioritize for recency calculation
+        force_recalculate: If True, recalculate regardless of last calculation time
 
     Returns:
         Calculated influence score (0.0 if error or entity not found)
     """
     try:
+        # Check when the score was last calculated
+        if not force_recalculate:
+            last_calc_time = _get_last_calculation_timestamp(conn, entity_id)
+            if last_calc_time is not None:
+                time_since_calc = datetime.now() - last_calc_time
+                # If calculated within the last 24 hours, return the existing score
+                if time_since_calc.total_seconds() < 24 * 3600:  # 24 hours in seconds
+                    current_score = _get_current_influence_score(
+                        conn, entity_id)
+                    if current_score is not None:
+                        logger.debug(
+                            f"Skipping influence calculation for entity {entity_id}. Last calculated {time_since_calc.total_seconds()/3600:.1f} hours ago.")
+                        return current_score
+                    # If we can't get the current score for some reason, recalculate
+
         # Step 1: Collect raw data (now includes entity_type)
         raw_data = _collect_entity_influence_data(
             conn, entity_id, recency_days)
@@ -235,7 +322,7 @@ def populate_default_entity_type_weights(conn) -> bool:
 
 
 def update_all_influence_scores(conn, entity_ids: Optional[List[int]] = None,
-                                recency_days: int = 30) -> Dict[str, Any]:
+                                recency_days: int = 30, force_recalculate: bool = False) -> Dict[str, Any]:
     """
     Update influence scores for multiple entities.
 
@@ -243,9 +330,10 @@ def update_all_influence_scores(conn, entity_ids: Optional[List[int]] = None,
         conn: Database connection
         entity_ids: List of entity IDs to update (if None, uses entities from recent articles)
         recency_days: Number of days to prioritize for recency calculation
+        force_recalculate: If True, recalculate all scores regardless of last calculation time
 
     Returns:
-        Dict with success count, error count, and total entities processed
+        Dict with success count, error count, skipped count, recalculated count, and total entities processed
     """
     # Populate default entity type weights first to avoid warnings
     populate_default_entity_type_weights(conn)
@@ -280,6 +368,7 @@ def update_all_influence_scores(conn, entity_ids: Optional[List[int]] = None,
 
         success_count = 0
         error_count = 0
+        skipped_count = 0
 
         # Process entities in batches to avoid long-running transactions
         # and to get fresh connections for better transaction isolation
@@ -301,9 +390,28 @@ def update_all_influence_scores(conn, entity_ids: Optional[List[int]] = None,
                         _cursor = conn.cursor()
                         _cursor.execute("BEGIN")
 
-                        # Calculate the score with this sub-transaction
+                        # Calculate the score with this sub-transaction, passing force_recalculate
+                        current_score = None
+                        if not force_recalculate:
+                            # Check if we should skip this entity (calculated within 24 hours)
+                            last_calc_time = _get_last_calculation_timestamp(
+                                conn, entity_id)
+                            if last_calc_time is not None:
+                                time_since_calc = datetime.now() - last_calc_time
+                                if time_since_calc.total_seconds() < 24 * 3600:  # 24 hours in seconds
+                                    current_score = _get_current_influence_score(
+                                        conn, entity_id)
+                                    if current_score is not None:
+                                        # Skip calculation but count as success
+                                        skipped_count += 1
+                                        success_count += 1
+                                        _cursor.execute("COMMIT")
+                                        _cursor.close()
+                                        continue
+
+                        # If we get here, we need to calculate the score
                         score = calculate_entity_influence_score(
-                            conn, entity_id, recency_days)
+                            conn, entity_id, recency_days, force_recalculate)
 
                         # If we get here, commit the sub-transaction
                         _cursor.execute("COMMIT")
@@ -336,6 +444,8 @@ def update_all_influence_scores(conn, entity_ids: Optional[List[int]] = None,
         return {
             "success_count": success_count,
             "error_count": error_count,
+            "skipped_count": skipped_count,
+            "recalculated_count": success_count - skipped_count,
             "total_entities": len(target_entity_ids)
         }
 
@@ -345,6 +455,7 @@ def update_all_influence_scores(conn, entity_ids: Optional[List[int]] = None,
         return {
             "success_count": 0,
             "error_count": 0,
+            "skipped_count": 0,
             # Report count even if setup failed
             "total_entities": len(target_entity_ids),
             "error": str(e)
@@ -619,6 +730,8 @@ def _get_entity_type_weight(conn, entity_type: str) -> float:
         if result:
             return float(result[0])
         else:
+            # Add the missing entity type to the database
+            _add_entity_type_weight(conn, entity_type)
             # Log warning about missing entity type
             logger.warning(
                 f"No weight found for entity type '{entity_type}'. Using default 1.0")
@@ -627,6 +740,43 @@ def _get_entity_type_weight(conn, entity_type: str) -> float:
         logger.error(
             f"Error retrieving weight for entity type '{entity_type}': {e}")
         return 1.0  # Default to neutral weight on error
+
+
+def _add_entity_type_weight(conn, entity_type: str, default_weight: float = 1.0) -> bool:
+    """
+    Add a new entity type with default weight to the entity_type_weights table.
+
+    Args:
+        conn: Database connection
+        entity_type: The entity type to add
+        default_weight: Default weight value to assign (default: 1.0)
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO entity_type_weights (entity_type, weight, updated_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (entity_type) DO NOTHING
+        """, (entity_type, default_weight))
+
+        conn.commit()
+        cursor.close()
+
+        logger.info(
+            f"Added new entity type '{entity_type}' with default weight {default_weight}")
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        logger.error(
+            f"Error adding entity type weight for '{entity_type}': {e}", exc_info=True)
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        return False
 
 
 def _store_influence_factors(conn, entity_id: int, factors_data: Dict[str, Any]) -> bool:
