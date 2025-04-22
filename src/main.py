@@ -160,68 +160,76 @@ async def main():  # Make main async
         logger.error("Aborting pipeline due to network issues")
         return 1  # Return non-zero exit code
 
-    # Execute Step 1: Data Collection, Processing and Storage
-    step1_result = run_step1(max_workers=args.workers)
+    # --- Phase 1 Steps (Controlled by RUN_PHASE_1_STEPS) ---
+    run_phase_1 = os.getenv("RUN_PHASE_1_STEPS", "true").lower() == "true"
 
-    # Handle both possible return types from step1 (dict or int)
-    if isinstance(step1_result, dict):
-        # New version returns status dictionary
-        logger.info("Step 1 Summary:")
-        logger.debug(json.dumps(step1_result, indent=2))
+    if run_phase_1:
+        logger.info("Executing Phase 1 Steps (1-4)...")
 
-        inserted_count = step1_result.get("step1.4_inserted", 0)
-        if inserted_count == 0:
-            logger.warning("No new articles inserted")
-        else:
-            logger.info(f"Inserted {inserted_count} articles")
-    else:
-        # Old version returns integer count of processed articles
-        if step1_result == 0:
-            logger.warning("Step 1 did not process any articles")
-        else:
-            logger.info(
-                f"Step 1 successfully processed {step1_result} articles")
+        # Execute Step 1: Data Collection, Processing and Storage
+        if os.getenv("RUN_STEP1", "true").lower() == "true":
+            step1_result = run_step1(max_workers=args.workers)
 
-    # Execute Step 2: Clustering (only if enabled via environment variable)
-    if os.getenv("RUN_CLUSTERING_STEP", "false").lower() == "true":
-        logger.info("========= STARTING STEP 2: CLUSTERING =========")
-        try:
-            step2_status = run_step2()
-            logger.info("Step 2 Summary:")
-            logger.debug(json.dumps(step2_status, indent=2))
+            # Handle both possible return types from step1 (dict or int)
+            if isinstance(step1_result, dict):
+                # New version returns status dictionary
+                logger.info("Step 1 Summary:")
+                logger.debug(json.dumps(step1_result, indent=2))
 
-            if step2_status.get("success", False):
-                logger.info(
-                    f"Clustering successful: {step2_status.get('clusters_found', 0)} clusters created")
+                inserted_count = step1_result.get("step1.4_inserted", 0)
+                if inserted_count == 0:
+                    logger.warning("No new articles inserted")
+                else:
+                    logger.info(f"Inserted {inserted_count} articles")
             else:
-                logger.warning(
-                    f"Clustering completed with issues: {step2_status.get('error', 'Unknown error')}")
-        except Exception as e:
-            logger.error(f"Step 2 failed with error: {e}", exc_info=True)
-        finally:
-            logger.info("========= STEP 2 COMPLETE =========")
-    else:
-        logger.info(
-            "Skipping Step 2: Clustering (RUN_CLUSTERING_STEP not true)")
+                # Old version returns integer count of processed articles
+                if step1_result == 0:
+                    logger.warning("Step 1 did not process any articles")
+                else:
+                    logger.info(
+                        f"Step 1 successfully processed {step1_result} articles")
+        else:
+            logger.info("Skipping Step 1 (RUN_STEP1 not true)")
 
-    # Execute Step 3: Entity Extraction (only if enabled via environment variable)
-    if os.getenv("RUN_STEP3", "false").lower() == "true":
-        logger.info("========= STARTING STEP 3: ENTITY EXTRACTION =========")
-        try:
-            step3_status = await run_step3()  # Use await for the async function
-            logger.info("Step 3 Summary:")
-            logger.debug(json.dumps(step3_status, indent=2))
+        # Execute Step 2: Clustering
+        if os.getenv("RUN_STEP2", "true").lower() == "true":
+            logger.info("========= STARTING STEP 2: CLUSTERING =========")
+            try:
+                step2_status = run_step2()
+                logger.info("Step 2 Summary:")
+                logger.debug(json.dumps(step2_status, indent=2))
 
-            if step3_status.get("success", False):
-                logger.info(
-                    f"Entity extraction successful: {step3_status.get('processed', 0)} articles processed")
-                logger.info(
-                    f"Created {step3_status.get('entity_links_created', 0)} entity links")
-                logger.info(
-                    f"Stored {step3_status.get('snippets_stored', 0)} supporting snippets")
+                if step2_status.get("success", False):
+                    logger.info(
+                        f"Clustering successful: {step2_status.get('clusters_found', 0)} clusters created")
+                else:
+                    logger.warning(
+                        f"Clustering completed with issues: {step2_status.get('error', 'Unknown error')}")
+            except Exception as e:
+                logger.error(f"Step 2 failed with error: {e}", exc_info=True)
+            finally:
+                logger.info("========= STEP 2 COMPLETE =========")
+        else:
+            logger.info("Skipping Step 2 (RUN_STEP2 not true)")
 
-                # Calculate influence scores for entities extracted in this run
-                if os.getenv("CALCULATE_INFLUENCE_SCORES", "true").lower() == "true":
+        # Execute Step 3: Entity Extraction
+        if os.getenv("RUN_STEP3", "true").lower() == "true":
+            logger.info(
+                "========= STARTING STEP 3: ENTITY EXTRACTION =========")
+            try:
+                step3_status = await run_step3()  # Use await for the async function
+                logger.info("Step 3 Summary:")
+                logger.debug(json.dumps(step3_status, indent=2))
+
+                if step3_status.get("success", False):
+                    logger.info(
+                        f"Entity extraction successful: {step3_status.get('processed', 0)} articles processed")
+                    logger.info(
+                        f"Created {step3_status.get('entity_links_created', 0)} entity links")
+                    logger.info(
+                        f"Stored {step3_status.get('snippets_stored', 0)} supporting snippets")
+
+                    # Calculate influence scores (now runs unconditionally if Step 3 runs)
                     logger.info(
                         "Calculating influence scores for extracted entities")
                     from src.database.reader_db_client import ReaderDBClient
@@ -236,39 +244,38 @@ async def main():  # Make main async
                             f"Influence score calculation: {influence_status}")
                     finally:
                         db_client.close()
-            else:
-                logger.warning(
-                    f"Entity extraction completed with issues: {step3_status.get('error', 'Unknown error')}")
-        except Exception as e:
-            logger.error(f"Step 3 failed with error: {e}", exc_info=True)
-        finally:
-            logger.info("========= STEP 3 COMPLETE =========")
-    else:
-        logger.info("Skipping Step 3: Entity Extraction (RUN_STEP3 not true)")
+                else:
+                    logger.warning(
+                        f"Entity extraction completed with issues: {step3_status.get('error', 'Unknown error')}")
+            except Exception as e:
+                logger.error(f"Step 3 failed with error: {e}", exc_info=True)
+            finally:
+                logger.info("========= STEP 3 COMPLETE =========")
+        else:
+            logger.info("Skipping Step 3 (RUN_STEP3 not true)")
 
-    # Execute Step 4: Data Export (only if enabled via environment variable)
-    if os.getenv("RUN_STEP4", "false").lower() == "true":
-        logger.info("========= STARTING STEP 4: DATA EXPORT =========")
-        try:
-            step4_status = await run_step4()  # Now properly awaits the async function
-            logger.info("Step 4 Summary:")
-            logger.debug(json.dumps(step4_status, indent=2))
+        # Execute Step 4: Data Export
+        if os.getenv("RUN_STEP4", "true").lower() == "true":
+            logger.info("========= STARTING STEP 4: DATA EXPORT =========")
+            try:
+                step4_status = await run_step4()  # Now properly awaits the async function
+                logger.info("Step 4 Summary:")
+                logger.debug(json.dumps(step4_status, indent=2))
 
-            if step4_status.get("success", False):
-                logger.info(
-                    f"Data export successful: Exported {step4_status.get('articles_processed', 0)} articles to {step4_status.get('output_file')}")
-            else:
-                logger.warning(
-                    f"Data export completed with issues: {step4_status.get('error', 'Unknown error')}")
-        except Exception as e:
-            logger.error(f"Step 4 failed with error: {e}", exc_info=True)
-        finally:
-            logger.info("========= STEP 4 COMPLETE =========")
-    else:
-        logger.info("Skipping Step 4: Data Export (RUN_STEP4 not true)")
+                if step4_status.get("success", False):
+                    logger.info(
+                        f"Data export successful: Exported {step4_status.get('articles_processed', 0)} articles to {step4_status.get('output_file')}")
+                else:
+                    logger.warning(
+                        f"Data export completed with issues: {step4_status.get('error', 'Unknown error')}")
+            except Exception as e:
+                logger.error(f"Step 4 failed with error: {e}", exc_info=True)
+            finally:
+                logger.info("========= STEP 4 COMPLETE =========")
+        else:
+            logger.info("Skipping Step 4 (RUN_STEP4 not true)")
 
-    # Weekly domain goodness calculation (can be triggered separately or scheduled)
-    if os.getenv("CALCULATE_DOMAIN_GOODNESS", "false").lower() == "true":
+        # Weekly domain goodness calculation (now runs unconditionally if Phase 1 runs)
         logger.info("========= CALCULATING DOMAIN GOODNESS SCORES =========")
         try:
             from src.database.reader_db_client import ReaderDBClient
@@ -292,8 +299,16 @@ async def main():  # Make main async
             logger.info(
                 "========= DOMAIN GOODNESS CALCULATION COMPLETE =========")
 
-    # Future steps would be executed here
-    # step4_result = run_step4()
+    else:
+        logger.info(
+            "Skipping Phase 1 Steps (1-4) as RUN_PHASE_1_STEPS is not true.")
+
+    # Future steps (Phase 2+) would be executed here
+    # Example:
+    # if os.getenv("RUN_STEP5", "false").lower() == "true":
+    #    logger.info("========= STARTING STEP 5 =========")
+    #    # Call run_step5()
+    #    logger.info("========= STEP 5 COMPLETE =========")
 
     logger.info("DATA REFINERY PIPELINE COMPLETE")
     # Make sure to explicitly exit with status code 0 to avoid container restart

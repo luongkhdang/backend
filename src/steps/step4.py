@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 # Model to use for analysis
-ANALYSIS_MODEL = "models/123123123"
+ANALYSIS_MODEL = "models/qweqweqwe"
 # Prompt file path
 PROMPT_FILE = "src/prompts/step4.txt"
 
@@ -113,33 +113,54 @@ async def run() -> Dict[str, Any]:  # Changed to async def
 
             # Format entities for the prompt input with snippets
             entities_for_prompt = []
+            influential_count = 0  # Counter for influential entities
+
+            # Check if this article is hot
+            is_hot = article.get('is_hot', False)
+
             for entity in top_entities_detail:
-                # Only include influential entities
-                if entity.get('is_influential_context', False):
+                # Only include influential entities and limit to top 2
+                if entity.get('is_influential_context', False) and influential_count < 2:
                     entity_id = entity.get('entity_id')
 
-                    # Get snippets for this entity in this article
-                    entity_snippets = db_client.get_article_entity_snippets(
-                        article_id, entity_id)
+                    # Format the entity data
+                    entity_data = [
+                        entity.get('name'),
+                        entity.get('entity_type')
+                    ]
 
-                    # Format the entity with its snippets
-                    entity_data = {
-                        "name": entity.get('name'),
-                        "entity_type": entity.get('entity_type'),
-                        "snippets": [snippet.get('snippet') for snippet in entity_snippets]
-                    }
+                    # Only get snippets if the article is hot
+                    if is_hot:
+                        # Get snippets for this entity in this article
+                        entity_snippets = db_client.get_article_entity_snippets(
+                            article_id, entity_id)
+                        # Add snippets as the third element
+                        entity_data.append([snippet.get('snippet')
+                                           for snippet in entity_snippets])
+                    else:
+                        # For non-hot articles, add an empty array for snippets
+                        entity_data.append([])
+
                     entities_for_prompt.append(entity_data)
+                    influential_count += 1  # Increment counter after processing an influential entity
 
-            # Construct the dictionary with fields required by the prompt
+            # Convert pub_date to ISO format string if it's a datetime object
+            pub_date = article.get('pub_date')
+            if isinstance(pub_date, datetime):
+                pub_date = pub_date.date().isoformat()
+            else:
+                pub_date = article.get('pub_date', '')
+
+            # Construct the list item with fields in positional order
             analysis_input_item = {
                 'article_id': article_id,
                 'title': article.get('title', ''),
                 'domain': article.get('domain', ''),
-                # Convert pub_date to ISO format string if it's a datetime object
-                'pub_date': article.get('pub_date').date().isoformat() if isinstance(article.get('pub_date'), datetime) else article.get('pub_date'),
-                'cluster_id': article.get('cluster_id'),
+                'content_length': article.get('content_length', 0),
+                'pub_date': pub_date,
+                'cluster_id': article.get('cluster_id', ''),
                 'frame_phrases': article.get('frame_phrases', []),
-                'top_entities': entities_for_prompt
+                'main_entities': entities_for_prompt,
             }
             articles_for_analysis.append(analysis_input_item)
 

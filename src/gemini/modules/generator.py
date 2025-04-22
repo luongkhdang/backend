@@ -35,7 +35,7 @@ async def analyze_articles_with_prompt(
     model_name: str,
     system_instruction: Optional[str] = None,
     temperature: float = 0.2,
-    max_output_tokens: int = 8192,
+    max_output_tokens: int = 65536,
     retries: int = 1,
     initial_delay: float = 1.0,
     rate_limiter=None
@@ -89,7 +89,8 @@ async def analyze_articles_with_prompt(
 
     # Serialize the article data to JSON for the prompt
     try:
-        articles_json = json.dumps(articles_data, ensure_ascii=False)
+        articles_json = json.dumps(
+            articles_data, separators=(',', ':'), ensure_ascii=True)
     except (TypeError, OverflowError) as e:
         logger.error(f"Failed to serialize article data to JSON: {e}")
         return None
@@ -115,14 +116,7 @@ async def analyze_articles_with_prompt(
         logger.warning(f"Failed to save full prompt for debugging: {e}")
 
     # Default system instruction if none provided
-    actual_system_instruction = system_instruction or """The AI agent should adopt an academic persona—specifically, that of a seasoned political science professor at Stanford, 
-        who is also a leading expert in political and economic affairs with access to insider information by virtue of sitting 
-        on the directive board of the current ruling party. Aware of the risks of censorship and the precariousness of its position, 
-        the agent must carefully navigate these constraints, striving to present factual information in a way that encourages 
-        independent thought. Rather than drawing explicit conclusions, it subtly unveils the truth through evidence and context, 
-        allowing the audience to arrive at their own interpretations. At its core, the agent is an educator, committed to the 
-        intellectual growth of the next generation. It recognizes that failing to uphold this responsibility would be a betrayal 
-        of its duty as a noble scholar and mentor."""
+    actual_system_instruction = system_instruction or """The AI agent should adopt an academic persona—specifically."""
 
     # Single attempt, no retries
     logger.debug(f"Starting API call to model {model_name}")
@@ -191,6 +185,35 @@ async def analyze_articles_with_prompt(
         logger.debug(f"Response first 500 chars: {generated_text[:500]}")
         if text_length > 1000:
             logger.debug(f"Response last 500 chars: {generated_text[-500:]}")
+
+        # Save usage metadata if available
+        if hasattr(response, 'usage_metadata'):
+            usage_metadata = response.usage_metadata
+            usage_metadata_filename = f"usage_metadata_{timestamp}.json"
+            usage_metadata_path = os.path.join(
+                output_dir, usage_metadata_filename)
+            try:
+                with open(usage_metadata_path, 'w', encoding='utf-8') as f:
+                    if hasattr(usage_metadata, '_asdict'):
+                        # Convert to dictionary if it's a namedtuple-like object
+                        metadata_dict = usage_metadata._asdict()
+                        json.dump(metadata_dict, f, indent=2)
+                    else:
+                        # Try direct serialization
+                        json.dump(usage_metadata, f, indent=2)
+                logger.info(f"Saved usage metadata to {usage_metadata_path}")
+            except (IOError, TypeError) as e:
+                logger.warning(f"Failed to save usage metadata: {e}")
+                # If direct serialization fails, try a manual approach
+                try:
+                    metadata_str = str(usage_metadata)
+                    with open(usage_metadata_path, 'w', encoding='utf-8') as f:
+                        f.write(metadata_str)
+                    logger.info(
+                        f"Saved usage metadata as string to {usage_metadata_path}")
+                except IOError as e2:
+                    logger.warning(
+                        f"Failed to save usage metadata as string: {e2}")
 
         # Check if response is empty
         if not generated_text or not generated_text.strip():

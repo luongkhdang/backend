@@ -218,6 +218,15 @@ def initialize_tables(conn) -> bool:
         CREATE INDEX IF NOT EXISTS idx_entity_snippets_article_id ON entity_snippets(article_id);
         """)
 
+        # Create clusters_fundamental table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clusters_fundamental (
+            id SERIAL PRIMARY KEY,
+            centroid VECTOR(768), -- Assuming same dimension as other vectors
+            metadata JSONB
+        );
+        """)
+
         # Create indexes to improve query performance
         create_indexes(conn)
 

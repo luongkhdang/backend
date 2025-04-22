@@ -135,6 +135,14 @@ _(Initial weights inserted for: PERSON, ORGANIZATION, GOVERNMENT_AGENCY, LOCATIO
 | `is_influential` | `BOOLEAN`   |                                        | `TRUE`              | Flag indicating if the snippet is influential |
 | `created_at`     | `TIMESTAMP` |                                        | `CURRENT_TIMESTAMP` | Timestamp when the snippet was stored         |
 
+### `clusters_fundamental`
+
+| Column     | Type          | Constraints   | Default | Description                                   |
+| ---------- | ------------- | ------------- | ------- | --------------------------------------------- |
+| `id`       | `SERIAL`      | `PRIMARY KEY` |         | Unique identifier for the fundamental cluster |
+| `centroid` | `VECTOR(768)` |               |         | Centroid vector representing the cluster      |
+| `metadata` | `JSONB`       |               |         | JSON blob for cluster metadata                |
+
 ## Indexes
 
 - **`articles`**:

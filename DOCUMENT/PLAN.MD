@@ -1,39 +1,39 @@
-Okay, I understand the feedback and refinements. Let's incorporate these points, particularly keeping the LLM-based grouping step (with `cluster_id` as input), adding sophistication to the de-duplication, and planning for long-form content generation.
+          Okay, I understand the feedback and refinements. Let's incorporate these points, particularly keeping the LLM-based grouping step (with `cluster_id` as input), adding sophistication to the de-duplication, and planning for long-form content generation.
 
-Here's how I interpreted your points and how we can refine the plan:
+          Here's how I interpreted your points and how we can refine the plan:
 
-1.  **Interpretation/Agreement (Point 1 & 3):** Acknowledged. We're aligned on the overall RAG approach and the multi-output generation strategy.
+          1.  **Interpretation/Agreement (Point 1 & 3):** Acknowledged. We're aligned on the overall RAG approach and the multi-output generation strategy.
 
-2.  **LLM-Based Grouping (Point 2 - Stage E.0 Refinement):**
+          2.  **LLM-Based Grouping (Point 2 - Stage E.0 Refinement):**
 
-    - **Your Direction:** Keep the single API call using `gemini-2.5-flash-preview` to generate 50 groups based on article metadata, importantly _including_ the `cluster_id` from Step 2 (HDBSCAN) as a key input signal for the LLM. Don't over-engineer _this specific step_ but potential sophistication is welcome.
-    - **My Interpretation:** Got it. The LLM isn't replacing Step 2 clustering but acting as a "smart selector" or "theme identifier" using metadata _plus_ the semantic cluster ID from Step 2.
-    - **Sophistication Add:** Instead of just grouping, we can ask the model to provide a _rationale_ or _thematic description_ for each group it creates, based on the patterns it sees in the titles, domains, dates, and cluster ID distributions. This rationale becomes the "description to help RAG pull supportive historical data effectively." We can also ask it to identify _up to_ 50 _significant_ groups rather than a fixed 50.
-    - **Plan Update:** Stage E.0 will use the single `gemini-2.5-flash-preview` call with input `(article_id, title, domain, pub_date, cluster_id)`. Prompt will ask for _up to 50 significant thematic groups_, allowing overlap, with a _generated rationale/description_ for each group, outputting structured JSON. Reliability/prompt complexity remains a challenge to note.
+              - **Your Direction:** Keep the single API call using `gemini-2.5-flash-preview` to generate 50 groups based on article metadata, importantly _including_ the `cluster_id` from Step 2 (HDBSCAN) as a key input signal for the LLM. Don't over-engineer _this specific step_ but potential sophistication is welcome.
+              - **My Interpretation:** Got it. The LLM isn't replacing Step 2 clustering but acting as a "smart selector" or "theme identifier" using metadata _plus_ the semantic cluster ID from Step 2.
+              - **Sophistication Add:** Instead of just grouping, we can ask the model to provide a _rationale_ or _thematic description_ for each group it creates, based on the patterns it sees in the titles, domains, dates, and cluster ID distributions. This rationale becomes the "description to help RAG pull supportive historical data effectively." We can also ask it to identify _up to_ 50 _significant_ groups rather than a fixed 50.
+              - **Plan Update:** Stage E.0 will use the single `gemini-2.5-flash-preview` call with input `(article_id, title, domain, pub_date, cluster_id)`. Prompt will ask for _up to 50 significant thematic groups_, allowing overlap, with a _generated rationale/description_ for each group, outputting structured JSON. Reliability/prompt complexity remains a challenge to note.
 
-3.  **De-duplication Sophistication (Point 4 - Stage E.0 Refinement):**
+          3.  **De-duplication Sophistication (Point 4 - Stage E.0 Refinement):**
 
-    - **Your Direction:** Make the context de-duplication step more sophisticated than just identifying repetition.
-    - **My Interpretation:** Enhance the value derived from the RAG context before feeding it to the main analysis model.
-    - **Sophistication Add:** Instead of just summarizing, the "less powerful model" (`gemini-flash`) in the de-duplication step can be prompted to:
-      - Extract key factual claims/statements from the RAG context.
-      - Identify source articles (`article_id`) and count mentions for each fact.
-      - Specifically highlight any _contradictory_ claims found within the RAG context.
-      - Optionally, provide a brief chronological sequence of key developments based on `pub_date`.
-    - **Plan Update:** The de-duplication substep within Stage E.0 will now produce a _structured context summary_ containing key facts, source counts, identified contradictions, and potential sequencing, providing richer input for the main analysis model in Stage E.1.
+              - **Your Direction:** Make the context de-duplication step more sophisticated than just identifying repetition.
+              - **My Interpretation:** Enhance the value derived from the RAG context before feeding it to the main analysis model.
+              - **Sophistication Add:** Instead of just summarizing, the "less powerful model" (`gemini-flash`) in the de-duplication step can be prompted to:
+                - Extract key factual claims/statements from the RAG context.
+                - Identify source articles (`article_id`) and count mentions for each fact.
+                - Specifically highlight any _contradictory_ claims found within the RAG context.
+                - Optionally, provide a brief chronological sequence of key developments based on `pub_date`.
+              - **Plan Update:** The de-duplication substep within Stage E.0 will now produce a _structured context summary_ containing key facts, source counts, identified contradictions, and potential sequencing, providing richer input for the main analysis model in Stage E.1.
 
-4.  **Long-Form Content Generation (Point 5 - New Stage H):**
+          4.  **Long-Form Content Generation (Point 5 - New Stage H):**
 
-    - **Your Direction:** Explore mixing/matching the generated summary/analysis chunks (output of Stage E.1) to create long-form content, utilizing more API quota if necessary.
-    - **My Interpretation:** Create a new _output format_ or _product_ derived from the analysis cache, suitable for reports or articles.
-    - **Sophistication Add:** Define a new, potentially on-demand or lower-frequency pipeline stage.
-    - **Plan Update:** Add **Stage H: Long-Form Content Assembly**. This stage queries the `analysis_snippets` and `essays` tables based on specific criteria (e.g., a theme, an entity, a cluster ID). It then uses an LLM (`gemini-flash` or `flash-preview`, managing quota) with a prompt focused on _assembling_ these selected chunks—adding transitions, introductions, conclusions—into a coherent long-form piece. This explicitly leverages the existing analysis cache for a different commercial output.
+              - **Your Direction:** Explore mixing/matching the generated summary/analysis chunks (output of Stage E.1) to create long-form content, utilizing more API quota if necessary.
+              - **My Interpretation:** Create a new _output format_ or _product_ derived from the analysis cache, suitable for reports or articles.
+              - **Sophistication Add:** Define a new, potentially on-demand or lower-frequency pipeline stage.
+              - **Plan Update:** Add **Stage H: Long-Form Content Assembly**. This stage queries the `analysis_snippets` and `essays` tables based on specific criteria (e.g., a theme, an entity, a cluster ID). It then uses an LLM (`gemini-flash` or `flash-preview`, managing quota) with a prompt focused on _assembling_ these selected chunks—adding transitions, introductions, conclusions—into a coherent long-form piece. This explicitly leverages the existing analysis cache for a different commercial output.
 
-5.  **Agreement (Point 6):** Noted.
+          5.  **Agreement (Point 6):** Noted.
 
-Now, let's regenerate the final plan (Version 5.0) incorporating these latest refinements.
+          Now, let's regenerate the final plan (Version 5.0) incorporating these latest refinements.
 
----
+          ---
 
 ## **Fracture Civic Intelligence Platform: Backend Plan**
 

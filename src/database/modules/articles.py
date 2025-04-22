@@ -852,7 +852,7 @@ def get_recent_day_processed_articles_with_details(conn, limit: Optional[int] = 
         limit: Optional maximum number of articles to return (returns all if None)
 
     Returns:
-        List of article dictionaries with domain goodness scores, is_hot flag, content, and frame_phrases
+        List of article dictionaries with domain goodness scores, is_hot flag, content, frame_phrases, and content_length
     """
     try:
         cursor = conn.cursor()

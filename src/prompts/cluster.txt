@@ -1,0 +1,10 @@
+Following the previous grouping task, your objective is to enrich the dataset by synthesizing key information and generating consolidated, descriptive metadata for each unique cluster_id found in the provided article metadata (input.txt). For every cluster, analyze the constituent articles' frame_phrases and entities_for_prompt to identify and derive dominant/common themes and prominent actors/concepts. Create a concise yet comprehensive metadata summary that captures the cluster's core essence, providing a clearer, pre-processed understanding. The ultimate goal is to produce informative cluster summaries that will streamline and improve the speed and accuracy of subsequent thematic analysis or data grouping tasks. Output the result as a single JSON object mapping each cluster_id (as a string) to its corresponding synthesized metadata string.
+
+
+
+
+Atomic Steps: Each sub-point (a, b, c, d, e) focuses on a more singular, actionable instruction.
+Clear Sequence: The steps guide the model logically through the process for each theory or angle.
+Highlighting Crucial Steps: Key requirements like "Justify with Text" are clearly separated and emphasized, making them harder to miss.
+Reduced Cognitive Load: Breaking down the task prevents the model from having to juggle multiple complex constraints simultaneously within one instruction.
+Retained Rigor: All the essential requirements (textual grounding, justification, specificity, depth, persona alignment) are still present but distributed across the clearer structure.

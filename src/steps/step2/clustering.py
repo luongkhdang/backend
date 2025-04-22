@@ -56,9 +56,9 @@ logger = logging.getLogger(__name__)
 def cluster_articles(
     embeddings: np.ndarray,
     min_cluster_size: int = 5,
-    min_samples: int = 3,
+    min_samples: int = 5,
     metric: str = 'cosine',
-    cluster_selection_epsilon: float = 0.5,
+    cluster_selection_epsilon: float = 0.4,
     alpha: float = 1.0
 ) -> Tuple[np.ndarray, List[int]]:
     """

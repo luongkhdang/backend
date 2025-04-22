@@ -104,22 +104,6 @@ def run() -> Dict[str, Any]:
         logger.info("Step 2.1: Initializing database connection")
         reader_client = ReaderDBClient()
 
-        # Load spaCy model if needed for topic relevance calculation or interpretation
-        calculate_topic_relevance = os.getenv(
-            "CALCULATE_TOPIC_RELEVANCE", "true").lower() == "true"
-        interpret_clusters = os.getenv(
-            "INTERPRET_CLUSTERS", "false").lower() == "true"
-
-        if (calculate_topic_relevance or interpret_clusters) and SPACY_AVAILABLE:
-            try:
-                nlp = initialize_nlp()
-                logger.info(
-                    "Successfully loaded spaCy model for keyword extraction")
-            except Exception as e:
-                logger.warning(
-                    f"Failed to load spaCy model: {e}. Topic relevance calculation may be limited.")
-                nlp = None
-
         # Step 2: Retrieve all embeddings and metadata from the database
         logger.info(
             "Step 2.2: Fetching article embeddings and metadata from database")
@@ -379,7 +363,7 @@ def run() -> Dict[str, Any]:
             # Don't fail the whole process if metadata generation fails
 
         # Step 11 (Optional): Basic cluster interpretation with spaCy
-        if SPACY_AVAILABLE and os.getenv("INTERPRET_CLUSTERS", "false").lower() == "true" and nlp is not None:
+        if SPACY_AVAILABLE and nlp is not None:
             logger.info("Step 2.11: Performing basic cluster interpretation")
             try:
                 # Get cluster interpretations for a subset of clusters (limit to save time)
