@@ -136,52 +136,71 @@ def extract_json_from_text(text: str) -> Tuple[Optional[str], Optional[str]]:
     if not text:
         return None, "Empty text"
 
+    # 1. Explicitly check for and strip ```json ... ``` markdown blocks
+    stripped_text = text.strip()
+    if stripped_text.startswith("```json") and stripped_text.endswith("```"):
+        json_candidate = stripped_text[len("```json"): -len("```")].strip()
+        # Basic validation before returning
+        if (json_candidate.startswith("{") and json_candidate.endswith("}")) or \
+           (json_candidate.startswith("[") and json_candidate.endswith("]")):
+            logger.debug("Extracted JSON by stripping ```json block.")
+            return json_candidate, None
+    # 2. Explicitly check for and strip ``` ... ``` markdown blocks
+    elif stripped_text.startswith("```") and stripped_text.endswith("```"):
+        json_candidate = stripped_text[len("```"): -len("```")].strip()
+        # Basic validation before returning
+        if (json_candidate.startswith("{") and json_candidate.endswith("}")) or \
+           (json_candidate.startswith("[") and json_candidate.endswith("]")):
+            logger.debug("Extracted JSON by stripping ``` block.")
+            return json_candidate, None
+
+    # 3. Fallback: Try the previous regex approach for embedded JSON
+    logger.debug(
+        "Markdown block stripping failed or not applicable, trying regex fallback.")
+
     # Try to find JSON object (starting with { and ending with })
-    object_match = re.search(r'({[\s\S]*?})', text)
-    array_match = re.search(r'(\[[\s\S]*?\])', text)
+    # Use non-greedy matching for nested structures
+    # Modified regex to be less likely to grab surrounding text
+    object_match = re.search(
+        r'{\s*(?:\"[^"]*\"|[^:{\[\],])*?\s*:(?:.|\n)*?}', text)
+    # Try to find JSON array (starting with [ and ending with ])
+    array_match = re.search(r'\[(?:.|\n)*?\]', text)
 
-    # If we found a potential JSON object
-    if object_match:
-        json_candidate = object_match.group(1)
+    # Prioritize the longer match if both are found, assuming it's more likely the full JSON
+    json_candidate = None
+    if object_match and array_match:
+        if object_match.start() <= array_match.start() and object_match.end() >= array_match.end():
+            json_candidate = object_match.group(0)
+        elif array_match.start() <= object_match.start() and array_match.end() >= object_match.end():
+            json_candidate = array_match.group(0)
+        # If they don't overlap cleanly, prefer the object match as it's more common for LLM JSON output
+        else:
+            json_candidate = object_match.group(0)
+    elif object_match:
+        json_candidate = object_match.group(0)
+    elif array_match:
+        json_candidate = array_match.group(0)
+
+    if json_candidate:
+        # Attempt to parse the candidate to verify it's valid JSON
         result, error = parse_json(json_candidate)
         if not error:
+            logger.debug(
+                f"Extracted JSON using regex fallback: {json_candidate[:50]}...")
             return json_candidate, None
+        else:
+            logger.debug(
+                f"Regex candidate failed parsing: {error}. Candidate: {json_candidate[:50]}...")
 
-    # If we found a potential JSON array
-    if array_match:
-        json_candidate = array_match.group(1)
-        result, error = parse_json(json_candidate)
-        if not error:
-            return json_candidate, None
-
-    # Try with code block extraction (for markdown-formatted text)
-    code_blocks = re.findall(r'```(?:json)?\s*([\s\S]*?)```', text)
+    # Final Fallback: Search specifically within ``` blocks again if primary stripping failed
+    # This handles cases where the stripping logic was too simple (e.g., extra whitespace)
+    code_blocks = re.findall(r'```(?:json)?\\s*([\\s\\S]*?)```', text)
     for block in code_blocks:
+        block = block.strip()  # Strip whitespace from the extracted block
         result, error = parse_json(block)
         if not error:
+            logger.debug(
+                f"Extracted JSON using final code block regex fallback: {block[:50]}...")
             return block, None
-
-    # Look for the largest matching braces that might contain valid JSON
-    # This is a more aggressive approach for malformed text
-    stack = []
-    start_indices = []
-    potential_jsons = []
-
-    for i, char in enumerate(text):
-        if char == '{':
-            if not stack:
-                start_indices.append(i)
-            stack.append('{')
-        elif char == '}' and stack and stack[-1] == '{':
-            stack.pop()
-            if not stack:
-                start_idx = start_indices.pop()
-                potential_jsons.append(text[start_idx:i+1])
-
-    # Try each potential JSON string
-    for json_str in potential_jsons:
-        result, error = parse_json(json_str)
-        if not error:
-            return json_str, None
 
     return None, "No valid JSON found in text"

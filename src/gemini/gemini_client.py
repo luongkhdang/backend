@@ -460,6 +460,9 @@ class GeminiClient:
                             if error:
                                 logger.warning(
                                     f"Extracted JSON parsing failed for {model_name}: {error}")
+                                # Log the problematic extracted JSON for debugging
+                                logger.debug(
+                                    f"Problematic extracted JSON from {model_name}:\n{extracted_json}")
                                 # Continue with retries or model switches
                                 continue
 
@@ -809,8 +812,13 @@ class GeminiClient:
                             parsed_json, error = parse_json(extracted_json)
 
                             if error:
+                                # --- ADDED LOGGING HERE ---
                                 logger.warning(
                                     f"Extracted JSON parsing failed for {model_name}: {error}")
+                                # Log the problematic extracted JSON for debugging
+                                logger.debug(
+                                    f"Problematic extracted JSON from {model_name}:\n{extracted_json}")
+                                # --- END ADDED LOGGING ---
                                 # Continue with retries or model switches
                                 continue
 
