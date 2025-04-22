@@ -104,6 +104,24 @@ def run() -> Dict[str, Any]:
         logger.info("Step 2.1: Initializing database connection")
         reader_client = ReaderDBClient()
 
+        # Load spaCy model if needed for keyword extraction (used in hotness and interpretation)
+        # calculate_topic_relevance = os.getenv(
+        #     "CALCULATE_TOPIC_RELEVANCE", "true").lower() == "true"
+        # interpret_clusters = os.getenv(
+        #     "INTERPRET_CLUSTERS", "false").lower() == "true"
+
+        # SpaCy is needed if either hotness uses topic relevance or interpretation is enabled
+        # We always attempt to load it if available, as it's relatively lightweight
+        if SPACY_AVAILABLE:
+            try:
+                nlp = initialize_nlp()
+                logger.info(
+                    "Successfully loaded spaCy model for keyword extraction")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load spaCy model: {e}. Keyword extraction will not be available.")
+                nlp = None
+
         # Step 2: Retrieve all embeddings and metadata from the database
         logger.info(
             "Step 2.2: Fetching article embeddings and metadata from database")
@@ -363,7 +381,7 @@ def run() -> Dict[str, Any]:
             # Don't fail the whole process if metadata generation fails
 
         # Step 11 (Optional): Basic cluster interpretation with spaCy
-        if SPACY_AVAILABLE and nlp is not None:
+        if SPACY_AVAILABLE and os.getenv("INTERPRET_CLUSTERS", "false").lower() == "true" and nlp is not None:
             logger.info("Step 2.11: Performing basic cluster interpretation")
             try:
                 # Get cluster interpretations for a subset of clusters (limit to save time)
@@ -385,6 +403,57 @@ def run() -> Dict[str, Any]:
             except Exception as e:
                 logger.warning(f"Cluster interpretation failed: {e}")
                 # Don't fail the whole process if interpretation fails
+
+        # --- STEP 7.3: Interpretation (using spaCy, now always runs if spaCy is available) ---
+        interpreted_clusters = {}
+        if SPACY_AVAILABLE and nlp is not None:
+            logger.info(
+                "Step 2.7.3: Interpreting cluster keywords (using spaCy)")
+            # Use the utility function
+            interpreted_clusters = get_cluster_keywords(
+                nlp, cluster_article_map, reader_client)
+        else:
+            logger.info(
+                "Skipping cluster interpretation (spaCy not available or failed to load)")
+
+        # --- STEP 7.4: Generate cluster metadata (always runs) ---
+        logger.info("Step 2.7.4: Generating cluster metadata")
+        try:
+            # Create a mapping of cluster_label -> list of article_ids
+            cluster_article_map = {}
+            for article_index, label in enumerate(labels):
+                if label >= 0:  # Skip noise points (label -1)
+                    if label not in cluster_article_map:
+                        cluster_article_map[label] = []
+                    cluster_article_map[label].append(
+                        article_ids[article_index])
+
+            # Create a mapping of article_id -> embedding for efficient lookups
+            embeddings_map = {article_ids[i]: embeddings[i]
+                              for i in range(len(article_ids))}
+
+            # Process each cluster
+            for label, cluster_articles in cluster_article_map.items():
+                db_cluster_id = cluster_db_map.get(label)
+                if db_cluster_id and cluster_articles:
+                    # Get the centroid for this cluster
+                    cluster_centroid = centroids.get(label)
+
+                    # Generate enhanced metadata for this cluster
+                    generate_and_update_cluster_metadata(
+                        cluster_id=db_cluster_id,
+                        article_ids=cluster_articles,
+                        embeddings_map=embeddings_map,
+                        cluster_centroid=cluster_centroid,
+                        reader_db_client=reader_client
+                    )
+
+            logger.info(
+                f"Successfully generated enhanced metadata for {len(cluster_article_map)} clusters")
+        except Exception as e:
+            logger.warning(
+                f"Error during enhanced metadata generation: {e}", exc_info=True)
+            # Don't fail the whole process if metadata generation fails
 
         status["success"] = True
 

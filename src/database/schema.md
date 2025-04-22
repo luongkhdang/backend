@@ -8,7 +8,11 @@
 
 ## Tables
 
+(Managed primarily by `src/database/modules/schema.py`)
+
 ### `articles`
+
+(Managed by `src/database/modules/articles.py`)
 
 | Column               | Type        | Constraints                             | Default | Description                                        |
 | -------------------- | ----------- | --------------------------------------- | ------- | -------------------------------------------------- |
@@ -26,6 +30,8 @@
 
 ### `entities`
 
+(Managed by `src/database/modules/entities.py`)
+
 | Column                    | Type        | Constraints           | Default             | Description                                        |
 | ------------------------- | ----------- | --------------------- | ------------------- | -------------------------------------------------- |
 | `id`                      | `SERIAL`    | `PRIMARY KEY`         |                     | Unique identifier for the entity                   |
@@ -41,6 +47,8 @@
 
 ### `article_entities` (Junction Table)
 
+(Managed by `src/database/modules/entities.py`)
+
 | Column                   | Type        | Constraints                                           | Default             | Description                                            |
 | ------------------------ | ----------- | ----------------------------------------------------- | ------------------- | ------------------------------------------------------ |
 | `article_id`             | `INTEGER`   | `PRIMARY KEY`, `FK to articles(id) ON DELETE CASCADE` |                     | ID of the article                                      |
@@ -51,6 +59,8 @@
 
 ### `embeddings`
 
+(Managed by `src/database/modules/embeddings.py`)
+
 | Column       | Type          | Constraints                                      | Default             | Description                                       |
 | ------------ | ------------- | ------------------------------------------------ | ------------------- | ------------------------------------------------- |
 | `id`         | `SERIAL`      | `PRIMARY KEY`                                    |                     | Unique identifier for the embedding record        |
@@ -59,6 +69,8 @@
 | `created_at` | `TIMESTAMP`   |                                                  | `CURRENT_TIMESTAMP` | Timestamp when the embedding was generated/stored |
 
 ### `clusters`
+
+(Managed by `src/database/modules/clusters.py`)
 
 | Column          | Type          | Constraints   | Default        | Description                                        |
 | --------------- | ------------- | ------------- | -------------- | -------------------------------------------------- |
@@ -71,6 +83,8 @@
 | `hotness_score` | `FLOAT`       |               | `NULL`         | Calculated hotness score for the cluster           |
 
 ### `essays`
+
+(Managed by `src/database/modules/essays.py`)
 
 | Column        | Type        | Constraints                             | Default             | Description                                    |
 | ------------- | ----------- | --------------------------------------- | ------------------- | ---------------------------------------------- |
@@ -86,12 +100,16 @@
 
 ### `essay_entities` (Junction Table)
 
+(Managed by `src/database/modules/essays.py`)
+
 | Column      | Type      | Constraints                                           | Default | Description             |
 | ----------- | --------- | ----------------------------------------------------- | ------- | ----------------------- |
 | `essay_id`  | `INTEGER` | `PRIMARY KEY`, `FK to essays(id) ON DELETE CASCADE`   |         | ID of the essay         |
 | `entity_id` | `INTEGER` | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE` |         | ID of the linked entity |
 
 ### `domain_statistics`
+
+(Managed by `src/database/modules/domains.py`)
 
 | Column                    | Type        | Constraints   | Default             | Description                                                            |
 | ------------------------- | ----------- | ------------- | ------------------- | ---------------------------------------------------------------------- |
@@ -103,6 +121,8 @@
 | `calculated_at`           | `TIMESTAMP` |               | `CURRENT_TIMESTAMP` | Timestamp when the statistics were last calculated                     |
 
 ### `entity_influence_factors`
+
+(Managed by `src/database/modules/influence.py`)
 
 | Column                  | Type        | Constraints                                           | Default             | Description                                    |
 | ----------------------- | ----------- | ----------------------------------------------------- | ------------------- | ---------------------------------------------- |
@@ -116,6 +136,8 @@
 
 ### `entity_type_weights`
 
+(Managed by `src/database/modules/influence.py`)
+
 | Column        | Type        | Constraints   | Default             | Description                                |
 | ------------- | ----------- | ------------- | ------------------- | ------------------------------------------ |
 | `entity_type` | `TEXT`      | `PRIMARY KEY` |                     | The entity type name                       |
@@ -125,6 +147,8 @@
 _(Initial weights inserted for: PERSON, ORGANIZATION, GOVERNMENT_AGENCY, LOCATION, GEOPOLITICAL_ENTITY, CONCEPT, LAW_OR_POLICY, EVENT, OTHER)_
 
 ### `entity_snippets`
+
+(Managed by `src/database/modules/entity_snippets.py`)
 
 | Column           | Type        | Constraints                            | Default             | Description                                   |
 | ---------------- | ----------- | -------------------------------------- | ------------------- | --------------------------------------------- |
@@ -136,6 +160,8 @@ _(Initial weights inserted for: PERSON, ORGANIZATION, GOVERNMENT_AGENCY, LOCATIO
 | `created_at`     | `TIMESTAMP` |                                        | `CURRENT_TIMESTAMP` | Timestamp when the snippet was stored         |
 
 ### `clusters_fundamental`
+
+(Managed by `src/database/modules/clusters.py`)
 
 | Column     | Type          | Constraints   | Default | Description                                   |
 | ---------- | ------------- | ------------- | ------- | --------------------------------------------- |

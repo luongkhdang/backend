@@ -147,6 +147,14 @@ async def main():  # Make main async
 
     logger.info("STARTING DATA REFINERY PIPELINE")
 
+    # --- Read Step Control Environment Variables ---
+    run_phase_1 = os.getenv("RUN_PHASE_1_STEPS", "true").lower() == "true"
+    run_step1_flag = os.getenv("RUN_STEP1", "true").lower() == "true"
+    run_step2_flag = os.getenv("RUN_STEP2", "true").lower() == "true"
+    run_step3_flag = os.getenv("RUN_STEP3", "true").lower() == "true"
+    run_step4_flag = os.getenv("RUN_STEP4", "true").lower() == "true"
+    # ----------------------------------------------
+
     # GPU Check (Log availability)
     gpu_available = check_gpu_availability()
     logger.info(f"GPU Check: CUDA Available for PyTorch = {gpu_available}")
@@ -160,39 +168,37 @@ async def main():  # Make main async
         logger.error("Aborting pipeline due to network issues")
         return 1  # Return non-zero exit code
 
-    # --- Phase 1 Steps (Controlled by RUN_PHASE_1_STEPS) ---
-    run_phase_1 = os.getenv("RUN_PHASE_1_STEPS", "true").lower() == "true"
-
+    # --- Phase 1 Steps (Steps 1-4) ---
     if run_phase_1:
         logger.info("Executing Phase 1 Steps (1-4)...")
 
         # Execute Step 1: Data Collection, Processing and Storage
-        if os.getenv("RUN_STEP1", "true").lower() == "true":
+        if run_step1_flag:
+            logger.info(
+                "========= STARTING STEP 1: DATA COLLECTION & PROCESSING =========")
             step1_result = run_step1(max_workers=args.workers)
 
             # Handle both possible return types from step1 (dict or int)
             if isinstance(step1_result, dict):
-                # New version returns status dictionary
                 logger.info("Step 1 Summary:")
                 logger.debug(json.dumps(step1_result, indent=2))
-
                 inserted_count = step1_result.get("step1.4_inserted", 0)
                 if inserted_count == 0:
-                    logger.warning("No new articles inserted")
+                    logger.warning("Step 1: No new articles inserted")
                 else:
-                    logger.info(f"Inserted {inserted_count} articles")
+                    logger.info(f"Step 1: Inserted {inserted_count} articles")
             else:
-                # Old version returns integer count of processed articles
                 if step1_result == 0:
                     logger.warning("Step 1 did not process any articles")
                 else:
                     logger.info(
                         f"Step 1 successfully processed {step1_result} articles")
+            logger.info("========= STEP 1 COMPLETE =========")
         else:
             logger.info("Skipping Step 1 (RUN_STEP1 not true)")
 
         # Execute Step 2: Clustering
-        if os.getenv("RUN_STEP2", "true").lower() == "true":
+        if run_step2_flag:
             logger.info("========= STARTING STEP 2: CLUSTERING =========")
             try:
                 step2_status = run_step2()
@@ -210,10 +216,10 @@ async def main():  # Make main async
             finally:
                 logger.info("========= STEP 2 COMPLETE =========")
         else:
-            logger.info("Skipping Step 2 (RUN_STEP2 not true)")
+            logger.info("Skipping Step 2: Clustering (RUN_STEP2 not true)")
 
         # Execute Step 3: Entity Extraction
-        if os.getenv("RUN_STEP3", "true").lower() == "true":
+        if run_step3_flag:
             logger.info(
                 "========= STARTING STEP 3: ENTITY EXTRACTION =========")
             try:
@@ -229,16 +235,14 @@ async def main():  # Make main async
                     logger.info(
                         f"Stored {step3_status.get('snippets_stored', 0)} supporting snippets")
 
-                    # Calculate influence scores (now runs unconditionally if Step 3 runs)
+                    # Calculate influence scores for entities extracted in this run (always run if Step 3 runs)
                     logger.info(
-                        "Calculating influence scores for extracted entities")
+                        "Calculating influence scores for extracted entities...")
                     from src.database.reader_db_client import ReaderDBClient
                     db_client = ReaderDBClient()
                     try:
-                        # Note: calculate_entities_influence_scores is currently synchronous
-                        # If it becomes async later, it would need await here.
                         influence_status = db_client.calculate_entities_influence_scores(
-                            force_recalculate=False  # Skip recalculation if done within 24 hours
+                            force_recalculate=False
                         )
                         logger.info(
                             f"Influence score calculation: {influence_status}")
@@ -252,10 +256,11 @@ async def main():  # Make main async
             finally:
                 logger.info("========= STEP 3 COMPLETE =========")
         else:
-            logger.info("Skipping Step 3 (RUN_STEP3 not true)")
+            logger.info(
+                "Skipping Step 3: Entity Extraction (RUN_STEP3 not true)")
 
         # Execute Step 4: Data Export
-        if os.getenv("RUN_STEP4", "true").lower() == "true":
+        if run_step4_flag:
             logger.info("========= STARTING STEP 4: DATA EXPORT =========")
             try:
                 step4_status = await run_step4()  # Now properly awaits the async function
@@ -273,45 +278,39 @@ async def main():  # Make main async
             finally:
                 logger.info("========= STEP 4 COMPLETE =========")
         else:
-            logger.info("Skipping Step 4 (RUN_STEP4 not true)")
-
-        # Weekly domain goodness calculation (now runs unconditionally if Phase 1 runs)
-        logger.info("========= CALCULATING DOMAIN GOODNESS SCORES =========")
-        try:
-            from src.database.reader_db_client import ReaderDBClient
-            db_client = ReaderDBClient()
-            try:
-                # Note: calculate_domain_goodness_scores is currently synchronous
-                domain_status = calculate_domain_goodness_scores(db_client)
-                logger.info(f"Domain goodness calculation: {domain_status}")
-
-                if domain_status.get("top_domains"):
-                    logger.info("Top domains by goodness score:")
-                    for domain in domain_status["top_domains"]:
-                        logger.info(
-                            f"  {domain['domain']}: {domain['score']:.4f}")
-            finally:
-                db_client.close()
-        except Exception as e:
-            logger.error(
-                f"Domain goodness calculation failed: {e}", exc_info=True)
-        finally:
-            logger.info(
-                "========= DOMAIN GOODNESS CALCULATION COMPLETE =========")
+            logger.info("Skipping Step 4: Data Export (RUN_STEP4 not true)")
 
     else:
         logger.info(
             "Skipping Phase 1 Steps (1-4) as RUN_PHASE_1_STEPS is not true.")
 
-    # Future steps (Phase 2+) would be executed here
-    # Example:
-    # if os.getenv("RUN_STEP5", "false").lower() == "true":
-    #    logger.info("========= STARTING STEP 5 =========")
-    #    # Call run_step5()
-    #    logger.info("========= STEP 5 COMPLETE =========")
+    # --- Domain Goodness Calculation (Always runs if pipeline reaches this point) ---
+    logger.info("========= CALCULATING DOMAIN GOODNESS SCORES =========")
+    try:
+        from src.database.reader_db_client import ReaderDBClient
+        db_client = ReaderDBClient()
+        try:
+            domain_status = calculate_domain_goodness_scores(db_client)
+            logger.info(f"Domain goodness calculation: {domain_status}")
+
+            if domain_status.get("top_domains"):
+                logger.info("Top domains by goodness score:")
+                for domain in domain_status["top_domains"]:
+                    logger.info(
+                        f"  {domain['domain']}: {domain['score']:.4f}")
+        finally:
+            db_client.close()
+    except Exception as e:
+        logger.error(
+            f"Domain goodness calculation failed: {e}", exc_info=True)
+    finally:
+        logger.info(
+            "========= DOMAIN GOODNESS CALCULATION COMPLETE =========")
+    # -----------------------------------------------------------------------------
+
+    # Future steps (e.g., Step 5) would be executed here
 
     logger.info("DATA REFINERY PIPELINE COMPLETE")
-    # Make sure to explicitly exit with status code 0 to avoid container restart
     return 0
 
 

@@ -1,6 +1,24 @@
 {
   "error_articles": [
     {
+      "id": 130640,
+      "scraper_id": 105325,
+      "title": "Chevy Blazer SS EV first drive, over 600hp and 300 miles of range!",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:58:20",
+      "domain": "electrek.co",
+      "processed_at": "2025-04-22T17:47:11.076058"
+    },
+    {
+      "id": 129683,
+      "scraper_id": 104224,
+      "title": "NWSL Power Rankings: KC Current Shine Brightest After Matchday 5 - Sports Illustrated",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T13:58:28",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-21T17:07:44.411454"
+    },
+    {
       "id": 128334,
       "scraper_id": 97262,
       "title": "Is NVIDIA Corporation (NVDA) the Best Metaverse Stock to Invest in? - Yahoo Finance",
@@ -3718,5 +3736,5 @@
       "processed_at": "2025-04-12T01:50:19.879116"
     }
   ],
-  "count": 413
+  "count": 415
 }

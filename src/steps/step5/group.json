@@ -1,0 +1,464 @@
+{
+    "processed_date": "2025-04-21 07:00 PM",
+    "article_groups": {
+      "group_1": {
+        "group_rationale": "Examines the framing of US foreign policy decisions, particularly concerning aid allocation and sanctions, revealing underlying narratives and potential biases in reporting. Aligns strongly with Recognize Framing and Trace Power.",
+        "article_ids": [
+          129078,
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128101
+        ]
+      },
+      "group_2": {
+        "group_rationale": "Investigates the interplay between political rhetoric, legislative action, and international relations, focusing on how domestic debates influence foreign policy execution. Primarily serves Trace Power and Recognize Framing.",
+        "article_ids": [
+          129078,
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128488,
+          128019,
+          128101
+        ]
+      },
+      "group_3": {
+        "group_rationale": "Highlights contradictions and ambiguities in official statements versus reported actions concerning international conflicts and aid distribution, fostering critical assessment of information. Connects strongly with Interpret Ambiguity and See Sparks.",
+        "article_ids": [
+          129078,
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128019,
+          128857
+        ]
+      },
+      "group_4": {
+        "group_rationale": "Analyzes competing perspectives on the effectiveness and ethical implications of US military and financial support in protracted conflicts. Directly supports Hold Competing Truths and Recognize Framing.",
+        "article_ids": [
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128019,
+          128857
+        ]
+      },
+      "group_5": {
+        "group_rationale": "Tracks the specific actions and influence networks surrounding key political figures (e.g., Johnson, Greene, Trump) in shaping US foreign policy decisions. Exemplifies Trace Power.",
+        "article_ids": [
+          129078,
+          128814,
+          128747,
+          129124,
+          129093,
+          128488,
+          128900
+        ]
+      },
+      "group_6": {
+        "group_rationale": "Exposes potential gaps and 'surprising silences' in reporting on controversial political appointments and internal investigations, prompting closer examination of institutional narratives. Aligns with See Sparks and Interpret Ambiguity.",
+        "article_ids": [
+          127891,
+          128488,
+          128857
+        ]
+      },
+      "group_7": {
+        "group_rationale": "Deconstructs the framing used in discussions about political accountability and ethics, particularly concerning allegations against public officials. Directly relates to Recognize Framing.",
+        "article_ids": [
+          127891,
+          128488,
+          128857,
+          128579
+        ]
+      },
+      "group_8": {
+        "group_rationale": "Maps the power dynamics within political parties and government agencies, focusing on appointments, resignations, and internal conflicts. Supports Trace Power.",
+        "article_ids": [
+          127891,
+          128488,
+          127703,
+          128857
+        ]
+      },
+      "group_9": {
+        "group_rationale": "Examines how corporations adapt strategies (M&A, financing) in response to geopolitical uncertainty and trade policy shifts, illustrating the tension between economic logic and political risk. Connects to Interpret Ambiguity and Trace Power.",
+        "article_ids": [
+          128900,
+          127703,
+          128101
+        ]
+      },
+      "group_10": {
+        "group_rationale": "Highlights the use of specific theoretical lenses (e.g., game theory) to interpret corporate behavior amid market volatility and political interventions. Primarily supports Recognize Framing.",
+        "article_ids": [
+          128900,
+          127703
+        ]
+      },
+      "group_11": {
+        "group_rationale": "Focuses on identifying 'intriguing angles' and unspoken factors influencing major corporate decisions, such as leadership changes and deal structuring. Aligns with See Sparks.",
+        "article_ids": [
+          128900,
+          127703
+        ]
+      },
+      "group_12": {
+        "group_rationale": "Explores the interaction between systemic issues like social inequality and specific events like housing crises or safety failures, encouraging a multi-layered analysis. Supports Hold Competing Truths and Recognize Framing.",
+        "article_ids": [
+          128579,
+          127891
+        ]
+      },
+      "group_13": {
+        "group_rationale": "Tracks the influence and accountability of specific entities (landlords, government agencies) in addressing public safety and housing standards. Directly serves Trace Power.",
+        "article_ids": [
+          128579,
+          128857
+        ]
+      },
+      "group_14": {
+        "group_rationale": "Analyzes the narrative construction around US aid packages, contrasting humanitarian justifications with geopolitical objectives. Supports Recognize Framing and Hold Competing Truths.",
+        "article_ids": [
+          127985,
+          128814,
+          128747,
+          129124,
+          129093
+        ]
+      },
+      "group_15": {
+        "group_rationale": "Examines the legislative process and political maneuvering involved in securing funding for foreign policy initiatives, highlighting points of leverage and contention. Aligns with Trace Power.",
+        "article_ids": [
+          129078,
+          127985,
+          128814,
+          128747,
+          129124,
+          129093
+        ]
+      },
+      "group_16": {
+        "group_rationale": "Investigates the potential domestic political consequences and public perception related to foreign aid spending decisions. Connects to Interpret Ambiguity.",
+        "article_ids": [
+          129078,
+          128814,
+          128747,
+          129124,
+          129093,
+          128019
+        ]
+      },
+      "group_17": {
+        "group_rationale": "Focuses on the role of specific Congressional figures and factions in shaping US foreign policy debates and outcomes. Directly supports Trace Power.",
+        "article_ids": [
+          129078,
+          128814,
+          128747,
+          129124,
+          129093
+        ]
+      },
+      "group_18": {
+        "group_rationale": "Analyzes the impact of leadership stability and change within major corporations on company strategy and market perception, especially under external pressures. Aligns with Trace Power and Interpret Ambiguity.",
+        "article_ids": [
+          127703,
+          127891
+        ]
+      },
+      "group_19": {
+        "group_rationale": "Considers the competitive landscape and industry-specific challenges (e.g., EV market) as context for corporate decisions and leadership changes. Supports Hold Competing Truths.",
+        "article_ids": [
+          127703,
+          128900
+        ]
+      },
+      "group_20": {
+        "group_rationale": "Examines the dynamics of internal government investigations and the narratives surrounding accountability for alleged misconduct by officials. Primarily serves Trace Power and Recognize Framing.",
+        "article_ids": [
+          127891,
+          128857
+        ]
+      },
+      "group_21": {
+        "group_rationale": "Focuses on the role of specific individuals (e.g., Hegseth, Mayorkas) and their actions within governmental structures, highlighting potential conflicts or controversies. Supports Trace Power.",
+        "article_ids": [
+          127891,
+          128857
+        ]
+      },
+      "group_22": {
+        "group_rationale": "Highlights potential inconsistencies or questions raised regarding official accounts of events or personnel matters within government departments. Aligns with See Sparks and Interpret Ambiguity.",
+        "article_ids": [
+          127891,
+          128857
+        ]
+      },
+      "group_23": {
+        "group_rationale": "Explores the intersection of economic policy (trade wars, tariffs) and corporate finance, particularly M&A activity and valuation adjustments. Connects to Trace Power and Interpret Ambiguity.",
+        "article_ids": [
+          128900,
+          128101
+        ]
+      },
+      "group_24": {
+        "group_rationale": "Analyzes how major political figures (e.g., Trump) influence market sentiment and corporate decision-making through policy and rhetoric. Primarily serves Trace Power.",
+        "article_ids": [
+          128900,
+          128101
+        ]
+      },
+      "group_25": {
+        "group_rationale": "Examines the use of specific financial jargon ('creative financing structures') and prompts inquiry into the underlying mechanisms and risks. Aligns with See Sparks.",
+        "article_ids": [
+          128900,
+          127703
+        ]
+      },
+      "group_26": {
+        "group_rationale": "Investigates the connection between urban living conditions (overcrowding, safety) and regulatory oversight or negligence. Supports Trace Power and Recognize Framing.",
+        "article_ids": [
+          128579,
+          128857
+        ]
+      },
+      "group_27": {
+        "group_rationale": "Uses specific incidents (like a house fire) to illustrate broader social issues, prompting analysis of systemic factors versus individual responsibility. Aligns with Hold Competing Truths.",
+        "article_ids": [
+          128579,
+          127891
+        ]
+      },
+      "group_28": {
+        "group_rationale": "Focuses on the operational aspects and public communication strategies of large retail corporations during peak periods or holidays. Connects to Interpret Ambiguity (regarding corporate motives) and Trace Power (corporate influence).",
+        "article_ids": [
+          129154,
+          128659
+        ]
+      },
+      "group_29": {
+        "group_rationale": "Examines consumer information and corporate service availability as a reflection of market dynamics and business operations. Primarily relates to Interpret Ambiguity (business priorities).",
+        "article_ids": [
+          129154,
+          128659
+        ]
+      },
+      "group_30": {
+        "group_rationale": "Tracks the flow of US financial and military resources to international partners, examining the stated goals and potential impacts. Supports Trace Power.",
+        "article_ids": [
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128101
+        ]
+      },
+      "group_31": {
+        "group_rationale": "Analyzes the geopolitical context surrounding US aid decisions, including relationships with recipient countries and regional stability concerns. Aligns with Hold Competing Truths.",
+        "article_ids": [
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128019
+        ]
+      },
+      "group_32": {
+        "group_rationale": "Examines media coverage of US foreign aid debates, identifying dominant narratives and potential counter-arguments or omissions. Supports Recognize Framing.",
+        "article_ids": [
+          129078,
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128019
+        ]
+      },
+      "group_33": {
+        "group_rationale": "Investigates the role of international organizations and alliances in coordinating or influencing US foreign policy and aid distribution. Connects to Trace Power.",
+        "article_ids": [
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128019
+        ]
+      },
+      "group_34": {
+        "group_rationale": "Highlights the specific details and timing of legislative actions related to foreign aid, prompting analysis of political urgency and strategy. Aligns with See Sparks.",
+        "article_ids": [
+          129078,
+          128814,
+          128747,
+          129124,
+          129093
+        ]
+      },
+      "group_35": {
+        "group_rationale": "Explores the potential long-term strategic implications of US aid decisions for regional power balances and international relations. Connects to Interpret Ambiguity.",
+        "article_ids": [
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128101
+        ]
+      },
+      "group_36": {
+        "group_rationale": "Analyzes the ethical dimensions and potential unintended consequences associated with government actions, from foreign aid to domestic policy enforcement. Supports Hold Competing Truths.",
+        "article_ids": [
+          127985,
+          128857,
+          128579
+        ]
+      },
+      "group_37": {
+        "group_rationale": "Examines instances where government actions or policies face scrutiny regarding their effectiveness, legality, or ethical justification. Aligns with Interpret Ambiguity.",
+        "article_ids": [
+          128857,
+          128747,
+          129124,
+          127891
+        ]
+      },
+      "group_38": {
+        "group_rationale": "Focuses on the communication strategies employed by government officials and agencies when addressing controversial issues or investigations. Supports Recognize Framing.",
+        "article_ids": [
+          128857,
+          127891,
+          128488
+        ]
+      },
+      "group_39": {
+        "group_rationale": "Tracks the interplay between executive branch actions (appointments, directives) and legislative branch responses (impeachments, funding debates). Supports Trace Power.",
+        "article_ids": [
+          128857,
+          128488,
+          129078
+        ]
+      },
+      "group_40": {
+        "group_rationale": "Highlights the language used to describe political conflicts and policy debates, revealing underlying assumptions and persuasive techniques. Aligns with Recognize Framing and See Sparks.",
+        "article_ids": [
+          128488,
+          129078,
+          128019,
+          128101
+        ]
+      },
+      "group_41": {
+        "group_rationale": "Explores the concept of political capital and influence, examining how figures like McCarthy or Greene leverage their positions within the legislative process. Connects to Trace Power.",
+        "article_ids": [
+          128488,
+          129078,
+          128814
+        ]
+      },
+      "group_42": {
+        "group_rationale": "Examines the strategic calculations and potential trade-offs involved in political decision-making, such as impeachment proceedings or foreign aid votes. Supports Interpret Ambiguity.",
+        "article_ids": [
+          128488,
+          128747,
+          129124,
+          129093
+        ]
+      },
+      "group_43": {
+        "group_rationale": "Analyzes the relationship between campaign rhetoric, policy positions (e.g., on China), and subsequent governmental actions or market impacts. Aligns with Trace Power and Recognize Framing.",
+        "article_ids": [
+          128019,
+          128101,
+          128900
+        ]
+      },
+      "group_44": {
+        "group_rationale": "Investigates the use of economic tools (tariffs, sanctions) as instruments of foreign policy and their perceived effectiveness or consequences. Supports Hold Competing Truths.",
+        "article_ids": [
+          128101,
+          128900,
+          127985
+        ]
+      },
+      "group_45": {
+        "group_rationale": "Highlights potentially overlooked connections between domestic political events (elections, policy debates) and international economic trends or corporate strategies. Aligns with See Sparks.",
+        "article_ids": [
+          128101,
+          128900,
+          128488
+        ]
+      },
+      "group_46": {
+        "group_rationale": "Examines the broader economic context, including competition and market pressures, influencing corporate decisions and political discourse. Connects to Interpret Ambiguity.",
+        "article_ids": [
+          128101,
+          127703
+        ]
+      },
+      "group_47": {
+        "group_rationale": "Focuses on the role of large corporations (Walmart, Tesla) in the broader economy and public life, including their operational decisions and leadership structures. Supports Trace Power.",
+        "article_ids": [
+          129154,
+          128659,
+          127703
+        ]
+      },
+      "group_48": {
+        "group_rationale": "Analyzes public safety incidents and regulatory responses, considering factors like infrastructure, accountability, and systemic issues. Aligns with Trace Power and Hold Competing Truths.",
+        "article_ids": [
+          128579,
+          129154,
+          128659
+        ]
+      },
+      "group_49": {
+        "group_rationale": "Considers the intersection of holiday observances, consumer behavior, and corporate operations, reflecting subtle economic and social patterns. Connects primarily to Interpret Ambiguity.",
+        "article_ids": [
+          129154,
+          128659,
+          128579
+        ]
+      },
+      "group_50": {
+        "group_rationale": "Examines the challenges and controversies surrounding political appointments and the vetting process within government. Supports Trace Power and Interpret Ambiguity.",
+        "article_ids": [
+          127891,
+          128488
+        ]
+      },
+      "group_51": {
+        "group_rationale": "Analyzes specific legislative votes on aid packages, highlighting the divisions and alliances within Congress regarding foreign policy spending. Primarily serves Trace Power and Recognize Framing.",
+        "article_ids": [
+          129078,
+          128814,
+          128747,
+          129124,
+          129093
+        ]
+      },
+      "group_52": {
+        "group_rationale": "Contrasts different media portrayals and political justifications for US involvement in foreign conflicts (Ukraine vs. others), revealing framing differences. Supports Recognize Framing and Hold Competing Truths.",
+        "article_ids": [
+          127985,
+          128814,
+          128747,
+          129124,
+          129093,
+          128019
+        ]
+      }
+    }
+  }

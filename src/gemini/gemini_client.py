@@ -52,6 +52,9 @@ except ImportError:
 # Import the function from the new generator module
 from src.gemini.modules.generator import analyze_articles_with_prompt as generator_analyze_articles
 
+# Add import for robust JSON parser
+from src.utils.json_parser import parse_json, extract_json_from_text, safe_loads
+
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -433,25 +436,42 @@ class GeminiClient:
                     if generated_text:
                         logger.info(
                             f"Successfully generated text using {model_name}")
-                        # Basic check for JSON structure - find first '{' and last '}'
-                        start_index = generated_text.find('{')
-                        end_index = generated_text.rfind('}')
-                        if start_index != -1 and end_index != -1 and start_index < end_index:
-                            json_part = generated_text[start_index:end_index+1]
-                            # Try to parse the JSON
-                            try:
-                                parsed_json = json.loads(json_part.strip())
-                                logger.info(
-                                    f"Successfully parsed JSON response from {model_name}")
-                                return parsed_json  # Return the parsed JSON dictionary
-                            except json.JSONDecodeError as json_err:
+
+                        # Use the robust JSON parser instead of basic parsing
+                        parsed_json, error = parse_json(generated_text)
+
+                        # If direct parsing fails, try to extract JSON from text
+                        if error:
+                            logger.warning(
+                                f"Direct JSON parsing failed for {model_name}: {error}")
+                            # Try to extract JSON from the response text
+                            extracted_json, extract_error = extract_json_from_text(
+                                generated_text)
+
+                            if extract_error:
                                 logger.warning(
-                                    f"JSON parsing error from {model_name}: {json_err}. Raw JSON: {json_part[:100]}...")
+                                    f"JSON extraction failed for {model_name}: {extract_error}")
                                 # Continue with retries or model switches
+                                continue
+
+                            # Parse the extracted JSON
+                            parsed_json, error = parse_json(extracted_json)
+
+                            if error:
+                                logger.warning(
+                                    f"Extracted JSON parsing failed for {model_name}: {error}")
+                                # Continue with retries or model switches
+                                continue
+
+                        # If we successfully parsed JSON, return it
+                        if parsed_json:
+                            logger.info(
+                                f"Successfully parsed JSON response from {model_name}")
+                            return parsed_json  # Return the parsed JSON dictionary
                         else:
                             logger.warning(
-                                f"Generated text from {model_name} does not appear to be valid JSON: {generated_text[:100]}...")
-                            # Treat as failure for this attempt, maybe retry or switch model
+                                f"Parsed JSON from {model_name} is empty or invalid.")
+                            # Continue with retries or model switches
                     else:
                         logger.warning(
                             f"Received empty or invalid response structure from {model_name}. Response: {response}")
@@ -757,32 +777,55 @@ class GeminiClient:
                         if text_parts:
                             # Concatenate if multiple parts
                             generated_text = "".join(text_parts)
+                    elif isinstance(response, dict) and 'text' in response:
+                        generated_text = response['text']
+                    else:
+                        logger.warning(
+                            f"Unexpected response format from {model_name}: {type(response)}")
+                        generated_text = None
 
                     if generated_text:
                         logger.info(
                             f"Successfully generated text using {model_name}")
-                        # Basic check for JSON structure - find first '{' and last '}'
-                        start_index = generated_text.find('{')
-                        end_index = generated_text.rfind('}')
-                        if start_index != -1 and end_index != -1 and start_index < end_index:
-                            json_part = generated_text[start_index:end_index+1]
-                            # Try to parse the JSON
-                            try:
-                                parsed_json = json.loads(json_part.strip())
-                                logger.info(
-                                    f"Successfully parsed JSON response from {model_name}")
-                                return parsed_json  # Return the parsed JSON dictionary
-                            except json.JSONDecodeError as json_err:
+
+                        # Use the robust JSON parser instead of basic parsing
+                        parsed_json, error = parse_json(generated_text)
+
+                        # If direct parsing fails, try to extract JSON from text
+                        if error:
+                            logger.warning(
+                                f"Direct JSON parsing failed for {model_name}: {error}")
+                            # Try to extract JSON from the response text
+                            extracted_json, extract_error = extract_json_from_text(
+                                generated_text)
+
+                            if extract_error:
                                 logger.warning(
-                                    f"JSON parsing error from {model_name}: {json_err}. Raw JSON: {json_part[:100]}...")
+                                    f"JSON extraction failed for {model_name}: {extract_error}")
                                 # Continue with retries or model switches
+                                continue
+
+                            # Parse the extracted JSON
+                            parsed_json, error = parse_json(extracted_json)
+
+                            if error:
+                                logger.warning(
+                                    f"Extracted JSON parsing failed for {model_name}: {error}")
+                                # Continue with retries or model switches
+                                continue
+
+                        # If we successfully parsed JSON, return it
+                        if parsed_json:
+                            logger.info(
+                                f"Successfully parsed JSON response from {model_name}")
+                            return parsed_json  # Return the parsed JSON dictionary
                         else:
                             logger.warning(
-                                f"Generated text from {model_name} does not appear to be valid JSON: {generated_text[:100]}...")
-                            # Treat as failure for this attempt, maybe retry or switch model
+                                f"Parsed JSON from {model_name} is empty or invalid.")
+                            # Continue with retries or model switches
                     else:
-                        logger.warning(
-                            f"Received empty or invalid response structure from {model_name}. Response: {response}")
+                        logger.warning(f"No generated text from {model_name}")
+                        # Continue to next attempt
 
                 except asyncio.TimeoutError:
                     # Handle timeout specifically if needed (e.g., break inner loop, switch model faster)
@@ -856,23 +899,22 @@ class GeminiClient:
                                            retries: int = 3,
                                            initial_delay: float = 1.0) -> Optional[str]:
         """
-        Delegates to the dedicated module implementation to analyze a list of articles using a specified prompt template.
-
-        This method has been relocated to src/gemini/modules/generator.py for better modularity.
-        This wrapper maintains backward compatibility for existing code.
+        Analyzes a list of articles using a specified prompt template and returns
+        structured JSON output. Used for article clustering and analysis in Step 4.
 
         Args:
-            articles_data: List of prepared article dictionaries.
-            prompt_file_path: Path to the prompt template file (e.g., `src/prompts/step4.txt`).
-            model_name: Specific Gemini model to use.
-            system_instruction: Override for the default system instruction.
-            temperature: Controls randomness in generation. Defaults to 0.2.
-            max_output_tokens: Maximum number of tokens in response. Defaults to 8192.
-            retries: Maximum number of retry attempts. Defaults to 3.
-            initial_delay: Initial delay between retries in seconds. Defaults to 1.0.
+            articles_data: List of article dictionaries, each containing at least 'title', 'url',
+                           and 'content' fields
+            prompt_file_path: Path to the prompt template file
+            model_name: Model to use for generation
+            system_instruction: Optional system instruction to prepend to the prompt
+            temperature: Sampling temperature (0.0-1.0)
+            max_output_tokens: Maximum number of tokens to generate
+            retries: Number of retries on error
+            initial_delay: Initial delay for exponential backoff
 
         Returns:
-            Optional[str]: The full text response if successful, None if all retries fail.
+            String containing the structured JSON response, or None if failed
         """
         # Default system instruction if none provided
         default_system_instruction = """

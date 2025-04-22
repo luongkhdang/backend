@@ -12,6 +12,9 @@ COPY . .
 # Create output directory for Step 4
 RUN mkdir -p /app/src/output && chmod 777 /app/src/output
 
+# Install json5 dependency needed by the copied code
+RUN pip install --no-cache-dir json5
+
 # Set environment variables
 ENV READER_DB_HOST=postgres
 ENV READER_DB_PORT=5432
@@ -40,23 +43,24 @@ ENV GEMINI_FLASH_OUTPUT_WINDOW_TOKEN=8192
 ENV GEMINI_FLASH_RATE_LIMIT_PER_MINUTE=15
 ENV GEMINI_FLASH_RATE_LIMIT_PER_DAY=1500
 
-# Step 2: Clustering settings (default values, will be overridden by docker-compose)
-ENV RUN_CLUSTERING_STEP=false
+# Step 2: Clustering settings (defaults below are now overridden by docker-compose)
+# ENV RUN_CLUSTERING_STEP=false # Removed: Controlled by RUN_STEP2 in compose
 ENV MIN_CLUSTER_SIZE=10
 ENV HOT_CLUSTER_THRESHOLD=20
-ENV INTERPRET_CLUSTERS=true
+# ENV INTERPRET_CLUSTERS=true # Removed: Runs automatically if spaCy available
 ENV MAX_CLUSTERS_TO_INTERPRET=10
 ENV CLUSTER_SAMPLE_SIZE=10
 
-# Step 3: Entity Extraction Settings
-ENV RUN_STEP3=true
+# Step 3: Entity Extraction Settings (defaults below are now overridden by docker-compose)
+# ENV RUN_STEP3=true # Removed: Controlled by RUN_STEP3 in compose
 ENV ENTITY_EXTRACTION_BATCH_SIZE=10
 ENV ENTITY_MAX_PRIORITY_ARTICLES=100
-ENV CALCULATE_INFLUENCE_SCORES=true
+# ENV CALCULATE_INFLUENCE_SCORES=true # Removed: Runs automatically within Step 3 logic in main.py
 # Allow longer wait times for fallback model in emergency case
 ENV GEMINI_MAX_WAIT_SECONDS=60
 ENV EMERGENCY_FALLBACK_WAIT_SECONDS=120
-ENV CALCULATE_DOMAIN_GOODNESS=true
+# ENV CALCULATE_DOMAIN_GOODNESS=true # Removed: Runs automatically after phase 1 in main.py
+
 # Verify only application modules - faster than verifying all dependencies
 RUN python -c "import sys; print(sys.path)" && \
     python -c "import src.gemini.gemini_client; print('Verified gemini_client')" && \

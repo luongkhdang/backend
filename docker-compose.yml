@@ -80,19 +80,18 @@ services:
       # Rate limit wait settings for intelligent model selection
       GEMINI_MAX_WAIT_SECONDS: ${GEMINI_MAX_WAIT_SECONDS:-40}
 
-      # --- Pipeline Step Control --- #
-      RUN_PHASE_1_STEPS: ${RUN_PHASE_1_STEPS:-true} # Master switch for steps 1-4
-      RUN_STEP1: ${RUN_STEP1:-true} # Switch for Step 1
-      RUN_STEP2: ${RUN_STEP2:-true} # Switch for Step 2 (Clustering)
-      RUN_STEP3: ${RUN_STEP3:-true} # Switch for Step 3 (Entity Extraction)
-      RUN_STEP4: ${RUN_STEP4:-true} # Switch for Step 4 (Data Export)
-
       # --- Other Settings --- #
       # Python path for Google imports
       PYTHONPATH: /app
       # Debug flag for imports
       PYTHONDEBUG: "1"
-      # Local NLP Settings (Step 1.7 - now always runs if Step 1 runs)
+      # Step Execution Control
+      RUN_PHASE_1_STEPS: ${RUN_PHASE_1_STEPS:-true} # Master switch for steps 1-4
+      RUN_STEP1: ${RUN_STEP1:-false} # Controls Step 1
+      RUN_STEP2: ${RUN_STEP2:-false} # Controls Step 2 (Clustering)
+      RUN_STEP3: ${RUN_STEP3:-true} # Controls Step 3 (Entity Extraction)
+      RUN_STEP4: ${RUN_STEP4:-true} # Controls Step 4 (Data Export)
+      # Local NLP Settings (Step 1.7 - Now always runs if Step 1 runs)
       LOCAL_NLP_MODEL: ${LOCAL_NLP_MODEL:-"facebook/bart-large-cnn"}
       MAX_SUMMARY_TOKENS: ${MAX_SUMMARY_TOKENS:-512}
       MIN_SUMMARY_TOKENS: ${MIN_SUMMARY_TOKENS:-150}
@@ -101,17 +100,17 @@ services:
       TARGET_CHUNK_TOKEN_SIZE: ${TARGET_CHUNK_TOKEN_SIZE:-1000}
       CHUNK_MAX_TOKENS: ${CHUNK_MAX_TOKENS:-300}
       CHUNK_MIN_TOKENS: ${CHUNK_MIN_TOKENS:-75}
-      # Step 2: Clustering settings (Switches removed, features run if Step 2 runs)
+      # Step 2: Clustering settings (Switches removed, settings remain)
       MIN_CLUSTER_SIZE: ${MIN_CLUSTER_SIZE:-10}
       HOT_CLUSTER_THRESHOLD: ${HOT_CLUSTER_THRESHOLD:-20}
       MAX_CLUSTERS_TO_INTERPRET: ${MAX_CLUSTERS_TO_INTERPRET:-10}
       CLUSTER_SAMPLE_SIZE: ${CLUSTER_SAMPLE_SIZE:-10}
-      # Step 3: Entity Extraction settings (Switches removed, features run if Step 3 runs)
+      # Step 3: Entity Extraction settings (Switches removed, settings remain)
       ENTITY_EXTRACTION_BATCH_SIZE: ${ENTITY_EXTRACTION_BATCH_SIZE:-10}
       ENTITY_MAX_PRIORITY_ARTICLES: ${ENTITY_MAX_PRIORITY_ARTICLES:-100}
       # Step 4: Data Export settings
       EMERGENCY_FALLBACK_WAIT_SECONDS: ${EMERGENCY_FALLBACK_WAIT_SECONDS:-120}
-      # Hotness calculation factors (Relevance switch removed)
+      # Hotness calculation factors (Switches removed, settings remain)
       RECENCY_DAYS: ${RECENCY_DAYS:-3}
       CORE_TOPIC_KEYWORDS: ${CORE_TOPIC_KEYWORDS:-"china,us,united states,vietnam,europe,germany,war,trade,exports,tariffs,geopolitics,geopolitical,political economy,influence,lobbying,narrative,framing,disinformation,misinformation,ai,artificial intelligence,election,campaign,pentagon,defense,state department,diplomacy,itc,international trade commission"}
       W_SIZE: ${W_SIZE:-0.15}
@@ -210,6 +209,7 @@ services:
       RUN_STEP3: ${RUN_STEP3:-true}
       ENTITY_EXTRACTION_BATCH_SIZE: ${ENTITY_EXTRACTION_BATCH_SIZE:-10}
       ENTITY_MAX_PRIORITY_ARTICLES: ${ENTITY_MAX_PRIORITY_ARTICLES:-100}
+      CALCULATE_INFLUENCE_SCORES: ${CALCULATE_INFLUENCE_SCORES:-true}
       # Python path for Google imports
       PYTHONPATH: /app
       # Wait settings

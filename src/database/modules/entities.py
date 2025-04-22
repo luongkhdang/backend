@@ -656,8 +656,7 @@ def get_top_entities_with_influence_flag(conn, article_id: int, limit: int = 10)
                 e.name, 
                 e.entity_type,
                 ae.is_influential_context,
-                e.influence_score,
-                ae.mention_count
+                e.influence_score
             FROM article_entities ae
             JOIN entities e ON ae.entity_id = e.id
             WHERE ae.article_id = %s

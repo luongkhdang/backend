@@ -36,9 +36,7 @@ Crucially, your entire response must consist only of a single, compact JSON obje
 - Adhere precisely to the example structure below:
 json
 {
-  "METHOD": {
-    "HOW WELL DID YOU DO IT": "BE CRITICAL! WAS THEIR ANY RESTRICTION STOP YOU FROM DOING WELL? IF ANY, WHAT ELSE DO YOU NEED THAT WOULD HELP YOU?"
-  }  
+  "Processed_date": {year-month-date hour:minute AM/PM},
   "article_groups": {
     "group_1": {
       "group_rationale": "Rationale for the group with the highest relevance alignment, reflecting analytical depth.",

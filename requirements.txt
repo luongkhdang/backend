@@ -14,6 +14,7 @@ argparse==1.4.0
 numpy==1.26.0
 pydantic==2.4.2
 python-dateutil==2.8.2  # For date parsing
+json5==0.9.14  # Robust JSON parsing with comments and trailing commas
 
 # Content processing
 beautifulsoup4==4.13.3  # Latest stable version as of April 2024

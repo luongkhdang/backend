@@ -20,7 +20,7 @@ Related files:
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional, Any, Set
 from collections import defaultdict, Counter
 import json
@@ -35,7 +35,6 @@ except ImportError:
 
 from src.database.reader_db_client import ReaderDBClient
 from src.steps.step2.interpretation import get_cluster_keywords
-from .config import load_step2_config
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -85,8 +84,6 @@ def calculate_hotness_factors(
     # Get configuration parameters from environment
     recency_days = int(os.getenv("RECENCY_DAYS", "3"))
     cluster_sample_size = int(os.getenv("CLUSTER_SAMPLE_SIZE", "10"))
-    calculate_topic_relevance = os.getenv(
-        "CALCULATE_TOPIC_RELEVANCE", "true").lower() == "true"
 
     # Get the target number of hot clusters from environment
     target_hot_clusters = int(os.getenv("TARGET_HOT_CLUSTERS", "15"))
@@ -146,7 +143,7 @@ def calculate_hotness_factors(
 
         # 4. Topic Relevance Factor (Raw): Binary score based on keyword matching
         relevance_score = 0
-        if calculate_topic_relevance and nlp:
+        if nlp:
             # Extract keywords from article titles
             keywords = get_cluster_keywords(
                 reader_client, article_db_ids, nlp, cluster_sample_size)
@@ -311,156 +308,3 @@ def get_weight_params() -> Dict[str, float]:
         "influence": float(os.getenv("W_INFLUENCE", "0.30")),
         "relevance": float(os.getenv("W_RELEVANCE", "0.25"))
     }
-
-
-def calculate_hotness_scores(db_client, cluster_article_map, nlp=None) -> Dict[int, float]:
-    """
-    Calculates hotness scores for clusters based on size, recency, entity influence, and topic relevance.
-
-    Args:
-        db_client: Instance of ReaderDBClient.
-        cluster_article_map: Dictionary mapping cluster_id to list of article_ids.
-        nlp: Optional loaded spaCy model for keyword extraction (topic relevance).
-
-    Returns:
-        Dictionary mapping cluster_id to hotness score.
-    """
-    if not cluster_article_map:
-        return {}
-
-    cfg = load_step2_config()
-    all_article_ids = [aid for articles in cluster_article_map.values()
-                       for aid in articles]
-
-    logger.info(
-        f"Calculating hotness for {len(cluster_article_map)} clusters using {len(all_article_ids)} articles.")
-
-    # Fetch necessary data in bulk
-    logger.debug("Fetching publication dates...")
-    pub_dates = db_client.get_publication_dates_for_articles(all_article_ids)
-    logger.debug("Fetching entity influence scores...")
-    influence_scores = db_client.get_entity_influence_for_articles(
-        all_article_ids)
-
-    # Topic Relevance Calculation (now runs unconditionally if nlp model provided)
-    topic_relevance_scores = defaultdict(float)  # Default to 0
-    if nlp:
-        logger.debug("Calculating topic relevance...")
-        try:
-            topic_relevance_scores = calculate_article_topic_relevance(
-                db_client, all_article_ids, nlp, cfg.core_topic_keywords
-            )
-        except Exception as e:
-            logger.error(
-                f"Error calculating topic relevance: {e}", exc_info=True)
-            # Continue without relevance scores if calculation fails
-    else:
-        logger.info(
-            "Skipping topic relevance calculation (spaCy model not available).")
-
-    hotness_scores = {}
-    current_time = datetime.now(timezone.utc)
-    max_articles_in_cluster = max(len(
-        articles) for articles in cluster_article_map.values()) if cluster_article_map else 1
-
-    # Precompute factors if possible (e.g., max influence score)
-    max_influence = max(influence_scores.values()) if influence_scores else 1.0
-    max_relevance = max(topic_relevance_scores.values()
-                        ) if topic_relevance_scores else 1.0
-
-    for cluster_id, article_ids in cluster_article_map.items():
-        if cluster_id == -1 or not article_ids:  # Skip noise cluster or empty clusters
-            continue
-
-        cluster_size = len(article_ids)
-
-        # --- Calculate individual components ---
-
-        # Size Score (normalized)
-        size_score = cluster_size / \
-            max_articles_in_cluster if max_articles_in_cluster > 0 else 0
-
-        # Recency Score (average recency)
-        total_recency_score = 0
-        valid_recency_count = 0
-        for article_id in article_ids:
-            pub_date = pub_dates.get(article_id)
-            if pub_date:
-                # Ensure pub_date is offset-aware for comparison
-                if pub_date.tzinfo is None:
-                    pub_date = pub_date.replace(
-                        tzinfo=timezone.utc)  # Assume UTC if naive
-                days_old = (current_time - pub_date).days
-                # Simple decay: score = 1 / (days_old + 1), capped by cfg.recency_days
-                recency_factor = 1.0 / (min(days_old, cfg.recency_days) + 1)
-                total_recency_score += recency_factor
-                valid_recency_count += 1
-        recency_score = total_recency_score / \
-            valid_recency_count if valid_recency_count > 0 else 0
-
-        # Influence Score (average normalized influence)
-        total_influence_score = 0
-        for article_id in article_ids:
-            score = influence_scores.get(article_id, 0)
-            # Normalize influence: score / max_influence (handle max_influence=0)
-            total_influence_score += score / max_influence if max_influence > 0 else 0
-        influence_score = total_influence_score / \
-            cluster_size if cluster_size > 0 else 0
-
-        # Topic Relevance Score (average normalized relevance)
-        total_relevance_score = 0
-        # Only calculate if nlp was available and scores were generated
-        if topic_relevance_scores:
-            for article_id in article_ids:
-                score = topic_relevance_scores.get(article_id, 0)
-                # Normalize relevance: score / max_relevance (handle max_relevance=0)
-                total_relevance_score += score / max_relevance if max_relevance > 0 else 0
-            relevance_score = total_relevance_score / \
-                cluster_size if cluster_size > 0 else 0
-        else:
-            relevance_score = 0  # Set to 0 if relevance couldn't be calculated
-
-        # Weighted Sum
-        hotness = (
-            (cfg.w_size * size_score) +
-            (cfg.w_recency * recency_score) +
-            (cfg.w_influence * influence_score) +
-            (cfg.w_relevance * relevance_score)
-        )
-
-        hotness_scores[cluster_id] = hotness
-        logger.debug(
-            f"Cluster {cluster_id}: Size={size_score:.3f}, Recency={recency_score:.3f}, Influence={influence_score:.3f}, Relevance={relevance_score:.3f} -> Hotness={hotness:.3f}")
-
-    return hotness_scores
-
-
-def calculate_article_topic_relevance(db_client, article_ids, nlp, core_keywords) -> Dict[int, float]:
-    """
-    Calculates topic relevance score for articles based on keyword overlap.
-
-    Args:
-        db_client: Instance of ReaderDBClient.
-        article_ids: List of article IDs.
-        nlp: Loaded spaCy model for keyword extraction.
-        core_keywords: Set of core topic keywords.
-
-    Returns:
-        Dictionary mapping article ID to topic relevance score.
-    """
-    topic_relevance_scores = {}
-    for article_id in article_ids:
-        relevance_score = 0
-        if nlp:
-            # Extract keywords from article titles
-            keywords = get_cluster_keywords(
-                db_client, [article_id], nlp, 10)
-
-            # Check if any keyword matches core topics
-            for keyword in keywords:
-                if any(core_topic in keyword or keyword in core_topic for core_topic in core_keywords):
-                    relevance_score = 1  # Binary score: either 0 or 1
-                    break
-
-        topic_relevance_scores[article_id] = relevance_score
-    return topic_relevance_scores
