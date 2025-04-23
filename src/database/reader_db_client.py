@@ -1729,3 +1729,21 @@ class ReaderDBClient:
             finally:
                 self.release_connection(conn)
         return []
+
+    def mark_duplicate_articles_as_error(self) -> int:
+        """
+        Find articles with duplicate content (excluding 'ERROR') and mark them as 'ERROR'.
+
+        Returns:
+            int: Number of articles marked as duplicates
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return articles.mark_duplicate_articles_as_error(conn)
+            except Exception as e:
+                logger.error(f"Error in mark_duplicate_articles_as_error: {e}")
+                return 0
+            finally:
+                self.release_connection(conn)
+        return 0

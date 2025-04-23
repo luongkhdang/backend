@@ -45,6 +45,8 @@ Exported functions:
   Gets unprocessed articles published yesterday and today only
 - get_recent_day_processed_articles_with_details(conn, limit: Optional[int] = None) -> List[Dict[str, Any]]
   Gets processed articles published yesterday or today with domain goodness scores
+- mark_duplicate_articles_as_error(conn) -> int
+  Finds articles with duplicate content (excluding those already marked 'ERROR') and updates their content to 'ERROR' and sets processed_at timestamp
 
 Related modules:
 - Connection management from connection.py
@@ -852,55 +854,98 @@ def get_recent_day_processed_articles_with_details(conn, limit: Optional[int] = 
         limit: Optional maximum number of articles to return (returns all if None)
 
     Returns:
-        List of article dictionaries with domain goodness scores, is_hot flag, content, frame_phrases, and content_length
+        List of article dictionaries with domain goodness scores
     """
     try:
         cursor = conn.cursor()
 
-        # Query to get processed articles from yesterday and today
-        # with domain goodness scores from domain_statistics
+        # Calculate the date range for 'yesterday' and 'today'
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
+
+        # Base query to select articles within the date range
         query = """
-            SELECT 
-                a.id AS article_id, 
-                a.title, 
-                a.domain, 
-                a.pub_date, 
-                a.cluster_id,
-                ds.goodness_score,
-                a.is_hot,
-                a.content,
-                a.frame_phrases
+            SELECT a.id, a.scraper_id, a.title, a.content, a.pub_date, a.domain, 
+                   a.processed_at, a.is_hot, a.cluster_id, d.goodness_score
             FROM articles a
-            LEFT JOIN domain_statistics ds ON a.domain = ds.domain
-            WHERE a.extracted_entities = TRUE
-            AND a.pub_date >= (CURRENT_DATE - INTERVAL '2 DAY')
-            AND a.pub_date <= CURRENT_DATE
+            LEFT JOIN domain_statistics d ON a.domain = d.domain
+            WHERE a.pub_date >= %s AND a.pub_date < %s
+            AND a.processed_at IS NOT NULL AND a.content != 'ERROR'
             ORDER BY a.pub_date DESC
         """
 
-        # Add limit if specified
-        if limit is not None:
+        # Add limit if provided
+        if limit:
             query += " LIMIT %s"
-            cursor.execute(query, (limit,))
+            cursor.execute(
+                query, (yesterday, today + timedelta(days=1), limit))
         else:
-            cursor.execute(query)
+            cursor.execute(query, (yesterday, today + timedelta(days=1)))
 
         columns = [desc[0] for desc in cursor.description]
-        articles = []
+        articles_list = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        for row in cursor.fetchall():
-            article_dict = dict(zip(columns, row))
-            # Provide default goodness_score if NULL
-            if article_dict.get('goodness_score') is None:
-                article_dict['goodness_score'] = 0.5
-            articles.append(article_dict)
+        cursor.close()
+        return articles_list
 
+    except Exception as e:
+        logger.error(
+            f"Error retrieving recent day processed articles with details: {e}")
+        return []
+
+
+def mark_duplicate_articles_as_error(conn) -> int:
+    """
+    Find articles with duplicate content (excluding those already marked 'ERROR')
+    and update their content to 'ERROR' and set processed_at timestamp.
+
+    Args:
+        conn: Database connection
+
+    Returns:
+        int: Number of articles marked as duplicates
+    """
+    try:
+        cursor = conn.cursor()
+
+        # Find IDs of articles with duplicate content, excluding those already marked 'ERROR'
+        find_duplicates_query = """
+            SELECT id
+            FROM articles
+            WHERE content IN (
+                SELECT content
+                FROM articles
+                WHERE content IS NOT NULL AND content != 'ERROR'
+                GROUP BY content
+                HAVING COUNT(*) > 1
+            )
+            AND content != 'ERROR';
+        """
+        cursor.execute(find_duplicates_query)
+        duplicate_ids = [row[0] for row in cursor.fetchall()]
+
+        if not duplicate_ids:
+            logger.debug("No duplicate articles found to mark as ERROR.")
+            cursor.close()
+            return 0
+
+        # Update the content and processed_at for the identified duplicate articles
+        update_query = """
+            UPDATE articles
+            SET content = 'ERROR',
+                processed_at = CURRENT_TIMESTAMP
+            WHERE id = ANY(%s);
+        """
+        cursor.execute(update_query, (duplicate_ids,))
+        updated_count = cursor.rowcount
+        conn.commit()
         cursor.close()
 
         logger.info(
-            f"Fetched {len(articles)} processed articles with details from yesterday and today")
-        return articles
+            f"Marked {updated_count} articles with duplicate content as 'ERROR'.")
+        return updated_count
+
     except Exception as e:
-        logger.error(
-            f"Error fetching recent day processed articles with details: {e}", exc_info=True)
-        return []
+        logger.error(f"Error marking duplicate articles: {e}", exc_info=True)
+        conn.rollback()
+        return 0

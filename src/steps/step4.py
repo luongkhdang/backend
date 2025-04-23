@@ -101,7 +101,7 @@ async def run() -> Dict[str, Any]:  # Changed to async def
         # Step 2: Prepare data for Gemini analysis input
         articles_for_analysis = []
         for article in articles_raw:
-            article_id = article.get('article_id')
+            article_id = article.get('id')
             if not article_id:
                 logger.warning(
                     f"Skipping article with missing ID in raw data: {article}")

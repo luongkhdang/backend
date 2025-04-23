@@ -21,6 +21,7 @@ import time
 import json
 import asyncio
 from typing import Dict, List, Any, Optional, Tuple
+from datetime import datetime, timedelta
 
 # Import DB and API clients
 from src.database.reader_db_client import ReaderDBClient
@@ -56,8 +57,22 @@ FALLBACK_MODEL = 'models/gemini-2.0-flash-lite'
 
 # Error handling constants
 MAX_CONSECUTIVE_FAILURES = 3
-FAILURE_COOLDOWN_SECONDS = 60
-INTER_BATCH_DELAY_SECONDS = 30  # Delay between batches
+FAILURE_COOLDOWN_SECONDS = 30
+INTER_BATCH_DELAY_SECONDS = 10  # Delay between batches
+
+# --- Helper Function for Time Formatting ---
+
+
+def format_seconds(seconds: float) -> str:
+    """Formats seconds into a human-readable string (e.g., 1m 30s)."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, seconds_rem = divmod(int(seconds), 60)
+    if minutes < 60:
+        return f"{minutes}m {seconds_rem}s"
+    hours, minutes_rem = divmod(minutes, 60)
+    return f"{hours}h {minutes_rem}m {seconds_rem}s"
+# --- End Helper Function ---
 
 
 async def run() -> Dict[str, Any]:
@@ -116,6 +131,12 @@ async def run() -> Dict[str, Any]:
         logger.info(f"Articles by tier: {len(tier0_articles)} in tier 0, "
                     f"{len(tier1_articles)} in tier 1, {len(tier2_articles)} in tier 2")
 
+        # Calculate initial total articles and estimate total batches
+        total_articles_to_process = len(prioritized_articles)
+        # Estimate total batches based on average batch size (adjust if needed)
+        estimated_total_batches = (
+            total_articles_to_process + BATCH_SIZE - 1) // BATCH_SIZE if BATCH_SIZE > 0 else 1
+
         # Initialize counters for final status
         total_processed = 0
         total_entity_links = 0
@@ -126,12 +147,15 @@ async def run() -> Dict[str, Any]:
         total_relationships = 0
         batch_index = 0  # For batch numbering
 
-        # Add heartbeat logging
+        # Add heartbeat logging and timing variables
         last_heartbeat = time.time()
         heartbeat_interval = 60  # Log a heartbeat every minute
+        total_batches_processed = 0
+        total_time_processed = 0.0
 
         # Process articles in balanced batches until all tiers are empty
         while tier0_articles or tier1_articles or tier2_articles:
+            batch_start_time = time.time()  # Record batch start time
             batch_index += 1
 
             # Compose a balanced batch with the defined ratio (4/5/1)
@@ -224,16 +248,37 @@ async def run() -> Dict[str, Any]:
                     f"Tier 1: {original_tier_counts[1]}, Tier 2: {original_tier_counts[2]}"
                 )
 
-            # Heartbeat logging
+            # Heartbeat logging (modified)
             current_time = time.time()
             if current_time - last_heartbeat >= heartbeat_interval:
-                remaining = len(tier0_articles) + \
-                    len(tier1_articles) + len(tier2_articles)
-                total = remaining + total_processed
-                progress = ((total - remaining) / total) * \
-                    100 if total > 0 else 0
+                processed_count = total_processed  # Use current total processed count
+                remaining_articles = len(
+                    tier0_articles) + len(tier1_articles) + len(tier2_articles)
+                progress = ((processed_count) / total_articles_to_process) * \
+                    100 if total_articles_to_process > 0 else 0
+
+                etc_str = "N/A"
+                avg_time_str = "N/A"
+                if total_batches_processed > 0:
+                    average_time_per_batch = total_time_processed / total_batches_processed
+                    avg_time_str = f"{average_time_per_batch:.1f}s/batch"
+                    # Estimate remaining batches based on remaining articles and avg batch size seen so far
+                    avg_batch_size = total_processed / \
+                        total_batches_processed if total_batches_processed > 0 else BATCH_SIZE
+                    estimated_remaining_batches = (
+                        remaining_articles / avg_batch_size) if avg_batch_size > 0 else 0
+
+                    estimated_seconds_remaining = average_time_per_batch * estimated_remaining_batches
+                    if estimated_seconds_remaining >= 0:
+                        etc_datetime = datetime.now() + timedelta(seconds=estimated_seconds_remaining)
+                        etc_str = f"ETC: {etc_datetime.strftime('%H:%M:%S')} ({format_seconds(estimated_seconds_remaining)} remaining)"
+                    else:
+                        etc_str = "ETC: Calculating..."
+
                 logger.info(
-                    f"Heartbeat: Processing batch {batch_index}, overall progress: {progress:.1f}%")
+                    f"Heartbeat: Batch {batch_index}/{estimated_total_batches} | Progress: {progress:.1f}% "
+                    f"({processed_count}/{total_articles_to_process} articles) | Avg: {avg_time_str} | {etc_str}"
+                )
                 last_heartbeat = current_time
 
             # Circuit breaker pattern
@@ -290,6 +335,12 @@ async def run() -> Dict[str, Any]:
                 logger.error(
                     f"Error processing batch {batch_index}: {e}", exc_info=True)
                 logger.warning(f"Consecutive failures: {consecutive_failures}")
+
+            # Track batch completion time and update timing totals
+            batch_end_time = time.time()
+            batch_duration = batch_end_time - batch_start_time
+            total_batches_processed += 1
+            total_time_processed += batch_duration
 
             # Add a delay between batches to allow rate limits to reset
             # Log rate limiter status for all models

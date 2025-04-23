@@ -5,7 +5,7 @@ main.py - Orchestrator for Data Refinery Pipeline
 This script orchestrates the entire data refinery pipeline by executing each step in sequence:
 - Step 0: Network Connectivity Check
 - Step 1: Data Collection, Processing and Storage
-  - Step 1.1: Data Collection from news-db
+  - Step 1.1: Data Collection from newsdb
   - Step 1.2: Article Content Processing
   - Step 1.3: Article Content Validation
   - Step 1.4: Incremental Database Storage

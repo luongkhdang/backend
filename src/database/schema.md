@@ -17,7 +17,7 @@
 | Column               | Type        | Constraints                             | Default | Description                                        |
 | -------------------- | ----------- | --------------------------------------- | ------- | -------------------------------------------------- |
 | `id`                 | `SERIAL`    | `PRIMARY KEY`                           |         | Unique identifier for the article                  |
-| `scraper_id`         | `INTEGER`   | `UNIQUE`                                |         | ID from the original scraper/source                |
+| `scraper_id`         | `INTEGER`   | `UNIQUE`                                |         | ID from the original scraper/source (newsdb)       |
 | `title`              | `TEXT`      |                                         |         | Title of the article                               |
 | `content`            | `TEXT`      |                                         |         | Full text content of the article                   |
 | `pub_date`           | `TIMESTAMP` |                                         |         | Publication date of the article                    |

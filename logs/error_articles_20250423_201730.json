@@ -1,0 +1,5243 @@
+{
+  "error_articles": [
+    {
+      "id": 125873,
+      "scraper_id": 89763,
+      "title": "Strong earnings from TSMC are not enough to give Nvidia shares a much-needed jolt",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:28:56",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131130,
+      "scraper_id": 109623,
+      "title": "US stocks rally as Trump signals thaw in trade war, Tesla shares soar",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T17:16:05",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 116193,
+      "scraper_id": 77979,
+      "title": "Tariffs live: Trump warns higher tariffs will return if countries can\u2019t strike deals with US in 90 days",
+      "content": "ERROR",
+      "pub_date": "2025-04-10T18:14:49",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131180,
+      "scraper_id": 109551,
+      "title": "Stocks gain on hopes Trump will ease tensions with the Fed -- and China",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T18:00:27",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131429,
+      "scraper_id": 109239,
+      "title": "US stocks rally as Trump signals thaw in trade war, Tesla shares soar - ABC News",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T16:15:18",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131476,
+      "scraper_id": 109210,
+      "title": "Stock market today: Dow, S&P 500, Nasdaq soar as Trump softens stance on Powell, China tariffs - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T15:59:02",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130589,
+      "scraper_id": 105397,
+      "title": "Crude Prices Supported as Asset Markets Recover",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:49",
+      "domain": "www.barchart.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129709,
+      "scraper_id": 104189,
+      "title": "Celebrate Mother Nature with these ongoing eco-friendly deals for EVs, power stations, tools, and more starting from $30 - 9to5Toys",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T13:04:21",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129994,
+      "scraper_id": 106159,
+      "title": "Altria Group, Inc. (NYSE: MO) Price Prediction and Forecast 2025-2030 (April 2025)",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:39",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130006,
+      "scraper_id": 106149,
+      "title": "America is no longer a safe place to park your investments, Wall Street tells Trump",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:53",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130015,
+      "scraper_id": 106138,
+      "title": "Trump stands by Hegseth amid ouster reports",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:17",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 126273,
+      "scraper_id": 89162,
+      "title": "Regions financial outlines 2025 growth projections amid stable deposit strategy and market uncertainty",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:26:00",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131074,
+      "scraper_id": 106401,
+      "title": "IMF cuts US economic growth forecast over trade tensions, policy uncertainty - Fox Business",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:34:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130545,
+      "scraper_id": 105458,
+      "title": "Woman Finds Cat 'Fast Asleep' on Her Bed, but There's Just One Problem",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:14:05",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130552,
+      "scraper_id": 105450,
+      "title": "UN says Asian scam call center epidemic expanding globally amid political heat",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:24:49",
+      "domain": "www.theregister.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129061,
+      "scraper_id": 98726,
+      "title": "Property owners sue California insurance companies over alleged 'collusion' following wildfires",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T23:07:09",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130609,
+      "scraper_id": 105372,
+      "title": "US Flexes Nuclear Weapons Forces",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:16",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130689,
+      "scraper_id": 107000,
+      "title": "Did you get a tax refund? Here's what you should do with it, above all else. - CBS News",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:25:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130567,
+      "scraper_id": 105425,
+      "title": "Trump revises his claims about tariff revenue, but he\u2019s still wrong",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:32",
+      "domain": "www.msnbc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 127678,
+      "scraper_id": 95525,
+      "title": "DEI rollbacks hit campus support systems for students of color",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T17:49:13",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 117438,
+      "scraper_id": 75212,
+      "title": "IRS warns bad tax return advice is all over social media - CBS News",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T14:34:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130004,
+      "scraper_id": 106150,
+      "title": "Hearts Melt Over Blind Cat's 'Joy' at Finding a Toy by Himself",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:06",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129989,
+      "scraper_id": 106167,
+      "title": "Here's How Much $100 Invested In Orla Mining 5 Years Ago Would Be Worth Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:00",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130016,
+      "scraper_id": 106136,
+      "title": "Aerial Images Show Progress at World's Biggest Construction Site",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:33",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130868,
+      "scraper_id": 106801,
+      "title": "What are the funeral plans for Pope Francis?",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T08:12:00",
+      "domain": "www.washingtonpost.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130563,
+      "scraper_id": 105435,
+      "title": "Gold soars to a new high as economic uncertainty deepens. Here's what to know",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:26",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129974,
+      "scraper_id": 106189,
+      "title": "Trump revises his claims about tariff revenue, but he\u2019s still wrong",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:32",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130005,
+      "scraper_id": 106146,
+      "title": "EU may impose fines on Meta, Apple on April 23",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:15",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130013,
+      "scraper_id": 106141,
+      "title": "US Flexes Nuclear Weapons Forces",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:16",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130014,
+      "scraper_id": 106143,
+      "title": "\"Personal\" Liberty Due Process Cases at the Supreme Court Between Carolene Products and Griswold",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:20",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129003,
+      "scraper_id": 98819,
+      "title": "How Trump backed away from promising to end the Russia-Ukraine war in 24 hours",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T04:01:28",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130001,
+      "scraper_id": 106153,
+      "title": "Konica Minolta aims to double life of flexible solar cells with new film",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:40",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129953,
+      "scraper_id": 106221,
+      "title": "Bank of America leads M&A financial adviser rankings for construction in Q1 2025",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:25:13",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129955,
+      "scraper_id": 106220,
+      "title": "Woman Finds Cat 'Fast Asleep' on Her Bed, but There's Just One Problem",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:14:05",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 127773,
+      "scraper_id": 95399,
+      "title": "How Don backed away from promising to end war in 24 hours...",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T16:31:36",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130017,
+      "scraper_id": 106135,
+      "title": "Dog 'Too Scared' To Move Cat off Her Spot on Couch, Asks Dad for Help",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:42",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130599,
+      "scraper_id": 105388,
+      "title": "Random Stray Cat's Life of Luxury After Being Brought Inside Delights",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:12",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 119972,
+      "scraper_id": 39907,
+      "title": "The GOP proves Orwell right: In this party, 2+2=5",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T12:40:24",
+      "domain": "www.washingtonpost.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130822,
+      "scraper_id": 106848,
+      "title": "Pope Francis dies latest: Vatican confirms funeral date after releasing images of pontiff in open casket",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:39:34",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130809,
+      "scraper_id": 106863,
+      "title": "Former Australian cricketer Michael Slater walks free after domestic violence sentencing",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T10:13:01",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130257,
+      "scraper_id": 105821,
+      "title": "Should Investors Buy Palantir Stock Before May 5? - The Motley Fool",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T13:24:46",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130000,
+      "scraper_id": 106157,
+      "title": "Social Security Benefits Could Be Withheld From Millions: What to Know",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:00",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130298,
+      "scraper_id": 105768,
+      "title": "Iridium outlines $302M free cash flow projection for 2025 amid tariff impact and IoT expansion",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T12:35:48",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130584,
+      "scraper_id": 105402,
+      "title": "Align Technology price target lowered to $185 from $200 at BofA",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:47",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128949,
+      "scraper_id": 98888,
+      "title": "Alito\u2019s dissent in deportation case says court rushed to block Trump with middle-of-the night order",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T01:47:39",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130373,
+      "scraper_id": 105680,
+      "title": "Supreme Court takes up religious rights dispute over LGBTQ books in Maryland schools",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T16:36:55",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130623,
+      "scraper_id": 105360,
+      "title": "INTERVIEW: This Legendary Anime Writer Turned Peter Rabbit into a Mech Game",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:41",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131020,
+      "scraper_id": 106502,
+      "title": "China threatens countermeasures against countries that 'appease' US on trade war - Fox Business",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T15:14:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130555,
+      "scraper_id": 105444,
+      "title": "Kinder Morgan share price weakness a buying opportunity, says Argus",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:37",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130591,
+      "scraper_id": 105394,
+      "title": "Why Fidelity\u2019s Dividend ETF (FDVV) Is a Safe Haven in Today\u2019s Market",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:19",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130592,
+      "scraper_id": 105392,
+      "title": "Altria Group, Inc. (NYSE: MO) Price Prediction and Forecast 2025-2030 (April 2025)",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:39",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130612,
+      "scraper_id": 105374,
+      "title": "\"Personal\" Liberty Due Process Cases at the Supreme Court Between Carolene Products and Griswold",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:20",
+      "domain": "reason.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129993,
+      "scraper_id": 106164,
+      "title": "Crude Prices Supported as Asset Markets Recover",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:49",
+      "domain": "www.barchart.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130608,
+      "scraper_id": 105373,
+      "title": "Nearly Half Of US Home-Sellers Are Offering Buyer Concessions",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:55",
+      "domain": "www.zerohedge.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130245,
+      "scraper_id": 105849,
+      "title": "Stock market today: Dow, S&P 500, Nasdaq futures climb as Trump escalates tensions with the Fed - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T07:48:37",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130598,
+      "scraper_id": 105389,
+      "title": "Social Security Benefits Could Be Withheld From Millions: What to Know",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:00",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130588,
+      "scraper_id": 105395,
+      "title": "India\u2019s EV startup Ather cuts IPO size to $308M, seeking $1.4B post-money valuation",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:08",
+      "domain": "techcrunch.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129958,
+      "scraper_id": 106210,
+      "title": "Prologis price target lowered to $122 from $130 at Argus",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:34",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130025,
+      "scraper_id": 106134,
+      "title": "2025 Chevrolet Blazer EV SS Is A Normal Family Crossover With Supercar Speed",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:53",
+      "domain": "www.jalopnik.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129998,
+      "scraper_id": 106156,
+      "title": "Random Stray Cat's Life of Luxury After Being Brought Inside Delights",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:12",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129972,
+      "scraper_id": 106191,
+      "title": "Taskrabbit CEO: I\u2019m a better gig-economy leader because of the empathy I learned in early jobs",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:24:34",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130624,
+      "scraper_id": 105358,
+      "title": "Dog 'Too Scared' To Move Cat off Her Spot on Couch, Asks Dad for Help",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:42",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129980,
+      "scraper_id": 106178,
+      "title": "Elanco price target lowered to $13 from $16 at BofA",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:52",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129285,
+      "scraper_id": 102555,
+      "title": "Are supermarkets open today? Opening and closing hours of Tesco, Asda, Aldi, Sainsbury\u2019s and more",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T04:11:05",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128865,
+      "scraper_id": 100011,
+      "title": "Stock futures fall after Wall Street posts another losing week: Live updates",
+      "content": "ERROR",
+      "pub_date": "2025-04-20T22:36:24",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129930,
+      "scraper_id": 106249,
+      "title": "Some Maryland parents want the Supreme Court to let them pull their kids from elementary school classes if story time features gay characters",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:13:42",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128510,
+      "scraper_id": 101438,
+      "title": "Trump Threatens to Cut Another $1 Billion in Harvard Funding, WSJ Reports",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T01:56:37",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128966,
+      "scraper_id": 98850,
+      "title": "Alito's dissent in deportation case says court rushed to block Trump with middle-of-the night order",
+      "content": "ERROR",
+      "pub_date": "2025-04-20T13:54:38",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128640,
+      "scraper_id": 100830,
+      "title": "3 Top Dividend Stocks Yielding Over 3% to Buy With $500 Right Now - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T14:30:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129963,
+      "scraper_id": 106202,
+      "title": "Netflix price target raised to $1,200 from $1,120 at Argus",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:17",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130828,
+      "scraper_id": 106843,
+      "title": "Trump warned US economic growth to be hit hardest by tariff trade war: Live updates",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:52:16",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130188,
+      "scraper_id": 105938,
+      "title": "Celebrate Mother Nature with these ongoing eco-friendly deals for EVs, power stations, tools, and more starting from $30 - 9to5Toys",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:39:45",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128434,
+      "scraper_id": 97126,
+      "title": "When are supermarkets open over Easter 2025? Opening times for Tesco, Asda, Aldi, Sainsbury\u2019s and more",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T08:59:08",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130008,
+      "scraper_id": 106152,
+      "title": "Map Shows Where Teens Being Banned From Stores as Crime Surges",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:00",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130607,
+      "scraper_id": 105378,
+      "title": "Chobani to build new $1 billion yogurt plant and create 1,000 jobs in Upstate NY",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:13",
+      "domain": "www.syracuse.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130615,
+      "scraper_id": 105364,
+      "title": "Trump stands by Hegseth amid ouster reports",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:17",
+      "domain": "theweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130581,
+      "scraper_id": 105405,
+      "title": "State Dept Gets A Makeover \u2014Trump Style",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:53",
+      "domain": "tippinsights.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130597,
+      "scraper_id": 105386,
+      "title": "Walmart, Target CEOs discuss 'path forward' with Trump as tariff concerns weigh on consumers",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:32",
+      "domain": "www.foxbusiness.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130826,
+      "scraper_id": 106844,
+      "title": "Ukraine-Russia war latest: Putin U-turns on Zelensky peace talks with Trump pushing for deal \u2018this week\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:48:22",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130565,
+      "scraper_id": 105430,
+      "title": "Don't make this crucial resume mistake, says ex-Visa HR exec",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:46",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128545,
+      "scraper_id": 101394,
+      "title": "Better Energy Stock: Chevron vs. Occidental Petroleum - The Motley Fool",
+      "content": "ERROR",
+      "pub_date": "2025-04-20T13:25:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131082,
+      "scraper_id": 105769,
+      "title": "Verizon outlines 2025 growth targets with focus on $82B wireless service revenue and AI opportunities",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T12:35:45",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131077,
+      "scraper_id": 105863,
+      "title": "Jim Cramer touts his favorite stock in the portfolio, says it's being overlooked - CNBC",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:26:49",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131088,
+      "scraper_id": 105429,
+      "title": "Taskrabbit CEO: I\u2019m a better gig-economy leader because of the empathy I learned in early jobs",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:24:34",
+      "domain": "fortune.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128653,
+      "scraper_id": 100760,
+      "title": "Trump threatens to cut another $1 billion in Harvard funding, WSJ reports",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T01:56:37",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130261,
+      "scraper_id": 105824,
+      "title": "Stock market today: Dow, S&P 500, Nasdaq rally as Wall Street hopes for trade progress - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T16:25:14",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 127898,
+      "scraper_id": 95212,
+      "title": "3 Top Dividend Stocks Yielding Over 3% to Buy With $500 Right Now",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T14:46:51",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130572,
+      "scraper_id": 105416,
+      "title": "Trump Media\u2019s fintech arm will launch a string of \u2018Made in America\u2019 ETFs with Crypto.com",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:47",
+      "domain": "fortune.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129952,
+      "scraper_id": 106222,
+      "title": "President Trump claims that \u201cDemocrats want to destroy Social Security\u201d \u2013 could that actually happen?",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:10",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129960,
+      "scraper_id": 106208,
+      "title": "GE Aerospace CEO Culp advocates tariff-free regime for aviation industry",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:14",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129965,
+      "scraper_id": 106196,
+      "title": "Truist Financial price target lowered to $43 from $52 at Argus",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:42",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130541,
+      "scraper_id": 105460,
+      "title": "President Trump claims that \u201cDemocrats want to destroy Social Security\u201d \u2013 could that actually happen?",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:10",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131117,
+      "scraper_id": 109643,
+      "title": "Palantir Is Soaring Today. Is the Stock a Buy Right Now?",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T17:27:53",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130633,
+      "scraper_id": 105354,
+      "title": "2025 Chevrolet Blazer EV SS Is A Normal Family Crossover With Supercar Speed",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:53",
+      "domain": "www.jalopnik.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130596,
+      "scraper_id": 105384,
+      "title": "Konica Minolta aims to double life of flexible solar cells with new film",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:40",
+      "domain": "asia.nikkei.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130620,
+      "scraper_id": 105359,
+      "title": "Aerial Images Show Progress at World's Biggest Construction Site",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:33",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130604,
+      "scraper_id": 105376,
+      "title": "China Courts Japan To One-Up U.S. In Tariff War",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:10",
+      "domain": "tippinsights.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129971,
+      "scraper_id": 106190,
+      "title": "Age-burdened \"silver economy\" comes with silver linings, IMF finds",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:49",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130600,
+      "scraper_id": 105379,
+      "title": "US wants to slap tariffs as high as 3,500% on solar panels from Southeast Asia",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:55",
+      "domain": "www.cnn.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130601,
+      "scraper_id": 105381,
+      "title": "Hearts Melt Over Blind Cat's 'Joy' at Finding a Toy by Himself",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:06",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129128,
+      "scraper_id": 98619,
+      "title": "Property owners sue California insurance companies over alleged 'collusion' following wildfires",
+      "content": "ERROR",
+      "pub_date": "2025-04-20T21:19:11",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130603,
+      "scraper_id": 105380,
+      "title": "America is no longer a safe place to park your investments, Wall Street tells Trump",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:53",
+      "domain": "edition.cnn.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130594,
+      "scraper_id": 105391,
+      "title": "IMF cuts US economic growth forecast over trade tensions, policy uncertainty",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:57",
+      "domain": "www.foxbusiness.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129986,
+      "scraper_id": 106171,
+      "title": "State Dept Gets A Makeover \u2014Trump Style",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:53",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128212,
+      "scraper_id": 97440,
+      "title": "Exclusive-Israel Still Eyeing a Limited Attack on Iran's Nuclear Facilities",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T05:04:27",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130007,
+      "scraper_id": 106145,
+      "title": "China Courts Japan To One-Up U.S. In Tariff War",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:10",
+      "domain": "tippinsights.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130583,
+      "scraper_id": 105401,
+      "title": "Here's How Much $100 Invested In Orla Mining 5 Years Ago Would Be Worth Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:00",
+      "domain": "www.benzinga.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130576,
+      "scraper_id": 105413,
+      "title": "Elanco price target lowered to $13 from $16 at BofA",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:52",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130558,
+      "scraper_id": 105440,
+      "title": "Netflix price target raised to $1,200 from $1,120 at Argus",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:17",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130550,
+      "scraper_id": 105448,
+      "title": "Prologis price target lowered to $122 from $130 at Argus",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:34",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130539,
+      "scraper_id": 105459,
+      "title": "Bank of America leads M&A financial adviser rankings for construction in Q1 2025",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:25:13",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130557,
+      "scraper_id": 105442,
+      "title": "UnitedHealth downgraded to Hold at Argus after guidance cut",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:19",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129503,
+      "scraper_id": 102262,
+      "title": "Nvidia Stock Furthers Slide on US-China Trade Tiff",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T15:00:10",
+      "domain": "www.investopedia.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129001,
+      "scraper_id": 98813,
+      "title": "Salvadoran President Bukele proposes prisoner swap with Maduro for Venezuelan deportees",
+      "content": "ERROR",
+      "pub_date": "2025-04-20T22:08:13",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129530,
+      "scraper_id": 102222,
+      "title": "China threatens countermeasures against countries that 'appease' US on trade war",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T15:33:36",
+      "domain": "www.foxbusiness.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130568,
+      "scraper_id": 105423,
+      "title": "L&T completes key phase in India\u2019s Rishikesh-Karnaprayag rail link project",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:46",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130803,
+      "scraper_id": 106869,
+      "title": "Watch live: JD Vance holds press conference during India trip to discuss trade deal",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T09:26:27",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128985,
+      "scraper_id": 98834,
+      "title": "As DEI rollbacks take hold, students of color say they're losing campus support systems",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T04:09:41",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130602,
+      "scraper_id": 105377,
+      "title": "EU may impose fines on Meta, Apple on April 23",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:15",
+      "domain": "breakingthenews.net",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128933,
+      "scraper_id": 98905,
+      "title": "El Salvador President Nayib Bukele proposes prisoner swap with Maduro for Venezuelan deportees",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T06:23:01",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130018,
+      "scraper_id": 106137,
+      "title": "INTERVIEW: This Legendary Anime Writer Turned Peter Rabbit into a Mech Game",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:41",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130003,
+      "scraper_id": 106148,
+      "title": "US wants to slap tariffs as high as 3,500% on solar panels from Southeast Asia",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:55",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129996,
+      "scraper_id": 106158,
+      "title": "IMF cuts US economic growth forecast over trade tensions, policy uncertainty",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:57",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130011,
+      "scraper_id": 106142,
+      "title": "Nearly Half Of US Home-Sellers Are Offering Buyer Concessions",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:55",
+      "domain": "www.zerohedge.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129988,
+      "scraper_id": 106168,
+      "title": "Align Technology price target lowered to $185 from $200 at BofA",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:47",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129991,
+      "scraper_id": 106162,
+      "title": "India\u2019s EV startup Ather cuts IPO size to $308M, seeking $1.4B post-money valuation",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:08",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129961,
+      "scraper_id": 106204,
+      "title": "UnitedHealth downgraded to Hold at Argus after guidance cut",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:19",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129013,
+      "scraper_id": 98800,
+      "title": "Netanyahu still eyeing limited attack on Iran...",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T01:16:37",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131205,
+      "scraper_id": 109511,
+      "title": "Palestinian President Urges Hamas to Lay Down Arms",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T10:54:23",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129968,
+      "scraper_id": 106197,
+      "title": "Gold soars to a new high as economic uncertainty deepens. Here's what to know",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:26",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131259,
+      "scraper_id": 109457,
+      "title": "Militants in Indian Kashmir Segregate Men From Women and Children Before Opening Fire",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T15:13:57",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131406,
+      "scraper_id": 109283,
+      "title": "We\u2019re suddenly talking about the Great Depression when discussing Trump\u2019s stock market - CNN",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T16:29:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131417,
+      "scraper_id": 109260,
+      "title": "Stocks gain on hopes Trump will ease tensions with the Fed \u2014 and China - NPR",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T17:50:38",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131433,
+      "scraper_id": 109234,
+      "title": "Palantir Is Soaring Today. Is the Stock a Buy Right Now? - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T17:11:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131471,
+      "scraper_id": 109170,
+      "title": "Te connectivity targets $4.3B Q3 sales driven by industrial growth and AI momentum",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T14:19:43",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131472,
+      "scraper_id": 109220,
+      "title": "Stock market today: Dow, S&P 500, Nasdaq futures jump as Trump softens stance on Powell, China tariffs - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T13:20:31",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131473,
+      "scraper_id": 109165,
+      "title": "Steel dynamics projects 50% aluminum mill capacity by year-end 2025",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T14:34:34",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131482,
+      "scraper_id": 109196,
+      "title": "Stock market today: Dow, S&P 500, Nasdaq rally as Trump softens stance on Powell, China tariffs - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T18:28:55",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130561,
+      "scraper_id": 105434,
+      "title": "Truist Financial price target lowered to $43 from $52 at Argus",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:42",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131520,
+      "scraper_id": 109103,
+      "title": "Heathrow makes first dividend payments in five years",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T07:07:29",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130595,
+      "scraper_id": 105385,
+      "title": "Europe closes higher with tariffs in spotlight",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:07",
+      "domain": "breakingthenews.net",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131569,
+      "scraper_id": 109055,
+      "title": "Lori Vallow Daybell convicted in Arizona of conspiring to kill her estranged husband in 2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T18:34:51",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131684,
+      "scraper_id": 108969,
+      "title": "Lori Vallow Daybell convicted in Arizona of conspiring to kill her estranged husband in 2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T22:55:14",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131685,
+      "scraper_id": 108964,
+      "title": "Palestinian president urges Hamas to lay down arms",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T10:54:23",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 131698,
+      "scraper_id": 108955,
+      "title": "Militants in Indian Kashmir segregate men from women and children before opening fire",
+      "content": "ERROR",
+      "pub_date": "2025-04-23T15:13:57",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 128843,
+      "scraper_id": 100041,
+      "title": "Stock futures fall after Wall Street posts another losing week: Live updates - CNBC",
+      "content": "ERROR",
+      "pub_date": "2025-04-20T23:30:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129959,
+      "scraper_id": 106206,
+      "title": "Kinder Morgan share price weakness a buying opportunity, says Argus",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:37",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129962,
+      "scraper_id": 106212,
+      "title": "UN says Asian scam call center epidemic expanding globally amid political heat",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:24:49",
+      "domain": "www.theregister.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129966,
+      "scraper_id": 106200,
+      "title": ", WeRide (WRD) and Oklo (OKLO) Are Shooting Higher Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:34",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129969,
+      "scraper_id": 106192,
+      "title": "Don't make this crucial resume mistake, says ex-Visa HR exec",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:46",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129973,
+      "scraper_id": 106187,
+      "title": "L&T completes key phase in India\u2019s Rishikesh-Karnaprayag rail link project",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:46",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129977,
+      "scraper_id": 106182,
+      "title": "Swiss drugmaker Roche to invest $50bn in US in effort to dodge Trump tariffs",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:24:39",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129978,
+      "scraper_id": 106181,
+      "title": "Trump Media\u2019s fintech arm will launch a string of \u2018Made in America\u2019 ETFs with Crypto.com",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:35:47",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129995,
+      "scraper_id": 106161,
+      "title": "Why Fidelity\u2019s Dividend ETF (FDVV) Is a Safe Haven in Today\u2019s Market",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:19",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 129997,
+      "scraper_id": 106155,
+      "title": "Walmart, Target CEOs discuss 'path forward' with Trump as tariff concerns weigh on consumers",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:32",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130002,
+      "scraper_id": 106154,
+      "title": "Europe closes higher with tariffs in spotlight",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:07",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130009,
+      "scraper_id": 106147,
+      "title": "Chobani to build new $1 billion yogurt plant and create 1,000 jobs in Upstate NY",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:13",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130230,
+      "scraper_id": 105894,
+      "title": "Stock market today: Dow sinks 1,100 points, S&P 500, Nasdaq tank with Trump's tariffs, Powell bashing in focus - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T18:05:36",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130248,
+      "scraper_id": 105851,
+      "title": "Stock market today: Dow drops 950 points, S&P 500, Nasdaq tumble as Trump bashes Fed's Powell again - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T21:03:43",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130262,
+      "scraper_id": 105810,
+      "title": "Nvidia Stock Furthers Slide on US-China Trade Tiff - Investopedia",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T13:39:10",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130553,
+      "scraper_id": 105446,
+      "title": "GE Aerospace CEO Culp advocates tariff-free regime for aviation industry",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:36:14",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130562,
+      "scraper_id": 105438,
+      "title": ", WeRide (WRD) and Oklo (OKLO) Are Shooting Higher Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:34",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130564,
+      "scraper_id": 105427,
+      "title": "Age-burdened \"silver economy\" comes with silver linings, IMF finds",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:46:49",
+      "domain": "www.investing.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130571,
+      "scraper_id": 105418,
+      "title": "Swiss drugmaker Roche to invest $50bn in US in effort to dodge Trump tariffs",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:24:39",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130606,
+      "scraper_id": 105383,
+      "title": "Map Shows Where Teens Being Banned From Stores as Crime Surges",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:47:00",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-23T20:17:26.781328"
+    },
+    {
+      "id": 130708,
+      "scraper_id": 106975,
+      "title": "A simple tweak to tax law has helped bring solar power to the communities that need it most - Grist.org",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T08:31:15",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-22T20:33:04.278329"
+    },
+    {
+      "id": 130692,
+      "scraper_id": 106997,
+      "title": "Washington approves 1% local tax on groceries despite mayor-elect\u2019s no vote - WEEK | 25 News Now | Peoria, IL",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T12:20:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-22T20:33:03.098196"
+    },
+    {
+      "id": 130640,
+      "scraper_id": 105325,
+      "title": "Chevy Blazer SS EV first drive, over 600hp and 300 miles of range!",
+      "content": "ERROR",
+      "pub_date": "2025-04-22T15:58:20",
+      "domain": "electrek.co",
+      "processed_at": "2025-04-22T17:47:11.076058"
+    },
+    {
+      "id": 129683,
+      "scraper_id": 104224,
+      "title": "NWSL Power Rankings: KC Current Shine Brightest After Matchday 5 - Sports Illustrated",
+      "content": "ERROR",
+      "pub_date": "2025-04-21T13:58:28",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-21T17:07:44.411454"
+    },
+    {
+      "id": 128334,
+      "scraper_id": 97262,
+      "title": "Is NVIDIA Corporation (NVDA) the Best Metaverse Stock to Invest in? - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T15:38:52",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-19T19:16:17.340546"
+    },
+    {
+      "id": 128289,
+      "scraper_id": 97335,
+      "title": "Eagles Surprising Addition Called \u2018Star Power\u2019 - Sports Illustrated",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T12:17:35",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-19T19:16:13.959026"
+    },
+    {
+      "id": 128138,
+      "scraper_id": 97547,
+      "title": "SSA Approves! $5,560 + $1,280 Direct Deposit Social Security, SSI & SSDI In 2025",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T18:16:26",
+      "domain": "dpradhanbjp.com",
+      "processed_at": "2025-04-19T19:16:02.388804"
+    },
+    {
+      "id": 128075,
+      "scraper_id": 96952,
+      "title": "SSA Approves! $5,560 + $1,280 Direct Deposit Social Security, SSI & SSDI In 2025",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T18:16:26",
+      "domain": "dpradhanbjp.com",
+      "processed_at": "2025-04-19T18:51:05.221701"
+    },
+    {
+      "id": 127738,
+      "scraper_id": 95439,
+      "title": "The US has a single rare earths mine. Chinese export limits are energizing a push for more",
+      "content": "ERROR",
+      "pub_date": "2025-04-18T04:22:34",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-19T18:32:50.139355"
+    },
+    {
+      "id": 127947,
+      "scraper_id": 95149,
+      "title": "Is NVIDIA Corporation (NVDA) the Best Metaverse Stock to Invest in?",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T15:53:09",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-19T18:10:53.781678"
+    },
+    {
+      "id": 127666,
+      "scraper_id": 95537,
+      "title": "The US has a single rare earths mine. Chinese export limits are energizing a push for more",
+      "content": "ERROR",
+      "pub_date": "2025-04-19T17:49:13",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-19T18:10:34.168978"
+    },
+    {
+      "id": 127641,
+      "scraper_id": 88630,
+      "title": "Woman Goes to Petsmart for Litter, Comes Home With Another Cat Instead",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:00",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-19T04:13:09.831048"
+    },
+    {
+      "id": 127613,
+      "scraper_id": 89744,
+      "title": "Woman Goes to Petsmart for Litter, Comes Home With Another Cat Instead",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:00",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-19T04:13:06.936480"
+    },
+    {
+      "id": 127039,
+      "scraper_id": 91039,
+      "title": "In 12 Years, This $40 Billion High-Speed Rail Line in Texas Has Not Laid a Single Foot of Track",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:24:22",
+      "domain": "reason.com",
+      "processed_at": "2025-04-18T19:50:27.642685"
+    },
+    {
+      "id": 127093,
+      "scraper_id": 90960,
+      "title": "No rest for the rocketry as NASA's Easter weekend heats up",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:46:21",
+      "domain": "www.theregister.com",
+      "processed_at": "2025-04-18T19:46:05.927448"
+    },
+    {
+      "id": 127042,
+      "scraper_id": 91032,
+      "title": "Price Prediction and Forecast 2025-2030 (April 2025)",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T18:08:53",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-18T19:39:56.187443"
+    },
+    {
+      "id": 127035,
+      "scraper_id": 91044,
+      "title": "The Navy Produced Nearly 10x More of This Ship Than the Next Most Common Ship",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T18:08:56",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-18T19:39:21.783005"
+    },
+    {
+      "id": 127073,
+      "scraper_id": 91006,
+      "title": "Hogs Sneaking Out Gains on Thursday",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:24:16",
+      "domain": "www.barchart.com",
+      "processed_at": "2025-04-18T19:36:57.304755"
+    },
+    {
+      "id": 127024,
+      "scraper_id": 91055,
+      "title": "Baker Hughes: US oil rig count up by one to 481",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:24:38",
+      "domain": "breakingthenews.net",
+      "processed_at": "2025-04-18T19:27:12.400503"
+    },
+    {
+      "id": 127187,
+      "scraper_id": 90831,
+      "title": "UK Police Being Forced To Undergo Training To Accept Their 'White Privilege'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T07:30:00",
+      "domain": "www.zerohedge.com",
+      "processed_at": "2025-04-18T19:25:05.539620"
+    },
+    {
+      "id": 127182,
+      "scraper_id": 90838,
+      "title": "Is Sharing Equity Worth It? Here's How to Add the Right Partners at the Right Time",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:00:00",
+      "domain": "www.entrepreneur.com",
+      "processed_at": "2025-04-18T19:20:57.298512"
+    },
+    {
+      "id": 127179,
+      "scraper_id": 90837,
+      "title": "The $50 Software That Could Save Your Business One Day",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:00:00",
+      "domain": "www.entrepreneur.com",
+      "processed_at": "2025-04-18T19:19:53.086159"
+    },
+    {
+      "id": 127184,
+      "scraper_id": 90836,
+      "title": "It's Time to 'Choose Better' \u2014 Inside BODYARMOR's Play for the Sports Drink Crown",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:30:00",
+      "domain": "www.entrepreneur.com",
+      "processed_at": "2025-04-18T19:18:46.085277"
+    },
+    {
+      "id": 127562,
+      "scraper_id": 90350,
+      "title": "This is a very tough day for trans people \u2013 with a long legal road ahead to right this wrong | Robin Moira White",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:49:31",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T19:18:45.836240"
+    },
+    {
+      "id": 127561,
+      "scraper_id": 90348,
+      "title": "Votes for 16-year-olds? Sorry, but I\u2019m not convinced | Simon Jenkins",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:08:56",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T19:18:45.556891"
+    },
+    {
+      "id": 127181,
+      "scraper_id": 90835,
+      "title": "'People Think I'm Crazy for Doing This': Fyre Festival 2 Has Been Postponed \u2014 Again",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:00:20",
+      "domain": "www.entrepreneur.com",
+      "processed_at": "2025-04-18T19:17:34.517261"
+    },
+    {
+      "id": 127183,
+      "scraper_id": 90834,
+      "title": "Chili's Is Taking Aim at McDonald's (Again) With a New, Quarter Pounder-Like Burger: 'A Fast Food Flavor Profile Our Guests Will Recognize'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:56:33",
+      "domain": "www.entrepreneur.com",
+      "processed_at": "2025-04-18T19:16:20.594422"
+    },
+    {
+      "id": 127519,
+      "scraper_id": 90398,
+      "title": "Helicopter crashes at Melbourne airport moments after takeoff",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T08:54:16",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:15:15.840266"
+    },
+    {
+      "id": 127521,
+      "scraper_id": 90397,
+      "title": "Three dead after horrific boat collision at Major League Fishing event",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:03:40",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:15:15.745476"
+    },
+    {
+      "id": 127188,
+      "scraper_id": 90832,
+      "title": "How to Build Strategic Partnerships That Actually Drive Growth",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:00:00",
+      "domain": "www.entrepreneur.com",
+      "processed_at": "2025-04-18T19:13:46.230742"
+    },
+    {
+      "id": 127528,
+      "scraper_id": 90391,
+      "title": "Seattle crosswalk audio buttons hacked to imitate Jeff Bezos\u2019 voice pleading not to tax the rich",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:40:37",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:13:46.073516"
+    },
+    {
+      "id": 127535,
+      "scraper_id": 90383,
+      "title": "Sean Hannity tells liberal commentator who praised Luigi Mangione that she has a \u2018missing chip\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:45:06",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:11:32.898186"
+    },
+    {
+      "id": 127539,
+      "scraper_id": 90378,
+      "title": "Victim breaks silence after video of her being racially abused in California parking lot goes viral",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:28:53",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:09:34.524321"
+    },
+    {
+      "id": 127544,
+      "scraper_id": 90376,
+      "title": "Picking a team from bars to beam and hoping for 10s: Fantasy leagues in gymnastics are a thing",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:51:17",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:09:34.234517"
+    },
+    {
+      "id": 127543,
+      "scraper_id": 90375,
+      "title": "Deadly E. coli outbreak linked to lettuce hit 15 states. The government chose to keep it secret",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:00:36",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:09:34.094202"
+    },
+    {
+      "id": 127403,
+      "scraper_id": 90537,
+      "title": "Putting your tax return to work - NBC Boston",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:09:45",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T19:09:33.843199"
+    },
+    {
+      "id": 127545,
+      "scraper_id": 90372,
+      "title": "Two firefighters arrested on hate crime charges for \u2018chasing employee with a noose\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:31:31",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:07:16.930966"
+    },
+    {
+      "id": 127549,
+      "scraper_id": 90369,
+      "title": "Tears on my MyPillow: Weeping pro-Trump conspiracy theorist Mike Lindell tells judge he has no money to pay fines: \u2018I\u2019m in ruins\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:50:16",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:07:16.740940"
+    },
+    {
+      "id": 127412,
+      "scraper_id": 90527,
+      "title": "Where's my tax refund? Here's how to track and check your tax refund status - Bergen Record",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:17",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T19:07:16.677232"
+    },
+    {
+      "id": 127325,
+      "scraper_id": 90646,
+      "title": "In 12 Years, This $40 Billion High-Speed Rail Line in Texas Has Not Laid a Single Foot of Track - Reason Magazine",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:10:53",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T19:05:07.030134"
+    },
+    {
+      "id": 127303,
+      "scraper_id": 90681,
+      "title": "Letters to the Editor: How the Dodgers could make amends after Jackie Robinson Day 'hypocrisy'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:00:25",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T19:03:07.973578"
+    },
+    {
+      "id": 127324,
+      "scraper_id": 90649,
+      "title": "The Universe May Be Rotating Once Every 500 Billion Years, And It Could Explain The Hubble Tension - IFLScience",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:24",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T19:03:07.783796"
+    },
+    {
+      "id": 127525,
+      "scraper_id": 90394,
+      "title": "Frail Pope Francis takes back seat as Catholic Church marks Holy Week",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:21:55",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T19:03:07.445491"
+    },
+    {
+      "id": 127472,
+      "scraper_id": 90459,
+      "title": "CBS regains \u2018Jeopardy!,\u2019 \u2018Wheel of Fortune\u2019 distribution rights after reversal of Sony win",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:20:46",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T19:01:17.646701"
+    },
+    {
+      "id": 127229,
+      "scraper_id": 90787,
+      "title": "End the ADA lawsuit madness in NYC: Stop the Marks brothers and paraplegic Jocelyn Pierre!",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:32:33",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T18:59:19.306712"
+    },
+    {
+      "id": 127091,
+      "scraper_id": 90978,
+      "title": "A massive blind taste test fed people real and vegan meats. It revealed something surprising",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:35:37",
+      "domain": "www.vox.com",
+      "processed_at": "2025-04-18T18:59:18.924610"
+    },
+    {
+      "id": 127047,
+      "scraper_id": 91028,
+      "title": "'Nothing but blue lights': FSU student describes aftermath of campus shooting",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:57:34",
+      "domain": "www.nbcnews.com",
+      "processed_at": "2025-04-18T18:56:56.837503"
+    },
+    {
+      "id": 127119,
+      "scraper_id": 90922,
+      "title": "Trump blasts Fed Chair Powell, saying his \u2018termination cannot come fast enough\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:57:45",
+      "domain": "www.cnn.com",
+      "processed_at": "2025-04-18T18:52:45.565456"
+    },
+    {
+      "id": 127040,
+      "scraper_id": 91040,
+      "title": "Is American Electric Power Company, Inc. (AEP) the Best Large-Cap Value Stock to Buy as the Recession Hits?",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:24:32",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T18:46:25.936908"
+    },
+    {
+      "id": 127054,
+      "scraper_id": 91020,
+      "title": "Scientists find 'strongest sign to date' of possible life on a distant planet",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:24:33",
+      "domain": "www.euronews.com",
+      "processed_at": "2025-04-18T18:33:50.916254"
+    },
+    {
+      "id": 127118,
+      "scraper_id": 90924,
+      "title": "GTCR Announces Sale of Worldpay to Global Payments for $24.25 Billion in Conjunction with Transformative Three-Way Transaction",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:57:20",
+      "domain": "www.prnewswire.com",
+      "processed_at": "2025-04-18T18:33:50.803774"
+    },
+    {
+      "id": 127338,
+      "scraper_id": 90621,
+      "title": "GTCR Announces Sale of Worldpay to Global Payments for $24.25 Billion in Conjunction with Transformative Three-Way Transaction - PR Newswire",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:35:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T18:31:48.187371"
+    },
+    {
+      "id": 127163,
+      "scraper_id": 90856,
+      "title": "An Abrupt And Cascading Dislocation",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T04:00:00",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-18T18:29:38.664844"
+    },
+    {
+      "id": 127164,
+      "scraper_id": 90854,
+      "title": "S&P 500 Enters New Volatility Cluster",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T08:27:00",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-18T18:25:43.243276"
+    },
+    {
+      "id": 127169,
+      "scraper_id": 90853,
+      "title": "Powell Warns Investors There Will Be No Tariff Bailout",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T09:04:52",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-18T18:23:53.071832"
+    },
+    {
+      "id": 127575,
+      "scraper_id": 89370,
+      "title": "Citi says buy power generator with a successful track record of managing around tariffs - CNBC",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:33:56",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T18:21:53.427808"
+    },
+    {
+      "id": 127323,
+      "scraper_id": 90648,
+      "title": "Business insider says Twins' $1.7 billion asking price is 'not an easy sell' - Sports Illustrated",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:39:40",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T18:20:05.641525"
+    },
+    {
+      "id": 127404,
+      "scraper_id": 90535,
+      "title": "Legislative Democrats unveil $12B tax plan - Axios",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:52:29",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T18:17:59.502466"
+    },
+    {
+      "id": 127509,
+      "scraper_id": 90410,
+      "title": "Italy's Meloni will test her mettle as EU-US bridge when she meets Trump in Washington",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T04:05:04",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T18:12:48.590552"
+    },
+    {
+      "id": 127554,
+      "scraper_id": 90363,
+      "title": "Trump live updates: President says Fed Chair Powell\u2019s \u2018termination cannot come fast enough\u2019 after tariff comments",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:59:05",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T18:12:48.244667"
+    },
+    {
+      "id": 127390,
+      "scraper_id": 90553,
+      "title": "Property tax relief bill logjam breaks loose - Daily Inter Lake",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:30:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T18:07:11.261004"
+    },
+    {
+      "id": 127453,
+      "scraper_id": 90482,
+      "title": "CoStar: US inbound international travel takes 12% hit",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T11:29:00.002000",
+      "domain": "www.calculatedriskblog.com",
+      "processed_at": "2025-04-18T17:53:59.573767"
+    },
+    {
+      "id": 127446,
+      "scraper_id": 90488,
+      "title": "Las Vegas in February: Visitor Traffic Down 11.9% YoY; Convention Traffic Down 19.5% YoY",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T14:38:00.001000",
+      "domain": "www.calculatedriskblog.com",
+      "processed_at": "2025-04-18T17:53:59.312416"
+    },
+    {
+      "id": 127402,
+      "scraper_id": 90536,
+      "title": "This week in tax: Gary Shapley tipped to become acting IRS commissioner - International Tax Review",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:26:43",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T17:53:56.775723"
+    },
+    {
+      "id": 127161,
+      "scraper_id": 90864,
+      "title": "It Will Be A Seesaw Moving Forward",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T09:09:34",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-18T17:53:40.623225"
+    },
+    {
+      "id": 126731,
+      "scraper_id": 88521,
+      "title": "Here's why the average US credit score is falling",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:19",
+      "domain": "www.foxbusiness.com",
+      "processed_at": "2025-04-18T16:55:41.922840"
+    },
+    {
+      "id": 126709,
+      "scraper_id": 88552,
+      "title": "Chicago Cancels Cinco de Mayo Parade Over Fears of ICE Deportations",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:15",
+      "domain": "reason.com",
+      "processed_at": "2025-04-18T16:54:30.105185"
+    },
+    {
+      "id": 126482,
+      "scraper_id": 88889,
+      "title": "Wild golf brawl erupts over slow play, ends with shirtless man getting pummeled",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T00:08:15",
+      "domain": "sports.yahoo.com",
+      "processed_at": "2025-04-18T16:53:51.846257"
+    },
+    {
+      "id": 126664,
+      "scraper_id": 88625,
+      "title": "Small ocean swirls may have an outsized affect on climate, NASA satellite shows",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:04",
+      "domain": "www.theregister.com",
+      "processed_at": "2025-04-18T16:53:17.590877"
+    },
+    {
+      "id": 125889,
+      "scraper_id": 89739,
+      "title": "Small ocean swirls may have an outsized affect on climate, NASA satellite shows",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:04",
+      "domain": "www.theregister.com",
+      "processed_at": "2025-04-18T16:53:17.538579"
+    },
+    {
+      "id": 126648,
+      "scraper_id": 88654,
+      "title": "Crypto Casino Founder Richard Kim Arrested After Gambling Away Investor Funds",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:14",
+      "domain": "www.coindesk.com",
+      "processed_at": "2025-04-18T16:51:56.137956"
+    },
+    {
+      "id": 126721,
+      "scraper_id": 88534,
+      "title": "Tariff turmoil fuels Coinbase International\u2019s BTC perpetuals to $100 billion in weekly volume",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:31",
+      "domain": "www.theblock.co",
+      "processed_at": "2025-04-18T16:51:56.026964"
+    },
+    {
+      "id": 127001,
+      "scraper_id": 90351,
+      "title": "At last, a moment of clarity \u2013 the UK supreme court has upheld the rights of women | Susanna Rustin",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:49:07",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T16:51:55.777328"
+    },
+    {
+      "id": 127002,
+      "scraper_id": 90349,
+      "title": "Growing up surrounded by boys, I\u2019m fascinated \u2013 and a bit scared \u2013 by the dynamic between sisters | Rebecca Shaw",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:00:45",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T16:51:55.668149"
+    },
+    {
+      "id": 127003,
+      "scraper_id": 90347,
+      "title": "Viktor Orb\u00e1n\u2019s latest clampdown bans Budapest Pride \u2013 but he won\u2019t stop us marching",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:30:44",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T16:51:55.444325"
+    },
+    {
+      "id": 126706,
+      "scraper_id": 88559,
+      "title": "US proposes eroding species protections",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:13",
+      "domain": "theweek.com",
+      "processed_at": "2025-04-18T16:50:04.619423"
+    },
+    {
+      "id": 126734,
+      "scraper_id": 88517,
+      "title": "Scientists find hint of alien life on distant world",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:15",
+      "domain": "theweek.com",
+      "processed_at": "2025-04-18T16:50:04.536655"
+    },
+    {
+      "id": 126671,
+      "scraper_id": 88617,
+      "title": "Dutch Bros (NYSE: BROS) Price Prediction and Forecast 2025-2030 (April 2025)",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:17",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-18T16:50:04.387047"
+    },
+    {
+      "id": 126658,
+      "scraper_id": 88636,
+      "title": "Wall Street\u2019s Nightmare Is Warren Buffett\u2019s Goldmine: Here Is the Gameplan",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:31",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-18T16:50:04.307575"
+    },
+    {
+      "id": 126672,
+      "scraper_id": 88611,
+      "title": "United Health (NYSE: UNH), Amgen (NYSE: AMGN) and Humana (NYSE: HUM) Are Tumbling Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:38",
+      "domain": "247wallst.com",
+      "processed_at": "2025-04-18T16:50:04.219973"
+    },
+    {
+      "id": 126654,
+      "scraper_id": 88648,
+      "title": "Cocoa Prices Rebound on Better-Than-Expected Cocoa Demand",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:28:55",
+      "domain": "www.barchart.com",
+      "processed_at": "2025-04-18T16:47:58.582213"
+    },
+    {
+      "id": 126998,
+      "scraper_id": 90356,
+      "title": "Stormy weather could impact Easter travel plans in parts of the US as millions hit road for holiday weekend",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:32:55",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T16:47:58.242726"
+    },
+    {
+      "id": 125879,
+      "scraper_id": 89762,
+      "title": "Cocoa Prices Rebound on Better-Than-Expected Cocoa Demand",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:28:55",
+      "domain": "www.barchart.com",
+      "processed_at": "2025-04-18T06:00:58.025602"
+    },
+    {
+      "id": 126719,
+      "scraper_id": 88551,
+      "title": "Earnings Preview: What To Expect From Gartner's Report",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:21",
+      "domain": "www.barchart.com",
+      "processed_at": "2025-04-18T05:59:39.519886"
+    },
+    {
+      "id": 126663,
+      "scraper_id": 88629,
+      "title": "Nearly 4 million new manufacturing jobs are coming to America as boomers retire\u2014but it\u2019s the one trade job Gen Z doesn\u2019t want",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:12",
+      "domain": "fortune.com",
+      "processed_at": "2025-04-18T05:51:53.130874"
+    },
+    {
+      "id": 126708,
+      "scraper_id": 88556,
+      "title": "Tesla is reportedly pulling workers off Cybertruck factory lines and dropping production targets for the model amid plummeting sales",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:21",
+      "domain": "fortune.com",
+      "processed_at": "2025-04-18T05:49:30.766480"
+    },
+    {
+      "id": 126703,
+      "scraper_id": 88572,
+      "title": "Tax attorneys say IRS has become a 'zombie' as agency cuts staff and halts audits of the wealthy",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:11",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-18T05:45:59.134445"
+    },
+    {
+      "id": 126702,
+      "scraper_id": 88562,
+      "title": "American Express\u2019s wealthy cardholders are mostly untouched by tariff jitters",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:37",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-18T05:45:22.539531"
+    },
+    {
+      "id": 126515,
+      "scraper_id": 88857,
+      "title": "BOOK: Musk fury over TESLA death investigation foreshadowed his war on DC...",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:25:37",
+      "domain": "www.msn.com",
+      "processed_at": "2025-04-18T05:43:35.267102"
+    },
+    {
+      "id": 126500,
+      "scraper_id": 88872,
+      "title": "Scientists find strongest evidence yet of life on alien planet...",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:25:38",
+      "domain": "www.msn.com",
+      "processed_at": "2025-04-18T05:41:41.455982"
+    },
+    {
+      "id": 125847,
+      "scraper_id": 89810,
+      "title": "Texas High-Speed Rail Issues Update After Trump Snub",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:07:16",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:32:37.201085"
+    },
+    {
+      "id": 126625,
+      "scraper_id": 88696,
+      "title": "Texas High-Speed Rail Issues Update After Trump Snub",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:07:16",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:31:57.813446"
+    },
+    {
+      "id": 126628,
+      "scraper_id": 88693,
+      "title": "Russia Seizes US Company's Soup To Feed Soldiers: Report",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:07:20",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:31:20.905688"
+    },
+    {
+      "id": 125850,
+      "scraper_id": 89807,
+      "title": "Russia Seizes US Company's Soup To Feed Soldiers: Report",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:07:20",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:30:40.995901"
+    },
+    {
+      "id": 125869,
+      "scraper_id": 89780,
+      "title": "President AOC? Analysts Predict She's a Top 2028 Contender",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:14",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:29:59.692222"
+    },
+    {
+      "id": 126646,
+      "scraper_id": 88666,
+      "title": "President AOC? Analysts Predict She's a Top 2028 Contender",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:14",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:29:20.708282"
+    },
+    {
+      "id": 126668,
+      "scraper_id": 88619,
+      "title": "Tropic Air Plane Hijacked by Knife-wielding Man",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:39:57",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:28:07.693519"
+    },
+    {
+      "id": 126704,
+      "scraper_id": 88565,
+      "title": "University of Texas Has 'Power Stripped' As Bill Passes",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:20",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:26:55.626977"
+    },
+    {
+      "id": 125941,
+      "scraper_id": 89661,
+      "title": "Remote Worker's Admission About What They Do All Day Cheered: 'Not Sorry'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:36",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:26:16.720556"
+    },
+    {
+      "id": 126713,
+      "scraper_id": 88547,
+      "title": "Remote Worker's Admission About What They Do All Day Cheered: 'Not Sorry'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:36",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:25:42.933459"
+    },
+    {
+      "id": 126249,
+      "scraper_id": 89191,
+      "title": "Adani Ports Acquires 50-MTPA Capacity Terminal In Australia To Boost Global Presence",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:54:39.234000",
+      "domain": "www.ndtvprofit.com",
+      "processed_at": "2025-04-18T05:23:56.621645"
+    },
+    {
+      "id": 126733,
+      "scraper_id": 88519,
+      "title": "Man, 28, Plagued by Spam Calls for a Year\u2014Then Comes Up With a Plan",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:36",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:23:09.264466"
+    },
+    {
+      "id": 126736,
+      "scraper_id": 88518,
+      "title": "How Neuroaesthetics Can Make Workplaces\u2014and Workers\u2014Better",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:38",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:22:13.811558"
+    },
+    {
+      "id": 126739,
+      "scraper_id": 88512,
+      "title": "INTERVIEW: Andrew Ahn Discusses the Importance of Community and His New Film The Wedding Banquet",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:41",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:21:09.787620"
+    },
+    {
+      "id": 126401,
+      "scraper_id": 89007,
+      "title": "A boat catches fire in Congo and capsizes, leaving at least 50 people dead, a local official says",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:29:00",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-18T05:21:09.681661"
+    },
+    {
+      "id": 126392,
+      "scraper_id": 89018,
+      "title": "Autism rates in US rise again to 1 in 31 kids, CDC says",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:29:00",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-18T05:21:09.535279"
+    },
+    {
+      "id": 125964,
+      "scraper_id": 89624,
+      "title": "Retired Neighbors Come Out as School Kids Get Off Bus, Reason Melts Hearts",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:49",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:20:07.709798"
+    },
+    {
+      "id": 126735,
+      "scraper_id": 88510,
+      "title": "Retired Neighbors Come Out as School Kids Get Off Bus, Reason Melts Hearts",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:49",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T05:18:48.410512"
+    },
+    {
+      "id": 126406,
+      "scraper_id": 89006,
+      "title": "NY prison guards beat an inmate to death then tried to cover it up, prosecutors say",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:29:00",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-18T05:18:48.261216"
+    },
+    {
+      "id": 125980,
+      "scraper_id": 89576,
+      "title": "In a world full of wedgies, are you a wedger like Trump, or a wedgee like me? | Adrian Chiles",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:00:36",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T05:17:37.105769"
+    },
+    {
+      "id": 126630,
+      "scraper_id": 88687,
+      "title": "New daily weight-loss pill shows success at clinical trial",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:07:13",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T05:15:16.394489"
+    },
+    {
+      "id": 126357,
+      "scraper_id": 89054,
+      "title": "When are supermarkets open over Easter 2025? Opening times for Tesco, Asda, Aldi, Sainsbury\u2019s and more",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:07:36",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-18T05:15:16.227010"
+    },
+    {
+      "id": 126568,
+      "scraper_id": 88771,
+      "title": "A 331-year-old violin was stolen from a USC student. How police recovered the $650,000 instrument",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T01:04:31",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T05:14:04.885843"
+    },
+    {
+      "id": 126563,
+      "scraper_id": 88777,
+      "title": "Anaheim police kill driver in high-speed pursuit, crash in Orange County",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T05:36:04",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T05:14:04.674622"
+    },
+    {
+      "id": 126569,
+      "scraper_id": 88770,
+      "title": "Live colossal squid, super-heavyweight of the deep sea, caught on video for the first time",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:00:28",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T05:11:35.496406"
+    },
+    {
+      "id": 126571,
+      "scraper_id": 88775,
+      "title": "Everything you need to know about Disneyland's biggest event of the decade",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:00:32",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T05:10:26.312465"
+    },
+    {
+      "id": 126531,
+      "scraper_id": 88808,
+      "title": "\"Una mujer mexicana, gay, exitosa\": El legado de Janelly Far\u00edas ante su retiro del f\u00fatbol",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:04:15",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T05:09:07.765279"
+    },
+    {
+      "id": 126535,
+      "scraper_id": 88805,
+      "title": "Why Brazilian DJ Alok wants to 'keep art human'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:00:41",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T05:07:52.230203"
+    },
+    {
+      "id": 126544,
+      "scraper_id": 88797,
+      "title": "Hundreds of Southern California Edison planners, technicians file for union election",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:00:09",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T05:07:52.165552"
+    },
+    {
+      "id": 126718,
+      "scraper_id": 88539,
+      "title": "Hundreds of Southern California Edison planners, technicians file for union election",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:10",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T05:07:52.086295"
+    },
+    {
+      "id": 125870,
+      "scraper_id": 89767,
+      "title": "PSA: It\u2019s not just you, Spotify is down [U: Fixed]",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:04",
+      "domain": "9to5mac.com",
+      "processed_at": "2025-04-18T05:07:51.977801"
+    },
+    {
+      "id": 126647,
+      "scraper_id": 88653,
+      "title": "PSA: It\u2019s not just you, Spotify is down [U: Fixed]",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:04",
+      "domain": "9to5mac.com",
+      "processed_at": "2025-04-18T05:06:52.266242"
+    },
+    {
+      "id": 126652,
+      "scraper_id": 88644,
+      "title": "Biden\u2019s Border Policies Are A Disaster, It\u2019s Time to Deport: Vance",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:14",
+      "domain": "tippinsights.com",
+      "processed_at": "2025-04-18T05:06:52.237277"
+    },
+    {
+      "id": 126732,
+      "scraper_id": 88522,
+      "title": "Trump Kills the Firewall, Musk Lights the Match",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:15",
+      "domain": "observer.com",
+      "processed_at": "2025-04-18T05:06:52.091711"
+    },
+    {
+      "id": 126740,
+      "scraper_id": 88506,
+      "title": "Goodfire, which works on decoding the inner workings of AI models, raised $50M led by Menlo; source: Anthropic invested $1M, its first startup investment",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:16",
+      "domain": "www.theinformation.com",
+      "processed_at": "2025-04-18T05:06:51.976843"
+    },
+    {
+      "id": 126497,
+      "scraper_id": 88878,
+      "title": "JK Rowling celebrates trans court win with cigar on luxury yacht...",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:25:39",
+      "domain": "www.thesun.co.uk",
+      "processed_at": "2025-04-18T05:05:55.340235"
+    },
+    {
+      "id": 126846,
+      "scraper_id": 90131,
+      "title": "Prince Harry \u2018lost interest\u2019 in African charity Sentebale after marrying Meghan Markle, co-founder\u2019s brother says",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T05:52:22",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T05:04:45.073422"
+    },
+    {
+      "id": 125822,
+      "scraper_id": 89832,
+      "title": "10-year-old California prodigy set to graduate from college with 2 degrees",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T06:26:33",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T05:04:44.999982"
+    },
+    {
+      "id": 125832,
+      "scraper_id": 89824,
+      "title": "7-foot beast snagged in Texas lake likely a world-record catch",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:34:40",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T05:03:50.180127"
+    },
+    {
+      "id": 125835,
+      "scraper_id": 89821,
+      "title": "LA mom drowned her 7-year-old daughter in bathtub after falling into depression over immigration status, fianc\u00e9 says",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:22:38",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T05:02:48.267692"
+    },
+    {
+      "id": 125836,
+      "scraper_id": 89820,
+      "title": "Baby food sold at Target is recalled due to elevated lead levels",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:23:37",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T05:02:48.219483"
+    },
+    {
+      "id": 125912,
+      "scraper_id": 89698,
+      "title": "Nvidia CEO Huang Flies to Beijing for Talks, Report Says",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:18",
+      "domain": "www.investopedia.com",
+      "processed_at": "2025-04-18T05:01:50.796303"
+    },
+    {
+      "id": 126689,
+      "scraper_id": 88584,
+      "title": "Nvidia CEO Huang Flies to Beijing for Talks, Report Says",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:18",
+      "domain": "www.investopedia.com",
+      "processed_at": "2025-04-18T05:00:44.265016"
+    },
+    {
+      "id": 126481,
+      "scraper_id": 88891,
+      "title": "Tears on my MyPillow: Weeping pro-Trump conspiracy theorist Mike Lindell tells judge he has no money to pay fines: \u2018I\u2019m in ruins\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:50:16",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-18T04:59:29.453253"
+    },
+    {
+      "id": 125989,
+      "scraper_id": 89563,
+      "title": "State faults Richmond for water failures and demands corrective action",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:14:37",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-18T04:57:40.258099"
+    },
+    {
+      "id": 125992,
+      "scraper_id": 89560,
+      "title": "Things are looking up for new life on a downtown Rochester rooftop",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:18:00",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-18T04:57:40.019159"
+    },
+    {
+      "id": 126124,
+      "scraper_id": 89399,
+      "title": "Milwaukee Bucks will need a healthy Giannis Antetokounmpo to power through the NBA playoffs - Milwaukee Journal Sentinel",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:33:53",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:57:39.893287"
+    },
+    {
+      "id": 126634,
+      "scraper_id": 88682,
+      "title": "ACEA and Eurelectric urge immediate grid upgrades for heavy-duty EV transition",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:22",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:53:51.877451"
+    },
+    {
+      "id": 126622,
+      "scraper_id": 88698,
+      "title": "Nvidia, AMD see charges due to new China export rules: Morning Buzz",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:27",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:53:51.776825"
+    },
+    {
+      "id": 126636,
+      "scraper_id": 88674,
+      "title": "Schwab Network Unveils \u201cExample\u201d Options Trade Involving NFLX",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:19:11",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:53:51.630189"
+    },
+    {
+      "id": 126637,
+      "scraper_id": 88676,
+      "title": "Blackstone's Schwarzman: 'Fast resolution' to Trump trade talks critical so economy stays on 'growth path'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:19:13",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:53:51.586395"
+    },
+    {
+      "id": 126666,
+      "scraper_id": 88622,
+      "title": "Luminar forms automotive council with industry veterans",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:11",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:53:51.502032"
+    },
+    {
+      "id": 126945,
+      "scraper_id": 89904,
+      "title": "It's the economic end times, so obviously I'm thinking about my takeaway coffee | Emma Brockes - The Guardian",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:30:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:53:51.404186"
+    },
+    {
+      "id": 126988,
+      "scraper_id": 89364,
+      "title": "Puerto Rico hit with island-wide blackout, crews working to restore power - CBS News",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:36:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:53:50.837928"
+    },
+    {
+      "id": 126670,
+      "scraper_id": 88614,
+      "title": "Grant Cardone Comes Out Swinging Against Savings Accounts: 'You've Been Burning Your Money'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:49",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:51:42.543594"
+    },
+    {
+      "id": 126679,
+      "scraper_id": 88599,
+      "title": "Canadians bought record amount of US shares in February",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:09",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:51:42.488004"
+    },
+    {
+      "id": 126682,
+      "scraper_id": 88600,
+      "title": "Here's Why Lockheed Martin Stock Flew Lower Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:26",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:51:42.464998"
+    },
+    {
+      "id": 126683,
+      "scraper_id": 88591,
+      "title": "Why New China Chip Export Curbs Could Affect Far More Than Just Nvidia, AMD",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:39",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:51:42.392278"
+    },
+    {
+      "id": 126151,
+      "scraper_id": 89356,
+      "title": "Oscoda County residents still without power 19 days after ice storm - abc12.com",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:56:17",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:51:41.893497"
+    },
+    {
+      "id": 126686,
+      "scraper_id": 88594,
+      "title": "US airlines struggle to forecast their business in worsening economic fog",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:43",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:49:52.858311"
+    },
+    {
+      "id": 126696,
+      "scraper_id": 88578,
+      "title": "US oilfield services firms brace for earnings as tariffs cloud outlook",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:48",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:49:52.772262"
+    },
+    {
+      "id": 126720,
+      "scraper_id": 88537,
+      "title": "Best CD rates today, April 17, 2025 (lock in up to 4.50% APY)",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:45",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:49:52.706504"
+    },
+    {
+      "id": 126133,
+      "scraper_id": 89392,
+      "title": "The power of movement for Parkinson\u2019s disease - Berkeleyside",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:00:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:49:51.906291"
+    },
+    {
+      "id": 126705,
+      "scraper_id": 88560,
+      "title": "Italian Sustainable Shoe Company ACBC Sells Majority Stake to Swiss Fund",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:47",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:47:32.729311"
+    },
+    {
+      "id": 126722,
+      "scraper_id": 88536,
+      "title": "French luxury conglomerate LVMH's CEO calls for calming trade tensions with the US",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:55",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:47:32.665573"
+    },
+    {
+      "id": 126726,
+      "scraper_id": 88530,
+      "title": "Brazil's Petrobras cuts diesel prices to distributors",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:57",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T04:47:32.580895"
+    },
+    {
+      "id": 126821,
+      "scraper_id": 90172,
+      "title": "The 15 Best Vietnam War Movies - Mental Floss",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:04:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:47:32.365591"
+    },
+    {
+      "id": 126695,
+      "scraper_id": 88586,
+      "title": "Cryptic, Crypto, Krypton",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:26",
+      "domain": "www.zerohedge.com",
+      "processed_at": "2025-04-18T04:38:38.988801"
+    },
+    {
+      "id": 126723,
+      "scraper_id": 88543,
+      "title": "\"Luxury Turns Late-Cycle\": After LVMH Miss, Hermes Stumbles Too",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:26",
+      "domain": "www.zerohedge.com",
+      "processed_at": "2025-04-18T04:36:38.271180"
+    },
+    {
+      "id": 126136,
+      "scraper_id": 89386,
+      "title": "Turning Waste into Wealth: The Transformative Power of Home Composting - RiverBender.com",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:55:28",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:36:37.914643"
+    },
+    {
+      "id": 126129,
+      "scraper_id": 89391,
+      "title": "Ugreen Just Outshined Anker With This Power Bank Price Drop You Can\u2019t Ignore - Gizmodo",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:55:34",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:36:37.786036"
+    },
+    {
+      "id": 126626,
+      "scraper_id": 88690,
+      "title": "FDA Sets The Countdown: Regeneron's Eylea HD Could Be Headed For Major Expansion",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:15",
+      "domain": "www.benzinga.com",
+      "processed_at": "2025-04-18T04:33:13.587080"
+    },
+    {
+      "id": 126645,
+      "scraper_id": 88655,
+      "title": "$1000 Invested In Murphy USA 5 Years Ago Would Be Worth This Much Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:11",
+      "domain": "www.benzinga.com",
+      "processed_at": "2025-04-18T04:33:13.163039"
+    },
+    {
+      "id": 126989,
+      "scraper_id": 89355,
+      "title": "Puerto Rico's power slowly returning after island-wide blackout - CBS News",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:10:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:33:12.430152"
+    },
+    {
+      "id": 126180,
+      "scraper_id": 89309,
+      "title": "Weather-related power outages possible Thursday - KOAT",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:33:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:31:10.380495"
+    },
+    {
+      "id": 126667,
+      "scraper_id": 88621,
+      "title": "Vegan, Sugar-Free, And Now In Australia: Tilray's Edibles Aren't Your Average Medical Launch",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:17",
+      "domain": "www.benzinga.com",
+      "processed_at": "2025-04-18T04:29:33.120119"
+    },
+    {
+      "id": 126669,
+      "scraper_id": 88613,
+      "title": "Here's How Much $1000 Invested In Axon Enterprise 5 Years Ago Would Be Worth Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:36",
+      "domain": "www.benzinga.com",
+      "processed_at": "2025-04-18T04:29:33.072790"
+    },
+    {
+      "id": 126162,
+      "scraper_id": 89338,
+      "title": "Invest in sustainable power for on-the-go and home backup at up to 50% off with Jackery\u2019s Earth Day Sale from $90 - 9to5Toys",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:37:49",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:29:32.769738"
+    },
+    {
+      "id": 125944,
+      "scraper_id": 89658,
+      "title": "Lilly's Diabetes Pill Clears Major Trial, Analyst Points To Global Potential",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:35",
+      "domain": "www.benzinga.com",
+      "processed_at": "2025-04-18T04:25:47.608242"
+    },
+    {
+      "id": 126716,
+      "scraper_id": 88544,
+      "title": "Lilly's Diabetes Pill Clears Major Trial, Analyst Points To Global Potential",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:35",
+      "domain": "www.benzinga.com",
+      "processed_at": "2025-04-18T04:25:47.550023"
+    },
+    {
+      "id": 126144,
+      "scraper_id": 89371,
+      "title": "MKE County: Supervisors Can Create Sheriff Citizen Review Board, But What Power Would It Have? - Urban Milwaukee",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:23:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:21:48.351490"
+    },
+    {
+      "id": 126624,
+      "scraper_id": 88694,
+      "title": "Target CEO to meet with civil rights leader Al Sharpton amid DEI cuts",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:07",
+      "domain": "abcnews.go.com",
+      "processed_at": "2025-04-18T04:19:56.304454"
+    },
+    {
+      "id": 126006,
+      "scraper_id": 89548,
+      "title": "Former OneRepublic Bassist to Take on California House Republican in Tight District",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:01:06",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:19:56.231759"
+    },
+    {
+      "id": 126010,
+      "scraper_id": 89543,
+      "title": "Improved Canine Eyedrops Deliver Antibiotics More Effectively",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:05:00",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:19:55.790089"
+    },
+    {
+      "id": 126128,
+      "scraper_id": 89393,
+      "title": "1958 Chevrolet Impala 'Tri-Power' Convertible Showcases One-Year Design and V8 Power - Yahoo Autos",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:30:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:19:55.363308"
+    },
+    {
+      "id": 126639,
+      "scraper_id": 88668,
+      "title": "429K portable chargers under recall after consumers report fires, minor burns",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:08",
+      "domain": "abcnews.go.com",
+      "processed_at": "2025-04-18T04:18:00.048819"
+    },
+    {
+      "id": 126130,
+      "scraper_id": 89398,
+      "title": "Outboard engines power on - Boating Industry",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:39:49",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:17:59.640606"
+    },
+    {
+      "id": 126655,
+      "scraper_id": 88637,
+      "title": "Global Payments buying Worldpay in $22 billion deal",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:28:54",
+      "domain": "abcnews.go.com",
+      "processed_at": "2025-04-18T04:15:56.403860"
+    },
+    {
+      "id": 126012,
+      "scraper_id": 89537,
+      "title": "Four Dead After Dredging Vessel Capsizes off Philippines, Says Coast Guard",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T10:28:48",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:15:56.363439"
+    },
+    {
+      "id": 126023,
+      "scraper_id": 89527,
+      "title": "Rafael Nadal to Be Honored With a Tribute at the French Open",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:10:37",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:12:13.176271"
+    },
+    {
+      "id": 126027,
+      "scraper_id": 89524,
+      "title": "US YouTuber Remains in Custody in India After Visiting Restricted Island With a Diet Coke Can",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:29:13",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:12:13.029279"
+    },
+    {
+      "id": 126031,
+      "scraper_id": 89523,
+      "title": "Taking a Mental Health Leave From Work Is an Option Most People Don't Know About",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T11:30:19",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:12:12.958627"
+    },
+    {
+      "id": 126034,
+      "scraper_id": 89516,
+      "title": "Filmmaker-Music Journalist Cameron Crowe Has a Memoir Out This Fall. It\u2019s Called \u2018The Uncool'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:30:47",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:10:23.117625"
+    },
+    {
+      "id": 126123,
+      "scraper_id": 89396,
+      "title": "Crews making progress to restore power in Puerto Rico - CBS News",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:09:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:10:22.543279"
+    },
+    {
+      "id": 126968,
+      "scraper_id": 89859,
+      "title": "Blackstone's Schwarzman: 'Fast resolution' to Trump trade talks critical so economy stays on 'growth path' - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:10:37",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:10:22.465924"
+    },
+    {
+      "id": 126141,
+      "scraper_id": 89374,
+      "title": "Demolition of old power plant at former Belchertown State School begins - Daily Hampshire Gazette",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:14:27",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:08:02.710820"
+    },
+    {
+      "id": 126049,
+      "scraper_id": 89499,
+      "title": "A Russian Bucket Brigade Helps Toads and Frogs Cross the Road to Get to a Spawning Site",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:57:40",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:05:58.144798"
+    },
+    {
+      "id": 126154,
+      "scraper_id": 89349,
+      "title": "Brief power outage in Bainbridge after car strikes powerline - WALB",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:28:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:05:57.919680"
+    },
+    {
+      "id": 126955,
+      "scraper_id": 89886,
+      "title": "US airlines struggle to forecast their business in worsening economic fog - Yahoo",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:38:03",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T04:05:57.592146"
+    },
+    {
+      "id": 126056,
+      "scraper_id": 89494,
+      "title": "NCAA Panel Gives Final OK to Rule Designed to Discourage Football Players From Faking Injuries",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:28:40",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:03:57.365283"
+    },
+    {
+      "id": 126058,
+      "scraper_id": 89492,
+      "title": "Drake Attacks Lamar's Super Bowl Performance in Lawsuit Against Record Label",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:38:53",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:03:57.207453"
+    },
+    {
+      "id": 126065,
+      "scraper_id": 89486,
+      "title": "Judge Strikes Down an Ohio Law Limiting Kids\u2019 Use of Social Media as Unconstitutional",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:10:04",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T04:01:51.300515"
+    },
+    {
+      "id": 126066,
+      "scraper_id": 89484,
+      "title": "NY Rangers' Panarin, MSG Made Settlement Payments After Employee Sexual Assault Allegations: Report",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:12:40",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T03:59:54.058077"
+    },
+    {
+      "id": 126068,
+      "scraper_id": 89481,
+      "title": "Endangered Sea Turtle Populations Show Signs of Recovery in More Than Half the World, Survey Finds",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:24:59",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T03:59:53.829470"
+    },
+    {
+      "id": 126069,
+      "scraper_id": 89480,
+      "title": "Scientists Find Possible Chemical Signs of Life on a Faraway Planet",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:25:18",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T03:59:53.718156"
+    },
+    {
+      "id": 126139,
+      "scraper_id": 89376,
+      "title": "Is American Electric Power Company, Inc. (AEP) the Best Large-Cap Value Stock to Buy as the Recession Hits? - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:10:41",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T03:59:53.464453"
+    },
+    {
+      "id": 126075,
+      "scraper_id": 89477,
+      "title": "429,000 Portable Chargers Are Under Recall After Some Consumers Report Fires, Minor Burn Injuries",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:35:07",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T03:58:13.984070"
+    },
+    {
+      "id": 126080,
+      "scraper_id": 89469,
+      "title": "Dozens More Possible Jurors Are Screened in Weinstein Retrial",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:09:48",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T03:56:03.617952"
+    },
+    {
+      "id": 126847,
+      "scraper_id": 90130,
+      "title": "Vatican opens solemn run-up to Easter with recovering Pope Francis on the sidelines",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T09:46:30",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T03:56:03.361719"
+    },
+    {
+      "id": 126085,
+      "scraper_id": 89464,
+      "title": "Man Convicted in 2019 Kansas Bar Shooting That Left 4 Dead and 5 Injured.",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:26:41",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T03:53:49.992569"
+    },
+    {
+      "id": 126087,
+      "scraper_id": 89462,
+      "title": "2 Wildfires Spreading in Rugged Terrain in Western North Carolina",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:27:12",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T03:53:49.863375"
+    },
+    {
+      "id": 126090,
+      "scraper_id": 89460,
+      "title": "Ex-Harvard Morgue Manager Charged With Selling Stolen Body Parts to Plead Guilty",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:33:39",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-18T03:53:49.815558"
+    },
+    {
+      "id": 126717,
+      "scraper_id": 88542,
+      "title": "US judge rules Google violated antitrust laws",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:25",
+      "domain": "breakingthenews.net",
+      "processed_at": "2025-04-18T03:53:49.198608"
+    },
+    {
+      "id": 126638,
+      "scraper_id": 88673,
+      "title": "Average US rate on a 30-year mortgage climbs to 6.83%, highest level since late February",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:17:53",
+      "domain": "www.bostonherald.com",
+      "processed_at": "2025-04-18T03:51:46.434894"
+    },
+    {
+      "id": 126691,
+      "scraper_id": 88581,
+      "title": "Mortgage rates climb to highest level in two months as Trump\u2019s tariffs continue to rock markets",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:33",
+      "domain": "www.cnn.com",
+      "processed_at": "2025-04-18T03:51:46.375329"
+    },
+    {
+      "id": 125851,
+      "scraper_id": 89801,
+      "title": "New daily weight-loss pill shows success at clinical trial",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:07:13",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:50:04.870845"
+    },
+    {
+      "id": 125845,
+      "scraper_id": 89808,
+      "title": "Target CEO to meet with civil rights leader Al Sharpton amid DEI cuts",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:07",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:50:04.630352"
+    },
+    {
+      "id": 126698,
+      "scraper_id": 88573,
+      "title": "The tariff loophole that drove Shein and Temu to fast-fashion dominance is closing in 8 days\u2014and forcing the cheap brands to hike prices",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:25",
+      "domain": "fortune.com",
+      "processed_at": "2025-04-18T03:50:04.147088"
+    },
+    {
+      "id": 125861,
+      "scraper_id": 89782,
+      "title": "429K portable chargers under recall after consumers report fires, minor burns",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:08",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:48:21.238452"
+    },
+    {
+      "id": 125849,
+      "scraper_id": 89804,
+      "title": "FDA Sets The Countdown: Regeneron's Eylea HD Could Be Headed For Major Expansion",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:15",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:48:21.130521"
+    },
+    {
+      "id": 126627,
+      "scraper_id": 88695,
+      "title": "Viral Moment Golden Retriever Can't Contain Affection for Owner Explained",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:07:29",
+      "domain": "www.newsweek.com",
+      "processed_at": "2025-04-18T03:48:20.777357"
+    },
+    {
+      "id": 125825,
+      "scraper_id": 89831,
+      "title": "Activist group releases bizarre \u2018POV\u2019 video of alleged teen killer Karmelo Anthony: \u2018He is not a hero\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T06:45:32",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T03:48:20.507469"
+    },
+    {
+      "id": 126293,
+      "scraper_id": 89131,
+      "title": "Scientists find strongest evidence yet of life on an alien planet",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:30:08",
+      "domain": "asia.nikkei.com",
+      "processed_at": "2025-04-18T03:46:37.773720"
+    },
+    {
+      "id": 125854,
+      "scraper_id": 89796,
+      "title": "ACEA and Eurelectric urge immediate grid upgrades for heavy-duty EV transition",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:22",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:46:37.603508"
+    },
+    {
+      "id": 125843,
+      "scraper_id": 89812,
+      "title": "Nvidia, AMD see charges due to new China export rules: Morning Buzz",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:27",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:46:37.194458"
+    },
+    {
+      "id": 125883,
+      "scraper_id": 89747,
+      "title": "Judge threatens Trump team with criminal contempt",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:14",
+      "domain": "theweek.com",
+      "processed_at": "2025-04-18T03:46:36.606873"
+    },
+    {
+      "id": 126659,
+      "scraper_id": 88633,
+      "title": "Judge threatens Trump team with criminal contempt",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:14",
+      "domain": "theweek.com",
+      "processed_at": "2025-04-18T03:46:36.505486"
+    },
+    {
+      "id": 125858,
+      "scraper_id": 89788,
+      "title": "Schwab Network Unveils \u201cExample\u201d Options Trade Involving NFLX",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:19:11",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:44:03.779166"
+    },
+    {
+      "id": 125856,
+      "scraper_id": 89790,
+      "title": "Blackstone's Schwarzman: 'Fast resolution' to Trump trade talks critical so economy stays on 'growth path'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:19:13",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:44:03.724733"
+    },
+    {
+      "id": 125878,
+      "scraper_id": 89751,
+      "title": "Global Payments buying Worldpay in $22 billion deal",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:28:54",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:44:03.592214"
+    },
+    {
+      "id": 126542,
+      "scraper_id": 88800,
+      "title": "Bobby Miller struggles, but Dodgers complete sweep of Rockies",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T05:14:53",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T03:44:03.421462"
+    },
+    {
+      "id": 126640,
+      "scraper_id": 88671,
+      "title": "Google held a monopoly in online ad tech, US judge finds",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:28:53",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T03:44:03.081466"
+    },
+    {
+      "id": 125867,
+      "scraper_id": 89769,
+      "title": "$1000 Invested In Murphy USA 5 Years Ago Would Be Worth This Much Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:11",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:42:20.353001"
+    },
+    {
+      "id": 125871,
+      "scraper_id": 89768,
+      "title": "Crypto Casino Founder Richard Kim Arrested After Gambling Away Investor Funds",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:14",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:42:20.225439"
+    },
+    {
+      "id": 125876,
+      "scraper_id": 89758,
+      "title": "Biden\u2019s Border Policies Are A Disaster, It\u2019s Time to Deport: Vance",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:14",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:42:20.104957"
+    },
+    {
+      "id": 126662,
+      "scraper_id": 88624,
+      "title": "FCC Chair Slams Comcast For Downplaying Garcia's MS-13 Ties",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:19",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:39:53.809024"
+    },
+    {
+      "id": 125886,
+      "scraper_id": 89738,
+      "title": "FCC Chair Slams Comcast For Downplaying Garcia's MS-13 Ties",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:19",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:39:53.761769"
+    },
+    {
+      "id": 125892,
+      "scraper_id": 89733,
+      "title": "Tropic Air Plane Hijacked by Knife-wielding Man",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:39:57",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:39:53.632437"
+    },
+    {
+      "id": 126620,
+      "scraper_id": 88699,
+      "title": "My in-laws are passing down a $16 million trust to my wife \u2013 how do we make sure it grows to its full potential?",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:10",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:39:53.561428"
+    },
+    {
+      "id": 126280,
+      "scraper_id": 89155,
+      "title": "Why Vietnam is rushing to halve local governments",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:30:08",
+      "domain": "asia.nikkei.com",
+      "processed_at": "2025-04-18T03:38:11.016116"
+    },
+    {
+      "id": 125844,
+      "scraper_id": 89813,
+      "title": "My in-laws are passing down a $16 million trust to my wife \u2013 how do we make sure it grows to its full potential?",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:10",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:38:10.984373"
+    },
+    {
+      "id": 125890,
+      "scraper_id": 89736,
+      "title": "Luminar forms automotive council with industry veterans",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:11",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:38:10.917616"
+    },
+    {
+      "id": 125888,
+      "scraper_id": 89743,
+      "title": "Nearly 4 million new manufacturing jobs are coming to America as boomers retire\u2014but it\u2019s the one trade job Gen Z doesn\u2019t want",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:12",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:38:10.791771"
+    },
+    {
+      "id": 125895,
+      "scraper_id": 89731,
+      "title": "Dutch Bros (NYSE: BROS) Price Prediction and Forecast 2025-2030 (April 2025)",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:17",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:38:10.584476"
+    },
+    {
+      "id": 125891,
+      "scraper_id": 89735,
+      "title": "Vegan, Sugar-Free, And Now In Australia: Tilray's Edibles Aren't Your Average Medical Launch",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:17",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:36:24.465486"
+    },
+    {
+      "id": 125882,
+      "scraper_id": 89750,
+      "title": "Wall Street\u2019s Nightmare Is Warren Buffett\u2019s Goldmine: Here Is the Gameplan",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:31",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:36:24.348375"
+    },
+    {
+      "id": 125894,
+      "scraper_id": 89727,
+      "title": "Here's How Much $1000 Invested In Axon Enterprise 5 Years Ago Would Be Worth Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:36",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:36:24.124085"
+    },
+    {
+      "id": 126856,
+      "scraper_id": 90088,
+      "title": "What Does the Market Think About Packaging Corp of America?",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:01:18",
+      "domain": "www.benzinga.com",
+      "processed_at": "2025-04-18T03:36:24.104915"
+    },
+    {
+      "id": 125862,
+      "scraper_id": 89785,
+      "title": "Google held a monopoly in online ad tech, US judge finds",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:28:53",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:36:23.516822"
+    },
+    {
+      "id": 126292,
+      "scraper_id": 89134,
+      "title": "'It's tragic': Myanmar quake survivors describe slow pace of relief",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:30:08",
+      "domain": "asia.nikkei.com",
+      "processed_at": "2025-04-18T03:34:17.522929"
+    },
+    {
+      "id": 125899,
+      "scraper_id": 89725,
+      "title": "United Health (NYSE: UNH), Amgen (NYSE: AMGN) and Humana (NYSE: HUM) Are Tumbling Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:38",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:34:17.478470"
+    },
+    {
+      "id": 125893,
+      "scraper_id": 89728,
+      "title": "Grant Cardone Comes Out Swinging Against Savings Accounts: 'You've Been Burning Your Money'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:49",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:34:17.365387"
+    },
+    {
+      "id": 125943,
+      "scraper_id": 89656,
+      "title": "US judge rules Google violated antitrust laws",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:25",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:34:16.760120"
+    },
+    {
+      "id": 126185,
+      "scraper_id": 89306,
+      "title": "Early hot streaks shake up Hitter Power Rankings - MLB.com",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T04:45:13",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T03:34:16.709720"
+    },
+    {
+      "id": 125904,
+      "scraper_id": 89713,
+      "title": "Canadians bought record amount of US shares in February",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:09",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:32:10.119674"
+    },
+    {
+      "id": 125928,
+      "scraper_id": 89679,
+      "title": "University of Texas Has 'Power Stripped' As Bill Passes",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:20",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:32:10.002520"
+    },
+    {
+      "id": 125916,
+      "scraper_id": 89700,
+      "title": "Cryptic, Crypto, Krypton",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:26",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:32:09.869524"
+    },
+    {
+      "id": 125921,
+      "scraper_id": 89702,
+      "title": "Sugar Prices Climb on Reduced Sugar Output in India",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:26",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:32:09.670097"
+    },
+    {
+      "id": 125848,
+      "scraper_id": 89809,
+      "title": "Viral Moment Golden Retriever Can't Contain Affection for Owner Explained",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:07:29",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:32:07.517444"
+    },
+    {
+      "id": 125905,
+      "scraper_id": 89714,
+      "title": "Here's Why Lockheed Martin Stock Flew Lower Today",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:26",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:29:15.634608"
+    },
+    {
+      "id": 125907,
+      "scraper_id": 89705,
+      "title": "Why New China Chip Export Curbs Could Affect Far More Than Just Nvidia, AMD",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:39",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:29:15.374267"
+    },
+    {
+      "id": 125908,
+      "scraper_id": 89708,
+      "title": "US airlines struggle to forecast their business in worsening economic fog",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:43",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:29:15.305123"
+    },
+    {
+      "id": 125919,
+      "scraper_id": 89692,
+      "title": "US oilfield services firms brace for earnings as tariffs cloud outlook",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:48",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:26:52.370146"
+    },
+    {
+      "id": 125927,
+      "scraper_id": 89686,
+      "title": "Tax attorneys say IRS has become a 'zombie' as agency cuts staff and halts audits of the wealthy",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:11",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:26:52.145564"
+    },
+    {
+      "id": 125931,
+      "scraper_id": 89673,
+      "title": "US proposes eroding species protections",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:13",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:26:52.049600"
+    },
+    {
+      "id": 125936,
+      "scraper_id": 89666,
+      "title": "Chicago Cancels Cinco de Mayo Parade Over Fears of ICE Deportations",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:15",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:26:51.980406"
+    },
+    {
+      "id": 126656,
+      "scraper_id": 88646,
+      "title": "Human Trafficking Too? Biden Admin Flagged Deported El Salvadoran As 'Suspect Alien'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:18",
+      "domain": "www.zerohedge.com",
+      "processed_at": "2025-04-18T03:26:51.875988"
+    },
+    {
+      "id": 125934,
+      "scraper_id": 89670,
+      "title": "Tesla is reportedly pulling workers off Cybertruck factory lines and dropping production targets for the model amid plummeting sales",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:21",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:24:43.460965"
+    },
+    {
+      "id": 126729,
+      "scraper_id": 88527,
+      "title": "Florida draft law mandating encryption backdoors for social media accounts billed \u2018dangerous and dumb\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:26",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:24:43.338951"
+    },
+    {
+      "id": 125955,
+      "scraper_id": 89641,
+      "title": "Florida draft law mandating encryption backdoors for social media accounts billed \u2018dangerous and dumb\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:26",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:24:43.276431"
+    },
+    {
+      "id": 126693,
+      "scraper_id": 88579,
+      "title": "Mortgage rates roar higher as uncertainty batters housing market",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:15",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-18T03:24:43.207549"
+    },
+    {
+      "id": 125860,
+      "scraper_id": 89787,
+      "title": "Average US rate on a 30-year mortgage climbs to 6.83%, highest level since late February",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:17:53",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:24:42.977950"
+    },
+    {
+      "id": 125949,
+      "scraper_id": 89648,
+      "title": "Tariff turmoil fuels Coinbase International\u2019s BTC perpetuals to $100 billion in weekly volume",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:31",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:23:04.554893"
+    },
+    {
+      "id": 125929,
+      "scraper_id": 89676,
+      "title": "American Express\u2019s wealthy cardholders are mostly untouched by tariff jitters",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:37",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:23:04.494397"
+    },
+    {
+      "id": 125914,
+      "scraper_id": 89695,
+      "title": "Mortgage rates climb to highest level in two months as Trump\u2019s tariffs continue to rock markets",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:33",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:23:04.121425"
+    },
+    {
+      "id": 125918,
+      "scraper_id": 89693,
+      "title": "Mortgage rates roar higher as uncertainty batters housing market",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:15",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:23:04.074248"
+    },
+    {
+      "id": 125961,
+      "scraper_id": 89631,
+      "title": "Scientists find hint of alien life on distant world",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:15",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:21:16.036342"
+    },
+    {
+      "id": 125962,
+      "scraper_id": 89627,
+      "title": "Baker Hughes: US oil rig count up by 1 to 481",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:15",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:21:15.970612"
+    },
+    {
+      "id": 125902,
+      "scraper_id": 89716,
+      "title": "Crews are still working to restore power to Puerto Rico after an island-wide blackout left millions without electricity for the second time in months",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:11",
+      "domain": "fortune.com",
+      "processed_at": "2025-04-18T03:21:15.945505"
+    },
+    {
+      "id": 126681,
+      "scraper_id": 88602,
+      "title": "Crews are still working to restore power to Puerto Rico after an island-wide blackout left millions without electricity for the second time in months",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:11",
+      "domain": "fortune.com",
+      "processed_at": "2025-04-18T03:21:15.784251"
+    },
+    {
+      "id": 126649,
+      "scraper_id": 88650,
+      "title": "European Central Bank cuts interest rates as tariffs threaten the economy",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:30",
+      "domain": "www.cnn.com",
+      "processed_at": "2025-04-18T03:21:15.688299"
+    },
+    {
+      "id": 125959,
+      "scraper_id": 89636,
+      "title": "Trump Kills the Firewall, Musk Lights the Match",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:15",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:19:23.703401"
+    },
+    {
+      "id": 125968,
+      "scraper_id": 89620,
+      "title": "Goodfire, which works on decoding the inner workings of AI models, raised $50M led by Menlo; source: Anthropic invested $1M, its first startup investment",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:16",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:19:23.562348"
+    },
+    {
+      "id": 125958,
+      "scraper_id": 89635,
+      "title": "Here's why the average US credit score is falling",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:19",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:19:23.549652"
+    },
+    {
+      "id": 125950,
+      "scraper_id": 89657,
+      "title": "\"Luxury Turns Late-Cycle\": After LVMH Miss, Hermes Stumbles Too",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:26",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:19:23.412790"
+    },
+    {
+      "id": 126692,
+      "scraper_id": 88582,
+      "title": "Donald Trump attacks Fed boss for not cutting interest rates",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:25",
+      "domain": "www.bbc.com",
+      "processed_at": "2025-04-18T03:19:23.276095"
+    },
+    {
+      "id": 125960,
+      "scraper_id": 89633,
+      "title": "Man, 28, Plagued by Spam Calls for a Year\u2014Then Comes Up With a Plan",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:36",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:17:26.469252"
+    },
+    {
+      "id": 125963,
+      "scraper_id": 89632,
+      "title": "How Neuroaesthetics Can Make Workplaces\u2014and Workers\u2014Better",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:38",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:17:26.366854"
+    },
+    {
+      "id": 126644,
+      "scraper_id": 88659,
+      "title": "Trump Fed control efforts risk higher inflation and interest rates",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:18",
+      "domain": "www.axios.com",
+      "processed_at": "2025-04-18T03:17:25.825091"
+    },
+    {
+      "id": 125966,
+      "scraper_id": 89626,
+      "title": "INTERVIEW: Andrew Ahn Discusses the Importance of Community and His New Film The Wedding Banquet",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:41",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:15:30.507459"
+    },
+    {
+      "id": 125948,
+      "scraper_id": 89651,
+      "title": "Best CD rates today, April 17, 2025 (lock in up to 4.50% APY)",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:45",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:15:30.443063"
+    },
+    {
+      "id": 125930,
+      "scraper_id": 89674,
+      "title": "Italian Sustainable Shoe Company ACBC Sells Majority Stake to Swiss Fund",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:47",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:15:30.407778"
+    },
+    {
+      "id": 125947,
+      "scraper_id": 89650,
+      "title": "French luxury conglomerate LVMH's CEO calls for calming trade tensions with the US",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:55",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:15:30.339580"
+    },
+    {
+      "id": 125954,
+      "scraper_id": 89644,
+      "title": "Brazil's Petrobras cuts diesel prices to distributors",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:57",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:15:30.248592"
+    },
+    {
+      "id": 126710,
+      "scraper_id": 88550,
+      "title": "IMF says global economy slowing on trade \u2018reboot\u2019 but avoiding recession",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:24",
+      "domain": "fortune.com",
+      "processed_at": "2025-04-18T03:15:29.917928"
+    },
+    {
+      "id": 126409,
+      "scraper_id": 89001,
+      "title": "Vatican opens solemn run-up to Easter with recovering Pope Francis on the sidelines",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:29:00",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-18T03:13:49.801183"
+    },
+    {
+      "id": 126818,
+      "scraper_id": 90168,
+      "title": "Bay Area family meets Vietnam veteran who helped save thousands of babies during little-known mission - FOX 13 Tampa Bay",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T00:39:33",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T03:13:49.243996"
+    },
+    {
+      "id": 126714,
+      "scraper_id": 88549,
+      "title": "Should investors dump U.S. stocks for international equities? Here's what experts are saying",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:29",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-18T03:13:49.180639"
+    },
+    {
+      "id": 126811,
+      "scraper_id": 90184,
+      "title": "To seek a newer world: youth protest from Vietnam to today - The Berkeley Beacon",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T00:50:03",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T03:11:56.155058"
+    },
+    {
+      "id": 126132,
+      "scraper_id": 89388,
+      "title": "U.S. Forest Service begins power line repairs in Wise County - WCYB",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T02:24:31",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T03:09:35.735897"
+    },
+    {
+      "id": 126805,
+      "scraper_id": 90189,
+      "title": "From Vietnam to Gaza: when peaceful opposition to US foreign policy becomes an accusation - Middle East Monitor",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T07:00:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T03:03:58.553461"
+    },
+    {
+      "id": 126690,
+      "scraper_id": 88585,
+      "title": "Japan reports a $63 billion trade surplus with the US as it talks with Trump on tariffs",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:13",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-18T03:03:57.943151"
+    },
+    {
+      "id": 126802,
+      "scraper_id": 90193,
+      "title": "Vietnam\u2019s Digital Future in the Spotlight as GSMA Summit Tackles Trust, Inclusion, and Scam Prevention - WebWire",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T07:25:26",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T03:02:00.930816"
+    },
+    {
+      "id": 125913,
+      "scraper_id": 89699,
+      "title": "Japan reports a $63 billion trade surplus with the US as it talks with Trump on tariffs",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:13",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:00:02.640587"
+    },
+    {
+      "id": 125939,
+      "scraper_id": 89664,
+      "title": "IMF says global economy slowing on trade \u2018reboot\u2019 but avoiding recession",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:02:24",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-18T03:00:02.510814"
+    },
+    {
+      "id": 126785,
+      "scraper_id": 90209,
+      "title": "Japan reports a $63 billion trade surplus with the US as it talks with Trump on tariffs - AP News",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T08:05:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:57:52.220806"
+    },
+    {
+      "id": 126165,
+      "scraper_id": 89333,
+      "title": "OPPD shuts off power in northwest Omaha after car crashes into pole - WOWT",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T09:01:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:55:42.927155"
+    },
+    {
+      "id": 126149,
+      "scraper_id": 89368,
+      "title": "'By Power and Pride': A Minuteman for life - WBUR",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T09:07:49",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:55:42.680647"
+    },
+    {
+      "id": 126967,
+      "scraper_id": 89862,
+      "title": "Trump blasts Fed Chair Powell, saying his \u2018termination cannot come fast enough\u2019 - CNN",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T12:45:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:55:42.564431"
+    },
+    {
+      "id": 126246,
+      "scraper_id": 89196,
+      "title": "ED Seeks Confiscation Of Rs 661-Crore Assets In National Herald Chargesheet",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T15:19:12.167000",
+      "domain": "www.ndtvprofit.com",
+      "processed_at": "2025-04-18T02:53:37.014308"
+    },
+    {
+      "id": 126979,
+      "scraper_id": 89844,
+      "title": "Donald Trump attacks Fed boss for not cutting interest rates - BBC",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:36:20",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:53:36.134392"
+    },
+    {
+      "id": 126970,
+      "scraper_id": 89855,
+      "title": "European Central Bank cuts interest rates as tariffs threaten the economy - CNN",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T14:56:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:51:34.558526"
+    },
+    {
+      "id": 126961,
+      "scraper_id": 89869,
+      "title": "Vermont dairy industry has $5.4 billion impact on state economy - WCAX",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:46.314635"
+    },
+    {
+      "id": 126883,
+      "scraper_id": 89987,
+      "title": "The Democratic Civil War Is Escalating - Newsweek",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T19:16:35",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:40.120921"
+    },
+    {
+      "id": 126881,
+      "scraper_id": 89991,
+      "title": "Trump's trade war unlikely to bring tech manufacturing back to the US - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T15:09:43",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:39.882984"
+    },
+    {
+      "id": 126878,
+      "scraper_id": 89999,
+      "title": "Photos: Two years of war in Sudan - NPR",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T19:09:02",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:39.723141"
+    },
+    {
+      "id": 126874,
+      "scraper_id": 90023,
+      "title": "Defying courts in deportation cases, Trump risks a tipping point, experts say",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T04:47:52",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T02:38:39.407254"
+    },
+    {
+      "id": 126869,
+      "scraper_id": 90022,
+      "title": "Special election for Oakland mayor too close to call, but Loren Taylor takes slim early lead",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T05:11:42",
+      "domain": "www.latimes.com",
+      "processed_at": "2025-04-18T02:38:39.034936"
+    },
+    {
+      "id": 126862,
+      "scraper_id": 90042,
+      "title": "In the red: global wine sales fall to lowest levels since 1961",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T22:33:24",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T02:38:38.446388"
+    },
+    {
+      "id": 126861,
+      "scraper_id": 90043,
+      "title": "Italian coffee pot maker Bialetti to be sold to Chinese business NUO Capital",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T15:48:47",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T02:38:38.408479"
+    },
+    {
+      "id": 126860,
+      "scraper_id": 90113,
+      "title": "US stock markets fall further after Trump curbs chip sales to China; gold hits new record high \u2013 as it happened",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T14:09:44",
+      "domain": "www.theguardian.com",
+      "processed_at": "2025-04-18T02:38:38.303588"
+    },
+    {
+      "id": 126842,
+      "scraper_id": 90133,
+      "title": "Rabbit sucked into United Airlines\u2019 plane engine causes \u2018giant fireball,\u2019 forces flight to make emergency landing",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T16:56:03",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T02:38:37.336233"
+    },
+    {
+      "id": 126841,
+      "scraper_id": 90134,
+      "title": "Berlin doctor accused of killing 15 patients \u2014 and trying to cover up the evidence with arson",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T15:54:36",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T02:38:37.307151"
+    },
+    {
+      "id": 126835,
+      "scraper_id": 90141,
+      "title": "UK Supreme Court rules transgender women do not fit legal term \u2018woman\u2019 in landmark decision",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T06:38:49",
+      "domain": "nypost.com",
+      "processed_at": "2025-04-18T02:38:36.938546"
+    },
+    {
+      "id": 126828,
+      "scraper_id": 90149,
+      "title": "Why Vietnam is rushing to halve local governments - Nikkei Asia",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T06:43:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:36.550445"
+    },
+    {
+      "id": 126816,
+      "scraper_id": 90169,
+      "title": "Woman in custody after allegedly vandalizing 21 flags representing the former Republic of Vietnam along Bellaire Boulevard - ABC13 Houston",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T03:33:45",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:35.597865"
+    },
+    {
+      "id": 126815,
+      "scraper_id": 90176,
+      "title": "China's Xi inks Vietnam deals as tariff war deepens; Trump says they\u2019re trying to 'screw' US - Fox Business",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T11:00:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:35.507688"
+    },
+    {
+      "id": 126800,
+      "scraper_id": 90188,
+      "title": "Vietnam gets major capacity boost as Viettel lights up ADC segment - Developing Telecoms",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T04:39:05",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:34.289222"
+    },
+    {
+      "id": 126776,
+      "scraper_id": 90236,
+      "title": "U.K. prime minister says online content moderation could be part of trade talks with U.S. - MSNBC News",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T23:24:20",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-18T02:38:32.405767"
+    },
+    {
+      "id": 125820,
+      "scraper_id": 89837,
+      "title": "SquareX to Uncover Data Splicing Attacks at BSides San Francisco, A Major DLP Flaw that Compromises Data Security of Millions",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T13:01:00",
+      "domain": "hackread.com",
+      "processed_at": "2025-04-18T00:02:43.669444"
+    },
+    {
+      "id": 126715,
+      "scraper_id": 88545,
+      "title": "US tariffs will weaken global economy and trigger inflation but not a global recession, IMF says",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:33",
+      "domain": "abcnews.go.com",
+      "processed_at": "2025-04-17T22:13:08.871573"
+    },
+    {
+      "id": 125922,
+      "scraper_id": 89687,
+      "title": "The tariff loophole that drove Shein and Temu to fast-fashion dominance is closing in 8 days\u2014and forcing the cheap brands to hike prices",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:51:25",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T22:13:08.280390"
+    },
+    {
+      "id": 125880,
+      "scraper_id": 89760,
+      "title": "Human Trafficking Too? Biden Admin Flagged Deported El Salvadoran As 'Suspect Alien'",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:18",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:37:36.971556"
+    },
+    {
+      "id": 125872,
+      "scraper_id": 89764,
+      "title": "European Central Bank cuts interest rates as tariffs threaten the economy",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:18:30",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:37:36.833746"
+    },
+    {
+      "id": 125868,
+      "scraper_id": 89773,
+      "title": "Trump Fed control efforts risk higher inflation and interest rates",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:29:18",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:37:36.748083"
+    },
+    {
+      "id": 125915,
+      "scraper_id": 89696,
+      "title": "Donald Trump attacks Fed boss for not cutting interest rates",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:40:25",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:37:36.695946"
+    },
+    {
+      "id": 125896,
+      "scraper_id": 89723,
+      "title": "Activist Robby Starbuck plans lobbying arm to make the anti-DEI revolution stick",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:17",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:28:55.368379"
+    },
+    {
+      "id": 125910,
+      "scraper_id": 89701,
+      "title": "Activist seeks CEO change at Hewlett Packard Enterprise",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:29",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:28:55.322103"
+    },
+    {
+      "id": 125945,
+      "scraper_id": 89663,
+      "title": "Should investors dump U.S. stocks for international equities? Here's what experts are saying",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:29",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:28:55.272909"
+    },
+    {
+      "id": 125942,
+      "scraper_id": 89659,
+      "title": "US tariffs will weaken global economy and trigger inflation but not a global recession, IMF says",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:33",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:28:55.099172"
+    },
+    {
+      "id": 125932,
+      "scraper_id": 89669,
+      "title": "Trump\u2019s cuts and crackdowns endanger American innovation, experts warn",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:51",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:28:55.010622"
+    },
+    {
+      "id": 125923,
+      "scraper_id": 89683,
+      "title": "Rubio, Witkoff arrive in Paris for Ukraine talks",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:59",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-17T21:28:54.945470"
+    },
+    {
+      "id": 126239,
+      "scraper_id": 89204,
+      "title": "Should investors dump U.S. stocks for international equities? Here's what experts are saying - CNBC",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T16:54:52",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-17T21:28:10.846291"
+    },
+    {
+      "id": 126707,
+      "scraper_id": 88555,
+      "title": "Trump\u2019s cuts and crackdowns endanger American innovation, experts warn",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T17:13:51",
+      "domain": "www.semafor.com",
+      "processed_at": "2025-04-17T19:36:13.588177"
+    },
+    {
+      "id": 126134,
+      "scraper_id": 89383,
+      "title": "Chicago alderman pushes for police power to break up teen crowds: 'Take the shackles off' - FOX 32 Chicago",
+      "content": "ERROR",
+      "pub_date": "2025-04-17T13:50:20",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-17T19:35:33.288006"
+    },
+    {
+      "id": 125665,
+      "scraper_id": 83655,
+      "title": "'The vibe shift is real'. San Fran Mayor becomes hometown's hype man...",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T05:13:37",
+      "domain": "www.msn.com",
+      "processed_at": "2025-04-17T06:24:55.579549"
+    },
+    {
+      "id": 125649,
+      "scraper_id": 83670,
+      "title": "Republicans set to avoid town halls during recess...",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T05:13:37",
+      "domain": "www.nbcnews.com",
+      "processed_at": "2025-04-17T06:24:55.201349"
+    },
+    {
+      "id": 125646,
+      "scraper_id": 83673,
+      "title": "Via porn, gore and ultra-violence, extremists sinking hooks into very young...",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T05:13:37",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-17T06:24:54.840758"
+    },
+    {
+      "id": 125794,
+      "scraper_id": 87472,
+      "title": "U.K. prime minister says online content moderation could be part of trade talks with U.S",
+      "content": "ERROR",
+      "pub_date": "2025-04-16T23:43:52",
+      "domain": "www.msnbc.com",
+      "processed_at": "2025-04-17T04:12:01.800486"
+    },
+    {
+      "id": 125657,
+      "scraper_id": 83662,
+      "title": "'World's coolest dictator' visits White House...",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T05:13:37",
+      "domain": "www.npr.org",
+      "processed_at": "2025-04-17T00:10:07.240090"
+    },
+    {
+      "id": 125163,
+      "scraper_id": 82871,
+      "title": "ZUCK COULD BE FORCED TO SELL INSTA, WHATSAPP...",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T14:40:37",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-16T22:28:42.678441"
+    },
+    {
+      "id": 125647,
+      "scraper_id": 83671,
+      "title": "ZUCK COULD BE FORCED TO SELL INSTA, WHATSAPP...",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T05:13:37",
+      "domain": "www.the-independent.com",
+      "processed_at": "2025-04-16T22:28:28.511768"
+    },
+    {
+      "id": 125181,
+      "scraper_id": 82851,
+      "title": "PA GOV. RESIDENCE SET ON FIRE",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T14:40:36",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-16T22:28:17.885784"
+    },
+    {
+      "id": 125643,
+      "scraper_id": 83675,
+      "title": "PA GOV. RESIDENCE TORCHED...",
+      "content": "ERROR",
+      "pub_date": "2025-04-15T05:13:37",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-16T22:28:17.335293"
+    },
+    {
+      "id": 125477,
+      "scraper_id": 83233,
+      "title": "Disney Stock: Experts Argue Pros and Cons of \u2018Buying the Dip\u2019 Amid Trump Tariff Drama - Yahoo Finance",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T14:27:17",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-15T19:25:45.812726"
+    },
+    {
+      "id": 125311,
+      "scraper_id": 82989,
+      "title": "US still won\u2019t say whether it will return mistakenly deported man, despite Supreme Court decision",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T15:27:57",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-15T18:37:40.796431"
+    },
+    {
+      "id": 125229,
+      "scraper_id": 83084,
+      "title": "Trump Administration Still Won\u2019t Say Whether It Will Return Mistakenly Deported Man, Despite Judge\u2019s Order",
+      "content": "ERROR",
+      "pub_date": "2025-04-13T14:00:00",
+      "domain": "time.com",
+      "processed_at": "2025-04-15T18:37:34.733393"
+    },
+    {
+      "id": 125184,
+      "scraper_id": 82847,
+      "title": "Republicans set to avoid town halls during recess...",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T14:40:36",
+      "domain": "www.nbcnews.com",
+      "processed_at": "2025-04-15T16:58:04.218301"
+    },
+    {
+      "id": 125174,
+      "scraper_id": 82862,
+      "title": "'The vibe shift is real'. San Fran Mayor becomes hometown's hype man...",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T14:40:36",
+      "domain": "www.msn.com",
+      "processed_at": "2025-04-15T16:58:03.482913"
+    },
+    {
+      "id": 125166,
+      "scraper_id": 82868,
+      "title": "'World's coolest dictator' visits White House...",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T14:40:37",
+      "domain": "www.npr.org",
+      "processed_at": "2025-04-15T16:58:02.552046"
+    },
+    {
+      "id": 125165,
+      "scraper_id": 82873,
+      "title": "Via porn, gore and ultra-violence, extremists sinking hooks into very young...",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T14:40:37",
+      "domain": "apnews.com",
+      "processed_at": "2025-04-15T16:58:02.230225"
+    },
+    {
+      "id": 124975,
+      "scraper_id": 82679,
+      "title": "Disney Stock: Experts Argue Pros and Cons of \u2018Buying the Dip\u2019 Amid Trump Tariff Drama",
+      "content": "ERROR",
+      "pub_date": "2025-04-14T14:48:23",
+      "domain": "finance.yahoo.com",
+      "processed_at": "2025-04-15T16:11:56.214476"
+    },
+    {
+      "id": 123854,
+      "scraper_id": 13153,
+      "title": "Best Debt Consolidation Loans",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T14:10:18",
+      "domain": "money.usnews.com",
+      "processed_at": "2025-04-12T02:22:49.288923"
+    },
+    {
+      "id": 123852,
+      "scraper_id": 13154,
+      "title": "Best Debt Consolidation Loans",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T14:04:18",
+      "domain": "money.usnews.com",
+      "processed_at": "2025-04-12T02:22:49.078679"
+    },
+    {
+      "id": 123770,
+      "scraper_id": 13197,
+      "title": "Best Student Loans for Bad Credit",
+      "content": "ERROR",
+      "pub_date": "2025-04-01T19:27:37",
+      "domain": "money.usnews.com",
+      "processed_at": "2025-04-12T02:22:29.248250"
+    },
+    {
+      "id": 123769,
+      "scraper_id": 13195,
+      "title": "Best Student Loans for Bad Credit",
+      "content": "ERROR",
+      "pub_date": "2025-04-01T19:27:37",
+      "domain": "money.usnews.com",
+      "processed_at": "2025-04-12T02:22:28.802903"
+    },
+    {
+      "id": 122814,
+      "scraper_id": 17023,
+      "title": "Not Every Election Is the Apocalypse | Opinion",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:26:44",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:45.334569"
+    },
+    {
+      "id": 122812,
+      "scraper_id": 17031,
+      "title": "Retail Sector Braces for Higher Levies",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:27:04",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:45.166915"
+    },
+    {
+      "id": 122811,
+      "scraper_id": 17024,
+      "title": "Female Fencer Disqualified After Refusing Match With Transgender Athlete",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:26:28",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:45.134075"
+    },
+    {
+      "id": 122809,
+      "scraper_id": 17034,
+      "title": "Meghan Markle silences critics after As Ever sells out in an hour",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:15:41",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:44.880905"
+    },
+    {
+      "id": 122808,
+      "scraper_id": 17037,
+      "title": "White Lion Reverses Fifth Circuit Again By Narrowly Reading Record And Question Presented",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:26:37",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:44.799788"
+    },
+    {
+      "id": 122805,
+      "scraper_id": 17047,
+      "title": "Woman Goes on 5-Day Work Trip, in Shock at What Husband Did to the Basement",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:15:40",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:43.521027"
+    },
+    {
+      "id": 122804,
+      "scraper_id": 17050,
+      "title": "Nvidia Falls On Trump's 'Liberation Day' Tariff Fears; Is Nvidia A Sell Now?",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:04:43",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:43.346833"
+    },
+    {
+      "id": 122803,
+      "scraper_id": 17055,
+      "title": "YouTube is about to steal something big from Disney",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:15:21",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:43.232774"
+    },
+    {
+      "id": 122801,
+      "scraper_id": 17056,
+      "title": "Richard Bernstein, Times Correspondent, Critic and Author, Dies at 80",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:04:42",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:42.989576"
+    },
+    {
+      "id": 122800,
+      "scraper_id": 17064,
+      "title": "Trendy Wellness Perks Do Not Tackle The Root Cause of Employee Stress \u2014 These Steps Will",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:59:55",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:42.955556"
+    },
+    {
+      "id": 122797,
+      "scraper_id": 17065,
+      "title": "Republicans aren't panicking about Trump or Elon Musk after Tuesday\u2019s elections",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T23:11:17",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:42.770050"
+    },
+    {
+      "id": 122794,
+      "scraper_id": 17069,
+      "title": "Stocks rise before closing ahead of Trump's tariff announcement in shaky trading day",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T22:04:45",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:18:42.046823"
+    },
+    {
+      "id": 122691,
+      "scraper_id": 17229,
+      "title": "Musk's cuts at US Social Security agency are illegal, lawsuit claims",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T00:31:30",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-12T02:18:22.421169"
+    },
+    {
+      "id": 122573,
+      "scraper_id": 17577,
+      "title": "Dividends By The Numbers In March 2025 And Q1 2025",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T09:05:00",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-12T02:18:01.555312"
+    },
+    {
+      "id": 122358,
+      "scraper_id": 18389,
+      "title": "Musk's Cuts at US Social Security Agency Are Illegal, Lawsuit Claims",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T00:31:30",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-12T02:17:21.294457"
+    },
+    {
+      "id": 122342,
+      "scraper_id": 18412,
+      "title": "Hamas Will Not Respond to Israel's Counter Gaza Ceasefire Proposal, Official Says",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T21:36:10",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-12T02:17:17.922735"
+    },
+    {
+      "id": 122325,
+      "scraper_id": 18427,
+      "title": "Trump Approval Falls to 43%, Lowest Since Returning to Office, Reuters/Ipsos Poll Finds",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T20:07:34",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-12T02:17:15.115055"
+    },
+    {
+      "id": 122173,
+      "scraper_id": 18712,
+      "title": "Thousands of Haitians Take to Streets to Protest Surging Gang Violence",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T02:17:41",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-12T02:16:45.294753"
+    },
+    {
+      "id": 122154,
+      "scraper_id": 18794,
+      "title": "Thousands of Haitians take to streets to protest surging gang violence",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T02:17:41",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-12T02:16:42.365802"
+    },
+    {
+      "id": 122047,
+      "scraper_id": 21177,
+      "title": "Hamas will not respond to Israel's counter Gaza ceasefire proposal, official says",
+      "content": "ERROR",
+      "pub_date": "2025-04-02T21:36:10",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-12T02:16:22.195614"
+    },
+    {
+      "id": 121843,
+      "scraper_id": 22599,
+      "title": "TRUMP APPROVAL SLIPS TO 43%...",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T16:25:36",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-12T02:15:37.808660"
+    },
+    {
+      "id": 121149,
+      "scraper_id": 32220,
+      "title": "US Senate Republicans to Vote on Trump's Sweeping Tax Cut Plan",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T22:24:28",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-12T02:13:05.252190"
+    },
+    {
+      "id": 120801,
+      "scraper_id": 33838,
+      "title": "Dow futures fall after tariffs push market to biggest losses since 2020: Live updates",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T23:58:14",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:11:55.619243"
+    },
+    {
+      "id": 120742,
+      "scraper_id": 33962,
+      "title": "Farmers aren't happy about Trump tariffs",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T22:18:28",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:11:37.506766"
+    },
+    {
+      "id": 120704,
+      "scraper_id": 34836,
+      "title": "US Senate Republicans vote to advance Trump's sweeping tax cut plan",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T22:24:28",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-12T02:11:30.917821"
+    },
+    {
+      "id": 120608,
+      "scraper_id": 35136,
+      "title": "\u2018He\u2019s Going to Tank Our Economy\u2019: Trump\u2019s Tariffs Draw Strong Reactions in Congress",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T19:12:54",
+      "domain": "time.com",
+      "processed_at": "2025-04-12T02:11:11.178483"
+    },
+    {
+      "id": 120489,
+      "scraper_id": 36086,
+      "title": "The Federal Reserve is not likely to rescue markets and economy from tariff turmoil anytime soon",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T00:20:11",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:10:43.934397"
+    },
+    {
+      "id": 120474,
+      "scraper_id": 36103,
+      "title": "Dow futures fall after tariffs push market to biggest losses since 2020: Live updates",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T23:58:14",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:10:40.694216"
+    },
+    {
+      "id": 119783,
+      "scraper_id": 41582,
+      "title": "Federal Reserve Chief Says Trump Tariffs Likely to Raise Inflation and Slow U.S. Economic Growth",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T16:44:34",
+      "domain": "time.com",
+      "processed_at": "2025-04-12T02:08:02.926444"
+    },
+    {
+      "id": 119551,
+      "scraper_id": 52121,
+      "title": "Why stores send so many emails",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T21:38:33",
+      "domain": "www.npr.org",
+      "processed_at": "2025-04-12T02:07:17.672916"
+    },
+    {
+      "id": 119493,
+      "scraper_id": 57356,
+      "title": "The newest developments in movie theater concessions",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T22:34:38",
+      "domain": "www.npr.org",
+      "processed_at": "2025-04-12T02:07:03.453081"
+    },
+    {
+      "id": 119492,
+      "scraper_id": 57354,
+      "title": "How tariffs on imports will affect logistics companies on the U.S.-Mexico border",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T22:34:23",
+      "domain": "www.npr.org",
+      "processed_at": "2025-04-12T02:07:03.435140"
+    },
+    {
+      "id": 119490,
+      "scraper_id": 57414,
+      "title": "What the sell-by deadline extension means for TikTok",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T22:12:05",
+      "domain": "www.npr.org",
+      "processed_at": "2025-04-12T02:07:03.107604"
+    },
+    {
+      "id": 119436,
+      "scraper_id": 61940,
+      "title": "House Republicans unveil property tax reform plan that aims to help a majority of homeowners - WFYI",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T22:22:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T02:06:49.942930"
+    },
+    {
+      "id": 119226,
+      "scraper_id": 62270,
+      "title": "Federal Reserve Chief Says Trump Tariffs Likely to Raise Inflation and Slow U.S. Economic Growth - Time Magazine",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T16:57:48",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T02:05:45.853957"
+    },
+    {
+      "id": 118985,
+      "scraper_id": 70601,
+      "title": "'He's Going to Tank Our Economy': Congress Reacts to Trump Tariffs - Time Magazine",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T19:15:10",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T02:04:48.405053"
+    },
+    {
+      "id": 118983,
+      "scraper_id": 70609,
+      "title": "Federal Reserve is unlikely to rescue markets and economy from tariff turmoil anytime soon - CNBC",
+      "content": "ERROR",
+      "pub_date": "2025-04-03T19:31:18",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T02:04:48.218832"
+    },
+    {
+      "id": 118860,
+      "scraper_id": 70868,
+      "title": "House Republicans unveil property tax reform plan that aims to help a majority of homeowners - WVXU",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T21:35:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T02:04:15.036165"
+    },
+    {
+      "id": 118676,
+      "scraper_id": 71143,
+      "title": "More US Senate Republicans Voice Support for Congressional Oversight on Tariffs",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T20:23:56",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-12T02:03:28.337653"
+    },
+    {
+      "id": 118434,
+      "scraper_id": 71718,
+      "title": "Microsoft AI chief Suleyman sees advantage in building models \u20183 or 6 months behind\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-05T00:25:52",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T02:02:25.071354"
+    },
+    {
+      "id": 118365,
+      "scraper_id": 72066,
+      "title": "Microsoft AI chief Suleyman sees advantage in building models \u20183 or 6 months behind\u2019",
+      "content": "ERROR",
+      "pub_date": "2025-04-05T00:25:52",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-12T02:02:10.535646"
+    },
+    {
+      "id": 118113,
+      "scraper_id": 74100,
+      "title": "How 'White Lotus' fans can get the best Thailand travel deals: 'Price alerts are going to be more important than ever,' one expert says",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T16:20:47",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-12T02:01:03.505970"
+    },
+    {
+      "id": 118087,
+      "scraper_id": 74147,
+      "title": "Politics chat: 'Hands Off' protests in Washington, Trump's tariffs and Republicans - NPR",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T11:53:13",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T02:00:56.619740"
+    },
+    {
+      "id": 118037,
+      "scraper_id": 74237,
+      "title": "Sex toys and exploding cosmetics: Anatomy of 'hybrid war' on West...",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T19:25:37",
+      "domain": "www.aol.com",
+      "processed_at": "2025-04-12T02:00:41.255499"
+    },
+    {
+      "id": 118019,
+      "scraper_id": 74258,
+      "title": "Sex toys and exploding cosmetics: anatomy of a 'hybrid war' on the West",
+      "content": "ERROR",
+      "pub_date": "2025-04-05T07:09:04",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-12T02:00:35.977790"
+    },
+    {
+      "id": 117759,
+      "scraper_id": 74631,
+      "title": "Iran Wants Indirect Talks With US, Warns Regional Countries Over Strikes Against It",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T08:27:22",
+      "domain": "www.usnews.com",
+      "processed_at": "2025-04-12T01:59:29.321801"
+    },
+    {
+      "id": 117676,
+      "scraper_id": 74824,
+      "title": "How 'White Lotus' fans can get the best Thailand travel deals: 'Price alerts are going to be more important than ever,' one expert says",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T16:20:47",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T01:59:08.362621"
+    },
+    {
+      "id": 117663,
+      "scraper_id": 74843,
+      "title": "Market crash not part of Trump\u2019s strategy, says top White House economic advisor",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T15:58:49",
+      "domain": "biztoc.com",
+      "processed_at": "2025-04-12T01:59:04.861542"
+    },
+    {
+      "id": 117537,
+      "scraper_id": 75089,
+      "title": "\u201cA battle Elon won\u2019t win\u201d: Musk takes on Trump\u2019s trade guru Peter Navarro - Semafor",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T03:44:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T01:58:34.345576"
+    },
+    {
+      "id": 117303,
+      "scraper_id": 75502,
+      "title": "More US Senate Republicans voice support for congressional oversight on tariffs",
+      "content": "ERROR",
+      "pub_date": "2025-04-04T20:23:56",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-12T01:57:30.375168"
+    },
+    {
+      "id": 117302,
+      "scraper_id": 75505,
+      "title": "Iran wants indirect talks with US, warns regional countries over strikes against it",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T08:27:22",
+      "domain": "www.yahoo.com",
+      "processed_at": "2025-04-12T01:57:30.134903"
+    },
+    {
+      "id": 117250,
+      "scraper_id": 75629,
+      "title": "Humpty Dumpty Was Pushed",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T16:00:00",
+      "domain": "seekingalpha.com",
+      "processed_at": "2025-04-12T01:57:20.739342"
+    },
+    {
+      "id": 117084,
+      "scraper_id": 76199,
+      "title": "CNBC Daily Open: The trade wars begin",
+      "content": "ERROR",
+      "pub_date": "2025-04-07T02:20:57",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-12T01:56:42.161050"
+    },
+    {
+      "id": 116930,
+      "scraper_id": 76534,
+      "title": "Trump not trying to crash market with tariffs, says White House economic advisor - CNBC",
+      "content": "ERROR",
+      "pub_date": "2025-04-06T15:46:09",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T01:56:08.513315"
+    },
+    {
+      "id": 116721,
+      "scraper_id": 77097,
+      "title": "CNBC Daily Open: The trade wars begin - CNBC",
+      "content": "ERROR",
+      "pub_date": "2025-04-07T01:32:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T01:55:12.330724"
+    },
+    {
+      "id": 116554,
+      "scraper_id": 77398,
+      "title": "Helicopter crashes in Hudson River off of Manhattan, police say",
+      "content": "ERROR",
+      "pub_date": "2025-04-10T20:12:37",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-12T01:54:27.063491"
+    },
+    {
+      "id": 116147,
+      "scraper_id": 78046,
+      "title": "Was Trump\u2019s Stock Tip\u2014Telling Followers to \u2018Buy\u2019 Hours Before He Lifted Tariffs\u2014Legal?",
+      "content": "ERROR",
+      "pub_date": "2025-04-10T03:15:00",
+      "domain": "time.com",
+      "processed_at": "2025-04-12T01:52:31.155216"
+    },
+    {
+      "id": 116032,
+      "scraper_id": 78198,
+      "title": "Was Trump\u2019s Stock Trading Tip to \u2018Buy\u2019\u2014Before He Lifted Tariffs\u2014Legal? - Time Magazine",
+      "content": "ERROR",
+      "pub_date": "2025-04-10T03:15:00",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T01:52:04.743421"
+    },
+    {
+      "id": 115948,
+      "scraper_id": 78316,
+      "title": "It\u2019s Time to Pray | Prayer: A Privilege and Power - Harvest.org",
+      "content": "ERROR",
+      "pub_date": "2025-04-10T07:03:42",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T01:51:33.374482"
+    },
+    {
+      "id": 115751,
+      "scraper_id": 78675,
+      "title": "Helicopter crashes in Hudson River off of Manhattan, police say",
+      "content": "ERROR",
+      "pub_date": "2025-04-10T20:12:37",
+      "domain": "www.cnbc.com",
+      "processed_at": "2025-04-12T01:50:46.727648"
+    },
+    {
+      "id": 115635,
+      "scraper_id": 78916,
+      "title": "Maximizing social security in an uncertain economy feat. Derieck Hodges - KFVS12",
+      "content": "ERROR",
+      "pub_date": "2025-04-10T17:37:41",
+      "domain": "news.google.com",
+      "processed_at": "2025-04-12T01:50:19.879116"
+    }
+  ],
+  "count": 582
+}

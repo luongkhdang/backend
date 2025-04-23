@@ -11,12 +11,12 @@ if ! docker network inspect reader_network > /dev/null 2>&1; then
     docker network create --driver bridge reader_network
 fi
 
-# Connect the news-db container if it exists and isn't already connected
-if docker ps | grep -q "news-db"; then
-    echo "Connecting news-db to reader_network..."
-    docker network connect reader_network news-db || echo "news-db already connected or error connecting"
+# Connect the newsdb container if it exists and isn't already connected
+if docker ps | grep -q "newsdb"; then
+    echo "Connecting newsdb to reader_network..."
+    docker network connect reader_network newsdb || echo "newsdb already connected or error connecting"
 else
-    echo "news-db container not found"
+    echo "newsdb container not found"
 fi
 
 # Connect the pgadmin container if it exists and isn't already connected

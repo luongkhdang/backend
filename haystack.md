@@ -35,9 +35,16 @@ example of `frame_phrases`:
 
 Historical articles (max 20. need to rate and select the top 20 what would suplement and answer all Intriguing_angles and Theories_and_interpretations of the articles in the group. We will need to append all Intriguing_angles and Theories_and_interpretations in to a group Intriguing_angles and Theories_and_interpretations) selected by Haystack RAG with the following:
 
-- Embedding
+- Embedding // Haystack natively supports PostgreSQL with pgvector for storing and querying embeddings, making it ideal for your data structure (articles, entities, clusters, embeddings)
 - Cluster
 - Event
 - Best fit to answer the group's Intriguing_angles and Theories_and_interpretations
 - Structured Data Retrieval:
-  - Entity Relationships //Identify relationships between entities by finding articles where multiple entities co-occur frequently, indicating potential alliances or conflicts.
+  - Entity Relationships //Identify relationships between entities by finding articles where multiple entities co-occur frequently, indicating potential alliances or conflicts. Rank by relevance (e.g., using confidence_score for relationships, event_date recency, or influence_score for entities). Deduplicate overlapping information (e.g., similar event mentions).
+  - Retrieve events involving key entities to construct a historical timeline.
+  - Fetch policies or agreements linked to key entities, including their descriptions and effective dates.
+  - Retrieve explicit relationships between entities, prioritizing high-confidence connections.
+  - Fetch co-occurrence contexts from entity_relationships where entities are mentioned together in specific contexts
+  - Fetch events and policies linked to entities within the news group’s cluster.
+
+The goal is to fill 200,000 input token context to produce meaningful essays that align to the application core.

@@ -1,19 +1,19 @@
 # Article Transfer System
 
-This system transfers articles from the news-db database to the reader-ultimate database.
+This system transfers articles from the newsdb database to the reader-ultimate database.
 
 ## Overview
 
 The article transfer system:
 
-1. Queries the `news-db` database for articles with `proceeding_status = 'ReadyForReview'`
+1. Queries the `newsdb` database for articles with `proceeding_status = 'ReadyForReview'`
 2. Transfers these articles to the `reader-ultimate` database's `articles` table
-3. Updates the status in the `news-db` to `'Transferred'` once successfully moved
+3. Updates the status in the `newsdb` to `'Transferred'` once successfully moved
 
 ## Components
 
 - `src/main.py` - Main entry point that handles the article transfer process
-- `src/database/news_db_client.py` - Client for interacting with the news-db database
+- `src/database/news_db_client.py` - Client for interacting with the newsdb database
 - `src/database/reader_db_client.py` - Client for interacting with the reader-ultimate database
 
 ## Docker Setup
@@ -58,7 +58,7 @@ If you want to run the transfer script directly:
 
 The script supports several command-line options:
 
-- `--news-host`: News DB hostname (default: 'news-db')
+- `--news-host`: News DB hostname (default: 'newsdb')
 - `--news-port`: News DB port (default: 5432)
 - `--news-dbname`: News DB database name (default: 'postgres')
 - `--news-user`: News DB username (default: 'postgres')
@@ -92,7 +92,7 @@ If you encounter connection issues:
 
    ```bash
    docker ps | grep reader-ultimate
-   docker ps | grep news-db
+   docker ps | grep newsdb
    ```
 
 2. Verify network connectivity:
@@ -220,53 +220,4 @@ managed automatically by Docker Compose.
 ## How It Works
 
 - The `backend/docker-compose.yml` defines and manages the `reader_network`.
-- The `Scraper-Ultimate/docker-compose.yml` declares `reader_network` as `external: true` and attaches `news-api` to it.
-- Docker's built-in DNS resolves service names (`news-api`, `postgres`) across this shared network.
-- The `article-transfer` service connects to `news-api` using the hostname `news-api`.
-- No manual network creation or connection steps are required - Docker Compose handles it automatically.
-- The `network_checker.py` script (run with `--skip-network-check`) verifies service reachability.
-
-## Troubleshooting
-
-If you encounter connectivity issues:
-
-1. Verify the startup order was followed (backend first, then scraper).
-2. Verify both projects are running:
-   ```bash
-   docker ps
-   ```
-3. Check that the `reader_network` exists and the correct containers are attached:
-   ```bash
-   docker network inspect reader_network
-   ```
-   (You should see containers from both projects, including `news-api` and `article-transfer`).
-4. Restart the services, ensuring the correct order:
-   ```bash
-   # In Scraper-Ultimate directory
-   docker-compose down
-   # In Reader-Ultimate/backend directory
-   docker-compose down
-   # Start backend first, then scraper
-   cd /path/to/Reader-Ultimate/backend && docker-compose up -d
-   cd /path/to/Scraper-Ultimate && docker-compose up -d
-   ```
-5. Check logs for connectivity errors:
-   ```bash
-   docker logs article-transfer
-   docker logs news-api
-   ```
-
-## Changes Made
-
-This setup replaces previous approaches which used:
-
-- Manual setup scripts (`setup_network.sh`, `connect_networks.ps1`)
-- The `network-connector` service
-- Complex Docker introspection and fallback logic
-
-The new approach follows Docker best practices for automated multi-container networking and provides:
-
-- More reliable connectivity
-- Improved security (no Docker socket mounting)
-- Cleaner, more maintainable code
-- Fully automated network management by Docker Compose
+- The `Scraper-Ultimate/docker-compose.yml`

@@ -36,14 +36,14 @@ logger = logging.getLogger(__name__)
 
 class NewsAPIClient:
     """
-    Client for interactions with the news-db API.
+    Client for interactions with the newsdb API.
 
     This client uses the REST API to access the news-api service on the shared Docker network.
 
     Exported functions:
     - test_connection(): Tests connection to News API, returns connection details
     - get_articles_ready_for_review(): Returns list of articles with 'ReadyForReview' status
-    - fetch_article_ids(): Returns list of article IDs with 'ReadyForReview' status 
+    - fetch_article_ids(): Returns list of article IDs with 'ReadyForReview' status
     - close(): Closes the client connection (no-op for API)
 
     Related files:
@@ -195,7 +195,7 @@ class NewsAPIClient:
             # 4. Construct final result
             return {
                 "version": "API",
-                "database": "news-db",
+                "database": "newsdb",
                 "connection_string": self.api_base_url,
                 "api_status": api_status.get("status", "unknown"),
                 "api_message": api_status.get("message", ""),
@@ -263,7 +263,7 @@ class NewsAPIClient:
 
     def fetch_article_ids(self) -> List[int]:
         """
-        Fetch only article IDs from news-db where proceeding_status = 'ReadyForReview'
+        Fetch only article IDs from newsdb where proceeding_status = 'ReadyForReview'
 
         Returns:
             List[int]: List of article IDs

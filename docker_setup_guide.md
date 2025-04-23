@@ -30,7 +30,7 @@ This guide explains how to set up the Reader-Ultimate database with pgAdmin for 
    - Mounts source code for easy development
 
 5. **Article Transfer Service** (container name: article-transfer)
-   - Transfers articles from news-db to reader-db
+   - Transfers articles from newsdb to reader-db
    - Connects to news-api (localhost:8000) and reader-db
    - Mounts source code for easy development
 
@@ -81,7 +81,7 @@ The system uses these key environment variables (from .env file):
    - Port: 5432
    - Maintenance database: postgres (or your news database name)
    - Username: postgres
-   - Password: postgres (or your news-db password)
+   - Password: postgres (or your newsdb password)
    - Save password: Yes (check the box)
 4. Click "Save"
 

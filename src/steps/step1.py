@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-step1.py - Step 1 of Data Refinery Pipeline
+step1.py - Data Collection, Processing, and Storage
+
+- Fetches articles with 'ReadyForReview' status from newsdb
+- Processes article content (initial validation, embedding generation)
+- Stores articles and embeddings in the reader-db database
 
 Step 1: Data Collection, Processing and Storage
-- Fetches articles with 'ReadyForReview' status from news-db
+- Fetches articles with 'ReadyForReview' status from newsdb
 - Processes article content (noise removal, standardization)
 - Validates content and flags invalid articles
 - Inserts data into reader-db with complete metadata
@@ -78,7 +82,7 @@ def get_project_root():
 def fetch_articles_for_processing() -> List[Dict[str, Any]]:
     """
     STEP 1.1: Data Collection
-    Fetch articles with proceeding_status = 'ReadyForReview' from news-db,
+    Fetch articles with proceeding_status = 'ReadyForReview' from newsdb,
     including all necessary fields for processing (id, title, content, pub_date, domain)
 
     Returns:
@@ -322,7 +326,7 @@ def process_article(article: Dict[str, Any]) -> Dict[str, Any]:
 def run(max_workers: int = None) -> int:
     """
     Main function executing Step 1 of the Data Refinery Pipeline with parallel processing:
-    - Collect article data from news-db (Step 1.1)
+    - Collect article data from newsdb (Step 1.1)
     - Pre-process: Filter out already processed articles
     - Process article content in parallel to remove noise and standardize (Step 1.2)
     - Validate article content and prepare for storage (Step 1.3)
@@ -368,7 +372,7 @@ def run(max_workers: int = None) -> int:
     wait_seconds = int(os.getenv("WAIT_SECONDS", "5"))
     time.sleep(wait_seconds)
 
-    # STEP 1.1: Fetch articles from news-db
+    # STEP 1.1: Fetch articles from newsdb
     raw_articles = fetch_articles_for_processing()
 
     processed_count = 0
@@ -463,6 +467,21 @@ def run(max_workers: int = None) -> int:
                 logger.info(
                     f"STEP 1.4 COMPLETE: Total articles inserted into database: {inserted_count}")
 
+                # STEP 1.4.1: Mark duplicate articles as 'ERROR'
+                logger.info(
+                    "Step 1.4.1: Checking for and marking duplicate articles...")
+                try:
+                    duplicates_marked = reader_db.mark_duplicate_articles_as_error()
+                    if duplicates_marked > 0:
+                        logger.info(
+                            f"Marked {duplicates_marked} duplicate articles as ERROR.")
+                    else:
+                        logger.debug(
+                            "No new duplicate articles found to mark.")
+                except Exception as dup_e:
+                    logger.error(
+                        f"Error during duplicate article check: {dup_e}", exc_info=True)
+
                 # STEP 1.5: Generate debug information for articles with errors
                 output_error_articles_json(reader_db)
 
@@ -485,7 +504,7 @@ def run(max_workers: int = None) -> int:
             logger.debug(
                 "All articles have already been processed in previous runs (Steps 1.2-1.5).")
     else:  # No raw articles fetched
-        logger.warning("No articles retrieved from news-db for processing.")
+        logger.warning("No articles retrieved from newsdb for processing.")
 
     # --- Embedding Generation Steps (Always run, use new DB connection) ---
 

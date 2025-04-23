@@ -11,16 +11,16 @@ try {
     docker network create --driver bridge reader_network
 }
 
-# Connect the news-db container if it exists and isn't already connected
-if (docker ps | Select-String -Pattern "news-db") {
-    Write-Host "Connecting news-db to reader_network..."
+# Connect the newsdb container if it exists and isn't already connected
+if (docker ps | Select-String -Pattern "newsdb") {
+    Write-Host "Connecting newsdb to reader_network..."
     try {
-        docker network connect reader_network news-db
+        docker network connect reader_network newsdb
     } catch {
-        Write-Host "news-db already connected or error connecting"
+        Write-Host "newsdb already connected or error connecting"
     }
 } else {
-    Write-Host "news-db container not found"
+    Write-Host "newsdb container not found"
 }
 
 # Connect the pgadmin container if it exists and isn't already connected

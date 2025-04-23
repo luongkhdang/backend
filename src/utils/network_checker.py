@@ -85,25 +85,6 @@ def check_network_connectivity(retry_count: int = 1, retry_delay: int = 5) -> Di
             {"name": "reader-pgadmin", "host": "pgadmin", "port": 80}
         ]
 
-        # Add fallback hosts for news-api if needed
-        news_api_fallbacks = [
-            "host.docker.internal",
-            "localhost",
-            "127.0.0.1"
-        ]
-
-        # Check if fallback URLs are specified in environment
-        fallback_env = os.getenv("NEWS_API_FALLBACK_URLS")
-        if fallback_env:
-            for url in fallback_env.split(","):
-                url = url.strip()
-                if "://" in url:
-                    parts = url.split("://")[1].split(":")
-                    host = parts[0]
-                    port = int(parts[1]) if len(parts) > 1 else 8000
-                    if host not in [s.get("host") for s in services] + news_api_fallbacks:
-                        news_api_fallbacks.append(host)
-
         # Check each service
         for service in services:
             service_result = {
@@ -118,34 +99,18 @@ def check_network_connectivity(retry_count: int = 1, retry_delay: int = 5) -> Di
                     f"Successfully connected to {service['host']}:{service['port']}"
                 )
             else:
-                # If failed, try additional diagnostics
+                # If failed, mark as disconnected and add diagnostic
                 service_result["status"] = "disconnected"
                 service_result["diagnostics"].append(
                     f"Failed to connect to {service['host']}:{service['port']}"
                 )
 
-                # For news-api, try fallbacks
-                if service["name"] == "news-api":
-                    for fallback in news_api_fallbacks:
-                        if ping_host(fallback, service["port"]):
-                            service_result["status"] = "connected-fallback"
-                            service_result["diagnostics"].append(
-                                f"Connected to fallback {fallback}:{service['port']}"
-                            )
-                            service_result["fallback_host"] = fallback
-                            break
-
             # Add to results
             results["services"][service["name"]] = service_result
 
-            # Update overall success status
+            # Update overall success status - failure for any service means overall failure
             if service_result["status"] in ["disconnected", "unknown"]:
-                if service["name"] == "news-api":
-                    # For news-api, only fail if all fallbacks fail
-                    if "fallback_host" not in service_result:
-                        results["success"] = False
-                else:
-                    results["success"] = False
+                results["success"] = False
 
         # Add overall diagnostics
         if not results["success"]:
@@ -226,9 +191,6 @@ def print_results(results: Dict[str, Any]) -> None:
 
         if status == "connected":
             print(f"✅ {service_name}: Connected successfully")
-        elif status == "connected-fallback":
-            print(
-                f"⚠️ {service_name}: Connected via fallback {service_result.get('fallback_host', 'unknown')}")
         else:
             print(f"❌ {service_name}: Connection FAILED")
 

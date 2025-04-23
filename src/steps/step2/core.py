@@ -248,13 +248,33 @@ def run() -> Dict[str, Any]:
             logger.error(f"Error computing distances or clustering: {e}")
 
             # Fallback to using the cluster_articles function with euclidean metric
-            logger.info(
-                "Falling back to direct clustering with cosine metric")
+            logger.info("Falling back to direct clustering with cosine metric")
+
+            # Log array sizes for debugging
+            logger.debug(
+                f"X shape before fallback: {X.shape}, article_ids length: {len(article_ids)}")
+
+            # Make sure X and article_ids have the same length before clustering
+            if len(article_ids) != X.shape[0]:
+                logger.warning(
+                    f"Data inconsistency: {X.shape[0]} embeddings but {len(article_ids)} article IDs")
+                # Trim the longer array to match the shorter one
+                min_length = min(len(article_ids), X.shape[0])
+                X = X[:min_length]
+                article_ids = list(article_ids)[:min_length]
+                pub_dates = list(pub_dates)[:min_length]
+                logger.info(f"Arrays trimmed to match at length {min_length}")
+
+            # Now perform the clustering with synced arrays
             labels, _ = cluster_articles(
                 embeddings=X,
                 min_cluster_size=min_cluster_size,
                 metric='cosine'  # Use cosine metric for high-dimensional data
             )
+
+            # Verify label length matches our data
+            logger.debug(
+                f"Labels length after clustering: {len(labels)}, article_ids length: {len(article_ids)}")
 
         # Analyze clustering results
         unique_labels = set(labels)
@@ -347,11 +367,20 @@ def run() -> Dict[str, Any]:
             # Create a mapping of cluster_label -> list of article_ids
             cluster_article_map = {}
             for article_index, label in enumerate(labels):
-                if label >= 0:  # Skip noise points (label -1)
+                # Skip noise points and check bounds
+                if label >= 0 and article_index < len(article_ids):
                     if label not in cluster_article_map:
                         cluster_article_map[label] = []
                     cluster_article_map[label].append(
                         article_ids[article_index])
+                elif article_index >= len(article_ids):
+                    logger.warning(
+                        f"Article index {article_index} out of bounds for article_ids list (length {len(article_ids)})")
+                    break
+
+            # Log validation message to confirm arrays are in sync
+            logger.debug(
+                f"Created cluster map with {len(cluster_article_map)} clusters after processing {len(labels)} labels")
 
             # Create a mapping of article_id -> embedding for efficient lookups
             embeddings_map = {article_ids[i]: embeddings[i]
@@ -434,11 +463,20 @@ def run() -> Dict[str, Any]:
             # Create a mapping of cluster_label -> list of article_ids
             cluster_article_map = {}
             for article_index, label in enumerate(labels):
-                if label >= 0:  # Skip noise points (label -1)
+                # Skip noise points and check bounds
+                if label >= 0 and article_index < len(article_ids):
                     if label not in cluster_article_map:
                         cluster_article_map[label] = []
                     cluster_article_map[label].append(
                         article_ids[article_index])
+                elif article_index >= len(article_ids):
+                    logger.warning(
+                        f"Article index {article_index} out of bounds for article_ids list (length {len(article_ids)})")
+                    break
+
+            # Log validation message to confirm arrays are in sync
+            logger.debug(
+                f"Created cluster map with {len(cluster_article_map)} clusters after processing {len(labels)} labels")
 
             # Create a mapping of article_id -> embedding for efficient lookups
             embeddings_map = {article_ids[i]: embeddings[i]
