@@ -409,9 +409,21 @@ def run() -> Dict[str, Any]:
         if SPACY_AVAILABLE and nlp is not None:
             logger.info(
                 "Step 2.7.3: Interpreting cluster keywords (using spaCy)")
-            # Use the utility function
-            interpreted_clusters = get_cluster_keywords(
-                nlp, cluster_article_map, reader_client)
+            try:
+                # Process each cluster separately and collect their keywords
+                for cluster_label, article_ids in cluster_article_map.items():
+                    cluster_keywords = get_cluster_keywords(
+                        reader_client=reader_client,
+                        article_db_ids=article_ids,
+                        nlp=nlp
+                    )
+                    interpreted_clusters[cluster_label] = cluster_keywords
+                logger.info(
+                    f"Successfully interpreted keywords for {len(interpreted_clusters)} clusters")
+            except Exception as e:
+                logger.error(
+                    f"Error interpreting cluster keywords: {e}", exc_info=True)
+                # Continue with the process even if keyword extraction fails
         else:
             logger.info(
                 "Skipping cluster interpretation (spaCy not available or failed to load)")

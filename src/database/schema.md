@@ -107,6 +107,79 @@
 | `essay_id`  | `INTEGER` | `PRIMARY KEY`, `FK to essays(id) ON DELETE CASCADE`   |         | ID of the essay         |
 | `entity_id` | `INTEGER` | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE` |         | ID of the linked entity |
 
+### `events`
+
+(Managed by `src/database/modules/events.py`)
+
+| Column               | Type        | Constraints   | Default             | Description                                      |
+| -------------------- | ----------- | ------------- | ------------------- | ------------------------------------------------ |
+| `id`                 | `SERIAL`    | `PRIMARY KEY` |                     | Unique identifier for the event                  |
+| `title`              | `TEXT`      | `NOT NULL`    |                     | Title/name of the event                          |
+| `event_type`         | `TEXT`      | `NOT NULL`    |                     | Type of event (e.g., MEETING, CONFLICT)          |
+| `date_mention`       | `TEXT`      |               |                     | Date mentioned in the text (as originally found) |
+| `description`        | `TEXT`      |               |                     | Optional description of the event                |
+| `first_mentioned_at` | `TIMESTAMP` |               | `CURRENT_TIMESTAMP` | Timestamp when first mentioned                   |
+| `last_mentioned_at`  | `TIMESTAMP` |               | `CURRENT_TIMESTAMP` | Timestamp when last mentioned                    |
+| `mention_count`      | `INTEGER`   |               | `1`                 | Number of times this event was mentioned         |
+| `metadata`           | `JSONB`     |               | `'{}'::jsonb`       | Additional metadata about the event              |
+
+### `event_entities` (Junction Table)
+
+(Managed by `src/database/modules/events.py`)
+
+| Column               | Type        | Constraints                                           | Default             | Description                                    |
+| -------------------- | ----------- | ----------------------------------------------------- | ------------------- | ---------------------------------------------- |
+| `event_id`           | `INTEGER`   | `PRIMARY KEY`, `FK to events(id) ON DELETE CASCADE`   |                     | ID of the event                                |
+| `entity_id`          | `INTEGER`   | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE` |                     | ID of the entity                               |
+| `role`               | `TEXT`      |                                                       | `'MENTIONED'`       | Role of the entity in the event                |
+| `first_mentioned_at` | `TIMESTAMP` |                                                       | `CURRENT_TIMESTAMP` | Timestamp when first mentioned in this context |
+| `last_mentioned_at`  | `TIMESTAMP` |                                                       | `CURRENT_TIMESTAMP` | Timestamp when last mentioned in this context  |
+| `mention_count`      | `INTEGER`   |                                                       | `1`                 | Number of mentions in this context             |
+
+### `policy_details`
+
+(Managed by `src/database/modules/policies.py`)
+
+| Column               | Type        | Constraints   | Default             | Description                                      |
+| -------------------- | ----------- | ------------- | ------------------- | ------------------------------------------------ |
+| `id`                 | `SERIAL`    | `PRIMARY KEY` |                     | Unique identifier for the policy                 |
+| `title`              | `TEXT`      | `NOT NULL`    |                     | Title/name of the policy                         |
+| `policy_type`        | `TEXT`      | `NOT NULL`    |                     | Type of policy (e.g., LAW, AGREEMENT)            |
+| `date_mention`       | `TEXT`      |               |                     | Date mentioned in the text (as originally found) |
+| `description`        | `TEXT`      |               |                     | Optional description of the policy               |
+| `first_mentioned_at` | `TIMESTAMP` |               | `CURRENT_TIMESTAMP` | Timestamp when first mentioned                   |
+| `last_mentioned_at`  | `TIMESTAMP` |               | `CURRENT_TIMESTAMP` | Timestamp when last mentioned                    |
+| `mention_count`      | `INTEGER`   |               | `1`                 | Number of times this policy was mentioned        |
+| `metadata`           | `JSONB`     |               | `'{}'::jsonb`       | Additional metadata about the policy             |
+
+### `policy_entities` (Junction Table)
+
+(Managed by `src/database/modules/policies.py`)
+
+| Column               | Type        | Constraints                                                 | Default             | Description                                    |
+| -------------------- | ----------- | ----------------------------------------------------------- | ------------------- | ---------------------------------------------- |
+| `policy_id`          | `INTEGER`   | `PRIMARY KEY`, `FK to policy_details(id) ON DELETE CASCADE` |                     | ID of the policy                               |
+| `entity_id`          | `INTEGER`   | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE`       |                     | ID of the entity                               |
+| `role`               | `TEXT`      |                                                             | `'MENTIONED'`       | Role of the entity in the policy               |
+| `first_mentioned_at` | `TIMESTAMP` |                                                             | `CURRENT_TIMESTAMP` | Timestamp when first mentioned in this context |
+| `last_mentioned_at`  | `TIMESTAMP` |                                                             | `CURRENT_TIMESTAMP` | Timestamp when last mentioned in this context  |
+| `mention_count`      | `INTEGER`   |                                                             | `1`                 | Number of mentions in this context             |
+
+### `entity_relationships`
+
+(Managed by `src/database/modules/relationships.py`)
+
+| Column             | Type        | Constraints                                           | Default             | Description                                            |
+| ------------------ | ----------- | ----------------------------------------------------- | ------------------- | ------------------------------------------------------ |
+| `entity_id_1`      | `INTEGER`   | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE` |                     | ID of the first entity in the relationship             |
+| `entity_id_2`      | `INTEGER`   | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE` |                     | ID of the second entity in the relationship            |
+| `context_type`     | `TEXT`      | `PRIMARY KEY`                                         | `NOT NULL`          | Type of relationship context (e.g., AGREEMENT_CONTEXT) |
+| `first_seen`       | `TIMESTAMP` |                                                       | `CURRENT_TIMESTAMP` | Timestamp when relationship was first observed         |
+| `last_updated`     | `TIMESTAMP` |                                                       | `CURRENT_TIMESTAMP` | Timestamp when relationship was last updated           |
+| `article_count`    | `INTEGER`   |                                                       | `1`                 | Number of articles mentioning this relationship        |
+| `confidence_score` | `FLOAT`     |                                                       | `0.1`               | Confidence in the relationship (0.0-1.0)               |
+| `metadata`         | `JSONB`     |                                                       | `'{}'::jsonb`       | Contains evidence snippets and article references      |
+
 ### `domain_statistics`
 
 (Managed by `src/database/modules/domains.py`)
@@ -189,5 +262,34 @@ _(Initial weights inserted for: PERSON, ORGANIZATION, GOVERNMENT_AGENCY, LOCATIO
 - **`entity_snippets`**:
   - `idx_entity_snippets_entity_id` on (`entity_id`)
   - `idx_entity_snippets_article_id` on (`article_id`)
+- **`events`**:
+  - `idx_events_title` on (`title`)
+  - `idx_events_type` on (`event_type`)
+  - `idx_events_first_mentioned` on (`first_mentioned_at`)
+- **`event_entities`**:
+  - `idx_event_entities_entity_id` on (`entity_id`)
+- **`policy_details`**:
+  - `idx_policies_title` on (`title`)
+  - `idx_policies_type` on (`policy_type`)
+  - `idx_policies_first_mentioned` on (`first_mentioned_at`)
+- **`policy_entities`**:
+  - `idx_policy_entities_entity_id` on (`entity_id`)
+- **`entity_relationships`**:
+  - `idx_entity_relationships_entity1` on (`entity_id_1`)
+  - `idx_entity_relationships_entity2` on (`entity_id_2`)
+  - `idx_entity_relationships_context` on (`context_type`)
+  - `idx_entity_relationships_confidence` on (`confidence_score` DESC)
 
 _(Note: Primary Key indexes are created automatically)_
+
+## Relational Data Usage
+
+The `events`, `policy_details`, and `entity_relationships` tables store structured relational information extracted from articles during entity processing. This data is initially populated with **mentions** from individual articles, capturing:
+
+1. **Event Mentions**: Significant occurrences mentioned in articles, with connections to involved entities.
+2. **Policy Mentions**: Laws, agreements, and other policies referenced in articles, with connections to relevant entities.
+3. **Entity Co-occurrence Contexts**: Pairs of entities mentioned together in meaningful contexts, with evidence snippets.
+
+These tables serve as a foundation for future enrichment processes that can analyze the aggregated data to identify deeper patterns, generate more comprehensive descriptions, calculate more accurate confidence scores, and infer complex relationships based on multiple observations over time.
+
+For optimal query performance, these tables maintain multiple indexes on frequently searched columns and store auxiliary data in JSONB fields to support flexible data storage without schema changes.

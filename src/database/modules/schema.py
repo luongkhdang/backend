@@ -230,6 +230,17 @@ def initialize_tables(conn) -> bool:
         # Create indexes to improve query performance
         create_indexes(conn)
 
+        # Initialize tables from new modules
+        # Import the module functions here to avoid circular imports
+        from src.database.modules.events import initialize_tables as init_events
+        from src.database.modules.policies import initialize_tables as init_policies
+        from src.database.modules.relationships import initialize_tables as init_relationships
+
+        # Initialize tables from each module
+        init_events(conn)
+        init_policies(conn)
+        init_relationships(conn)
+
         conn.commit()
         cursor.close()
 

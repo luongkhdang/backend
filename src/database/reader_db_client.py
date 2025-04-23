@@ -43,6 +43,9 @@ from src.database.modules import essays
 from src.database.modules import domains
 from src.database.modules import entity_snippets
 from src.database.modules import influence
+from src.database.modules import events
+from src.database.modules import policies
+from src.database.modules import relationships
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -1414,6 +1417,315 @@ class ReaderDBClient:
                 logger.error(
                     f"Error retrieving top entities with influence flag for article {article_id}: {e}")
                 return []
+            finally:
+                self.release_connection(conn)
+        return []
+
+    # Event operations
+    def find_or_create_event(self, title: str, event_type: str, date_mention: Optional[str] = None) -> Optional[int]:
+        """
+        Find an existing event by title or create a new one if it doesn't exist.
+
+        Args:
+            title: The title/name of the event
+            event_type: The type of event (e.g., MEETING, CONFLICT, STATEMENT)
+            date_mention: Optional date mentioned in the text in original format
+
+        Returns:
+            int or None: Event ID if successful, None otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return events.find_or_create_event(conn, title, event_type, date_mention)
+            except Exception as e:
+                logger.error(f"Error finding/creating event '{title}': {e}")
+                return None
+            finally:
+                self.release_connection(conn)
+        return None
+
+    def link_event_entity(self, event_id: int, entity_id: int, role: str = 'MENTIONED') -> bool:
+        """
+        Link an entity to an event with a specific role.
+
+        Args:
+            event_id: ID of the event
+            entity_id: ID of the entity
+            role: The role of the entity in the event (e.g., MENTIONED, ORGANIZER, PARTICIPANT)
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return events.link_event_entity(conn, event_id, entity_id, role)
+            except Exception as e:
+                logger.error(
+                    f"Error linking entity {entity_id} to event {event_id}: {e}")
+                return False
+            finally:
+                self.release_connection(conn)
+        return False
+
+    def get_event_by_id(self, event_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get an event by its ID, including related entities.
+
+        Args:
+            event_id: ID of the event
+
+        Returns:
+            Dict or None: Event data with related entities or None if not found
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return events.get_event_by_id(conn, event_id)
+            finally:
+                self.release_connection(conn)
+        return None
+
+    def get_events_by_entity(self, entity_id: int, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get events associated with a specific entity.
+
+        Args:
+            entity_id: ID of the entity
+            limit: Maximum number of events to return
+
+        Returns:
+            List[Dict[str, Any]]: List of events associated with the entity
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return events.get_events_by_entity(conn, entity_id, limit)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_recent_events(self, days: int = 30, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get events first mentioned within the specified number of days.
+
+        Args:
+            days: Number of days to look back
+            limit: Maximum number of events to return
+
+        Returns:
+            List[Dict[str, Any]]: List of recent events
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return events.get_recent_events(conn, days, limit)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    # Policy operations
+    def find_or_create_policy(self, title: str, policy_type: str, date_mention: Optional[str] = None) -> Optional[int]:
+        """
+        Find an existing policy by title or create a new one if it doesn't exist.
+
+        Args:
+            title: The title/name of the policy
+            policy_type: The type of policy (e.g., LAW, AGREEMENT, REGULATION)
+            date_mention: Optional date mentioned in the text in original format
+
+        Returns:
+            int or None: Policy ID if successful, None otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return policies.find_or_create_policy(conn, title, policy_type, date_mention)
+            except Exception as e:
+                logger.error(f"Error finding/creating policy '{title}': {e}")
+                return None
+            finally:
+                self.release_connection(conn)
+        return None
+
+    def link_policy_entity(self, policy_id: int, entity_id: int, role: str = 'MENTIONED') -> bool:
+        """
+        Link an entity to a policy with a specific role.
+
+        Args:
+            policy_id: ID of the policy
+            entity_id: ID of the entity
+            role: The role of the entity in relation to the policy (e.g., MENTIONED, CREATOR, ENFORCER)
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return policies.link_policy_entity(conn, policy_id, entity_id, role)
+            except Exception as e:
+                logger.error(
+                    f"Error linking entity {entity_id} to policy {policy_id}: {e}")
+                return False
+            finally:
+                self.release_connection(conn)
+        return False
+
+    def get_policy_by_id(self, policy_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get a policy by its ID, including related entities.
+
+        Args:
+            policy_id: ID of the policy
+
+        Returns:
+            Dict or None: Policy data with related entities or None if not found
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return policies.get_policy_by_id(conn, policy_id)
+            finally:
+                self.release_connection(conn)
+        return None
+
+    def get_policies_by_entity(self, entity_id: int, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get policies associated with a specific entity.
+
+        Args:
+            entity_id: ID of the entity
+            limit: Maximum number of policies to return
+
+        Returns:
+            List[Dict[str, Any]]: List of policies associated with the entity
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return policies.get_policies_by_entity(conn, entity_id, limit)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_recent_policies(self, days: int = 30, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get policies first mentioned within the specified number of days.
+
+        Args:
+            days: Number of days to look back
+            limit: Maximum number of policies to return
+
+        Returns:
+            List[Dict[str, Any]]: List of recent policies
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return policies.get_recent_policies(conn, days, limit)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    # Entity relationship operations
+    def record_relationship_context(self, entity_id_1: int, entity_id_2: int, context_type: str,
+                                    article_id: int, evidence_snippet: Optional[str] = None) -> bool:
+        """
+        Record or update a relationship context between two entities.
+
+        This function will:
+        - Insert a new relationship if it doesn't exist
+        - Increment the article_count if it exists
+        - Add the article_id and evidence_snippet to the metadata
+        - Update the last_updated timestamp
+        - Adjust confidence_score based on simple rules
+
+        Args:
+            entity_id_1: ID of the first entity
+            entity_id_2: ID of the second entity
+            context_type: Type of relationship context (e.g., AGREEMENT_CONTEXT, CONFLICT_CONTEXT)
+            article_id: ID of the article where this relationship was mentioned
+            evidence_snippet: Text snippet providing evidence of the relationship
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return relationships.record_relationship_context(
+                    conn, entity_id_1, entity_id_2, context_type, article_id, evidence_snippet)
+            except Exception as e:
+                logger.error(
+                    f"Error recording relationship context between entities {entity_id_1} and {entity_id_2}: {e}")
+                return False
+            finally:
+                self.release_connection(conn)
+        return False
+
+    def get_entity_relationships(self, entity_id: int, context_type: Optional[str] = None,
+                                 limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get relationships for a specific entity, optionally filtered by context type.
+
+        Args:
+            entity_id: ID of the entity
+            context_type: Optional filter for specific context types
+            limit: Maximum number of relationships to return
+
+        Returns:
+            List[Dict[str, Any]]: List of relationships with related entities
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return relationships.get_entity_relationships(conn, entity_id, context_type, limit)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_relationship_snippets(self, entity_id_1: int, entity_id_2: int,
+                                  context_type: Optional[str] = None, limit: Optional[int] = None) -> List[str]:
+        """
+        Get evidence snippets for a relationship between two entities.
+
+        Args:
+            entity_id_1: ID of the first entity
+            entity_id_2: ID of the second entity
+            context_type: Optional filter for specific context type
+            limit: Maximum number of snippets to return
+
+        Returns:
+            List[str]: List of evidence snippets
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return relationships.get_relationship_snippets(conn, entity_id_1, entity_id_2, context_type, limit)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_relationship_articles(self, entity_id_1: int, entity_id_2: int,
+                                  context_type: Optional[str] = None, limit: Optional[int] = None) -> List[int]:
+        """
+        Get article IDs mentioning a relationship between two entities.
+
+        Args:
+            entity_id_1: ID of the first entity
+            entity_id_2: ID of the second entity
+            context_type: Optional filter for specific context type
+            limit: Maximum number of article IDs to return
+
+        Returns:
+            List[int]: List of article IDs
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return relationships.get_relationship_articles(conn, entity_id_1, entity_id_2, context_type, limit)
             finally:
                 self.release_connection(conn)
         return []

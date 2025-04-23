@@ -403,15 +403,15 @@ class GeminiClient:
                     )
 
                     # Log the full response object for debugging
-                    logger.info(
+                    logger.debug(
                         f"[RESPONSE] Full response from {model_name}: {response}")
 
                     # Log usage metadata if available
                     if hasattr(response, 'usage_metadata'):
-                        logger.info(
+                        logger.debug(
                             f"[USAGE] {model_name} usage metadata: {response.usage_metadata}")
                     elif isinstance(response, dict) and 'usage_metadata' in response:
-                        logger.info(
+                        logger.debug(
                             f"[USAGE] {model_name} usage metadata: {response['usage_metadata']}")
 
                     # Register the successful call *after* it completes
@@ -726,15 +726,15 @@ class GeminiClient:
                             f"[{model_name}] Attempt {model_attempt}: generate_content_async call succeeded in {call_duration:.2f}s.")
 
                         # Log the full response
-                        logger.info(
+                        logger.debug(
                             f"[RESPONSE] Full response from {model_name}: {response}")
 
                         # Log usage metadata if available
                         if hasattr(response, 'usage_metadata'):
-                            logger.info(
+                            logger.debug(
                                 f"[USAGE] {model_name} usage metadata: {response.usage_metadata}")
                         elif isinstance(response, dict) and 'usage_metadata' in response:
-                            logger.info(
+                            logger.debug(
                                 f"[USAGE] {model_name} usage metadata: {response['usage_metadata']}")
                     except asyncio.TimeoutError:
                         call_duration = time.monotonic() - task_start_time

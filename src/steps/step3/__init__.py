@@ -121,6 +121,9 @@ async def run() -> Dict[str, Any]:
         total_entity_links = 0
         total_snippets = 0
         total_errors = 0
+        total_events = 0
+        total_policies = 0
+        total_relationships = 0
         batch_index = 0  # For batch numbering
 
         # Add heartbeat logging
@@ -262,10 +265,20 @@ async def run() -> Dict[str, Any]:
                     total_entity_links += batch_store_results.get("links", 0)
                     total_snippets += batch_store_results.get("snippets", 0)
                     total_errors += batch_store_results.get("errors", 0)
+                    # Add new relational data counters
+                    total_events = total_events + \
+                        batch_store_results.get("events", 0)
+                    total_policies = total_policies + \
+                        batch_store_results.get("policies", 0)
+                    total_relationships = total_relationships + \
+                        batch_store_results.get("relationships", 0)
 
                     logger.info(f"Batch {batch_index} complete: Processed {batch_store_results.get('processed', 0)} articles, "
                                 f"created {batch_store_results.get('links', 0)} entity links, "
-                                f"stored {batch_store_results.get('snippets', 0)} snippets.")
+                                f"stored {batch_store_results.get('snippets', 0)} snippets, "
+                                f"created {batch_store_results.get('events', 0)} event links, "
+                                f"created {batch_store_results.get('policies', 0)} policy links, "
+                                f"recorded {batch_store_results.get('relationships', 0)} relationships.")
                 else:
                     # Increment failure counter on empty results
                     consecutive_failures += 1
@@ -303,12 +316,18 @@ async def run() -> Dict[str, Any]:
             "entity_links_created": total_entity_links,
             "snippets_stored": total_snippets,
             "errors": total_errors,
+            "events": total_events,
+            "policies": total_policies,
+            "relationships": total_relationships,
             "runtime_seconds": time.time() - start_time
         }
 
         logger.info(f"Step 3 completed in {status['runtime_seconds']:.2f} seconds. "
                     f"Processed {status['processed']} articles, created {status['entity_links_created']} entity links, "
-                    f"stored {status['snippets_stored']} supporting snippets.")
+                    f"stored {status['snippets_stored']} supporting snippets, "
+                    f"created {status['events']} event links, "
+                    f"created {status['policies']} policy links, "
+                    f"recorded {status['relationships']} relationships.")
 
         return status
 
@@ -576,6 +595,7 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
     """
     Store extracted entities, link them to articles, and update article status.
     Processes and commits results in batches of 10 articles for incremental progress.
+    Also processes relational data: event mentions, policy mentions, and entity co-occurrence contexts.
 
     Args:
         db_client: Database client instance
@@ -588,9 +608,14 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
     entity_links_created = 0
     snippets_stored = 0
     errors = 0
+    # New counters for relational data
+    events_created = 0
+    policies_created = 0
+    relationships_recorded = 0
 
     if not entity_results:
-        return {"processed": 0, "links": 0, "snippets": 0, "errors": 0}
+        return {"processed": 0, "links": 0, "snippets": 0, "errors": 0,
+                "events": 0, "policies": 0, "relationships": 0}
 
     # First, collect all unique entity types from the results to add them to the database
     unique_entity_types = set()
@@ -649,6 +674,9 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
         batch_links = 0
         batch_snippets = 0
         batch_errors = 0
+        batch_events = 0
+        batch_policies = 0
+        batch_relationships = 0
 
         for article_id in batch_article_ids:
             extracted_data = entity_results[article_id]
@@ -684,6 +712,218 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
                         f"Received direct list for article {article_id}, expected dict with 'ents' key.")
                     entity_list_to_process = extracted_data
 
+                # ----------------------------------------------------
+                # Process Event Mentions if present
+                # ----------------------------------------------------
+                event_mentions = None
+                if isinstance(extracted_data, dict) and 'ev_mentions' in extracted_data and isinstance(extracted_data['ev_mentions'], list):
+                    event_mentions = extracted_data['ev_mentions']
+                    logger.debug(
+                        f"Found {len(event_mentions)} event mentions for article {article_id}")
+
+                    for event in event_mentions:
+                        try:
+                            # Extract event information
+                            event_title = event.get('ti')
+                            event_type = event.get('ty')
+                            date_mention = event.get('dt')
+                            entity_mentions = event.get('ent_mens', [])
+
+                            if not event_title or not event_type:
+                                logger.warning(
+                                    f"Skipping event with missing title or type in article {article_id}: {event}")
+                                continue
+
+                            # Create or find the event
+                            event_id = db_client.find_or_create_event(
+                                title=event_title,
+                                event_type=event_type,
+                                date_mention=date_mention
+                            )
+
+                            if not event_id:
+                                logger.warning(
+                                    f"Failed to create/find event '{event_title}' for article {article_id}")
+                                continue
+
+                            # Process entity mentions for this event
+                            for entity_mention in entity_mentions:
+                                # Check if entity_mention is a string (old format) or dict (new format)
+                                if isinstance(entity_mention, dict):
+                                    entity_name = entity_mention.get('en')
+                                    entity_role = entity_mention.get(
+                                        'role', 'MENTIONED')
+                                else:
+                                    entity_name = entity_mention
+                                    entity_role = 'MENTIONED'  # Default for backward compatibility
+
+                                if not entity_name:
+                                    continue
+
+                                # Find or create the entity - use ORGANIZATION as default type since we don't have specific type info
+                                entity_id = db_client.find_or_create_entity(
+                                    name=entity_name,
+                                    entity_type="ORGANIZATION"  # Default type for entities mentioned in events
+                                )
+
+                                if not entity_id:
+                                    logger.warning(
+                                        f"Failed to create/find entity '{entity_name}' for event {event_id}")
+                                    continue
+
+                                # Link the entity to the event with the specified role
+                                link_success = db_client.link_event_entity(
+                                    event_id=event_id,
+                                    entity_id=entity_id,
+                                    role=entity_role
+                                )
+
+                                if link_success:
+                                    batch_events += 1
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing event mention in article {article_id}: {e}", exc_info=True)
+
+                # ----------------------------------------------------
+                # Process Policy Mentions if present
+                # ----------------------------------------------------
+                policy_mentions = None
+                if isinstance(extracted_data, dict) and 'pol_mentions' in extracted_data and isinstance(extracted_data['pol_mentions'], list):
+                    policy_mentions = extracted_data['pol_mentions']
+                    logger.debug(
+                        f"Found {len(policy_mentions)} policy mentions for article {article_id}")
+
+                    for policy in policy_mentions:
+                        try:
+                            # Extract policy information
+                            policy_title = policy.get('ti')
+                            policy_type = policy.get('ty')
+                            date_mention = policy.get('edt')
+                            entity_mentions = policy.get('ent_mens', [])
+
+                            if not policy_title or not policy_type:
+                                logger.warning(
+                                    f"Skipping policy with missing title or type in article {article_id}: {policy}")
+                                continue
+
+                            # Create or find the policy
+                            policy_id = db_client.find_or_create_policy(
+                                title=policy_title,
+                                policy_type=policy_type,
+                                date_mention=date_mention
+                            )
+
+                            if not policy_id:
+                                logger.warning(
+                                    f"Failed to create/find policy '{policy_title}' for article {article_id}")
+                                continue
+
+                            # Process entity mentions for this policy
+                            for entity_mention in entity_mentions:
+                                # Check if entity_mention is a string (old format) or dict (new format)
+                                if isinstance(entity_mention, dict):
+                                    entity_name = entity_mention.get('en')
+                                    entity_role = entity_mention.get(
+                                        'role', 'MENTIONED')
+                                else:
+                                    entity_name = entity_mention
+                                    entity_role = 'MENTIONED'  # Default for backward compatibility
+
+                                if not entity_name:
+                                    continue
+
+                                # Find or create the entity - use ORGANIZATION as default type since we don't have specific type info
+                                entity_id = db_client.find_or_create_entity(
+                                    name=entity_name,
+                                    entity_type="ORGANIZATION"  # Default type for entities mentioned in policies
+                                )
+
+                                if not entity_id:
+                                    logger.warning(
+                                        f"Failed to create/find entity '{entity_name}' for policy {policy_id}")
+                                    continue
+
+                                # Link the entity to the policy with the specified role
+                                link_success = db_client.link_policy_entity(
+                                    policy_id=policy_id,
+                                    entity_id=entity_id,
+                                    role=entity_role
+                                )
+
+                                if link_success:
+                                    batch_policies += 1
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing policy mention in article {article_id}: {e}", exc_info=True)
+
+                # ----------------------------------------------------
+                # Process Relationship Contexts if present
+                # ----------------------------------------------------
+                rel_contexts = None
+                if isinstance(extracted_data, dict) and 'rel_contexts' in extracted_data and isinstance(extracted_data['rel_contexts'], list):
+                    rel_contexts = extracted_data['rel_contexts']
+                    logger.debug(
+                        f"Found {len(rel_contexts)} relationship contexts for article {article_id}")
+
+                    for context in rel_contexts:
+                        try:
+                            # Extract relationship information
+                            entity1_name = context.get('e1n')
+                            entity2_name = context.get('e2n')
+                            # Extract entity types if available in the updated format
+                            # Default to ORGANIZATION if not specified
+                            entity1_type = context.get('e1t', 'ORGANIZATION')
+                            # Default to ORGANIZATION if not specified
+                            entity2_type = context.get('e2t', 'ORGANIZATION')
+                            context_type = context.get('ctx_ty')
+
+                            # Handle both formats:
+                            # - Old: 'evi' is a list of strings
+                            # - New: 'evi' is a single string representing the best evidence
+                            evidence = context.get('evi')
+                            evidence_snippet = None
+
+                            if isinstance(evidence, list) and evidence:
+                                # Old format - take the first snippet from the list
+                                evidence_snippet = evidence[0]
+                            elif isinstance(evidence, str):
+                                # New format - direct string
+                                evidence_snippet = evidence
+
+                            if not entity1_name or not entity2_name or not context_type:
+                                logger.warning(
+                                    f"Skipping relationship with missing entity names or context type in article {article_id}: {context}")
+                                continue
+
+                            # Find or create the entities with their types
+                            entity_id_1 = db_client.find_or_create_entity(
+                                name=entity1_name, entity_type=entity1_type)
+                            entity_id_2 = db_client.find_or_create_entity(
+                                name=entity2_name, entity_type=entity2_type)
+
+                            if not entity_id_1 or not entity_id_2 or entity_id_1 == entity_id_2:
+                                logger.warning(
+                                    f"Failed to create valid entity pair '{entity1_name}' and '{entity2_name}' for relationship")
+                                continue
+
+                            # Record the relationship context
+                            rel_success = db_client.record_relationship_context(
+                                entity_id_1=entity_id_1,
+                                entity_id_2=entity_id_2,
+                                context_type=context_type,
+                                article_id=article_id,
+                                evidence_snippet=evidence_snippet
+                            )
+
+                            if rel_success:
+                                batch_relationships += 1
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing relationship context in article {article_id}: {e}", exc_info=True)
+
+                # ----------------------------------------------------
+                # Continue with regular entity processing
+                # ----------------------------------------------------
                 if entity_list_to_process is not None:  # Proceed if we found a valid list of entities
                     # Check if the list is empty
                     if not entity_list_to_process:
@@ -822,27 +1062,22 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
         entity_links_created += batch_links
         snippets_stored += batch_snippets
         errors += batch_errors
+        events_created += batch_events
+        policies_created += batch_policies
+        relationships_recorded += batch_relationships
 
-        # Log batch completion
         logger.info(
-            f"Batch {batch_num}/{total_batches} complete: Processed {batch_processed} articles, created {batch_links} links, stored {batch_snippets} snippets.")
+            f"Batch {batch_num}/{total_batches} complete: {batch_processed} processed, {batch_links} entity links, " +
+            f"{batch_snippets} snippets, {batch_events} event links, {batch_policies} policy links, " +
+            f"{batch_relationships} relationships, {batch_errors} errors")
 
-        # Explicitly ensure the current batch is committed by releasing and getting a new connection
-        # This ensures DB writes are persisted in case of interruptions
-        try:
-            # First release any existing connection back to the pool
-            # Assuming get_connection() returns the connection object itself
-            conn = db_client.get_connection()
-            if conn:
-                db_client.release_connection(conn)
-                logger.debug(
-                    f"Committed batch {batch_num} to database (connection released)")
-            else:
-                logger.warning(
-                    f"Could not get connection to commit batch {batch_num}")
-        except Exception as e:
-            logger.warning(f"Error during explicit batch commit: {e}")
-
-    logger.debug(
-        f"Storage complete. Total: {processed_count} articles processed, {entity_links_created} entity links created, {snippets_stored} snippets stored, {errors} errors.")
-    return {"processed": processed_count, "links": entity_links_created, "snippets": snippets_stored, "errors": errors}
+    # Return overall summary
+    return {
+        "processed": processed_count,
+        "links": entity_links_created,
+        "snippets": snippets_stored,
+        "errors": errors,
+        "events": events_created,
+        "policies": policies_created,
+        "relationships": relationships_recorded
+    }
