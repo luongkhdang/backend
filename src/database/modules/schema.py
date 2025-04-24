@@ -4,9 +4,11 @@ schema.py - Database schema management
 This module provides functions for initializing and managing the database schema,
 including tables, indexes, and extensions.
 
-The articles table includes a frame_phrases TEXT[] column which stores narrative framing phrases
-extracted during entity extraction (Step 3). These represent the dominant narrative frames
-present in each article.
+The articles table includes:
+- frame_phrases TEXT[]: Stores narrative framing phrases.
+- embedding VECTOR(768): Stores the vector embedding for the article content.
+
+The essays table stores generated essays, including source article IDs, generation settings, etc.
 
 Exported functions:
 - initialize_tables(conn) -> None
@@ -54,7 +56,8 @@ def initialize_tables(conn) -> bool:
             extracted_entities BOOLEAN DEFAULT FALSE,
             is_hot BOOLEAN DEFAULT FALSE,
             cluster_id INTEGER,
-            frame_phrases TEXT[] NULL
+            frame_phrases TEXT[] NULL,
+            embedding VECTOR(768) NULL -- Added for Haystack integration
             -- Note: Foreign key to clusters cannot be added here due to potential cyclic dependency
             -- or if clusters table might not exist yet. It could be added separately if needed.
         );
@@ -96,16 +99,6 @@ def initialize_tables(conn) -> bool:
         ALTER TABLE articles ADD COLUMN IF NOT EXISTS frame_phrases TEXT[] NULL;
         """)
 
-        # Create embeddings table
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS embeddings (
-            id SERIAL PRIMARY KEY,
-            article_id INTEGER UNIQUE REFERENCES articles(id) ON DELETE CASCADE,
-            embedding VECTOR(768),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
-
         # Create clusters table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS clusters (
@@ -119,27 +112,23 @@ def initialize_tables(conn) -> bool:
         );
         """)
 
-        # Create essays table
+        # Create essays table (Revised Schema for RAG)
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS essays (
             id SERIAL PRIMARY KEY,
-            type TEXT,
-            article_id INTEGER, -- Not a foreign key based on schema? Consider implications.
+            group_id TEXT NULL, -- Nullable if not always grouped
+            cluster_id INTEGER REFERENCES clusters(id) ON DELETE SET NULL,
+            type TEXT NOT NULL, -- e.g., 'rag_historical_essay'
             title TEXT,
             content TEXT,
-            layer_depth INTEGER,
-            cluster_id INTEGER REFERENCES clusters(id) ON DELETE SET NULL,
+            source_article_ids INTEGER[], -- Array of article IDs used
+            model_name TEXT,
+            generation_settings JSONB DEFAULT '{}'::jsonb,
+            input_token_count INTEGER,
+            output_token_count INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            tags TEXT[]
-        );
-        """)
-
-        # Create essay_entities junction table
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS essay_entities (
-            essay_id INTEGER REFERENCES essays(id) ON DELETE CASCADE,
-            entity_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
-            PRIMARY KEY (essay_id, entity_id)
+            tags TEXT[],
+            prompt_template_hash TEXT NULL
         );
         """)
 
@@ -317,7 +306,7 @@ def create_indexes(conn) -> bool:
         ("idx_entities_type", "entities", "entity_type"),
         ("idx_article_entities_article_id", "article_entities", "article_id"),
         ("idx_article_entities_entity_id", "article_entities", "entity_id"),
-        ("idx_embeddings_article_id", "embeddings", "article_id"),
+        # ("idx_embeddings_article_id", "embeddings", "article_id"), # Removed embeddings table
     ]
 
     success = True

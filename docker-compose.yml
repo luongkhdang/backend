@@ -52,6 +52,8 @@ services:
       GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT: ${GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT:-2048}
       GEMINI_EMBEDDING_OUTPUT_DIMENSION: ${GEMINI_EMBEDDING_OUTPUT_DIMENSION:-768}
       GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE: ${GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE:-1500}
+      # --- Add connection string for Haystack --- #
+      PG_CONN_STR: "postgresql://postgres:postgres@postgres:5432/reader_db"
 
       # --- Gemini Generation Models --- #
       # Shared limits

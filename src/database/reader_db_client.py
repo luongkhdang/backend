@@ -46,6 +46,7 @@ from src.database.modules import influence
 from src.database.modules import events
 from src.database.modules import policies
 from src.database.modules import relationships
+from src.database.modules import haystack_db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -1747,3 +1748,99 @@ class ReaderDBClient:
             finally:
                 self.release_connection(conn)
         return 0
+
+    # --- Start of Haystack RAG Methods (Wrappers) ---
+
+    def get_key_entities_for_group(self, article_ids: List[int], top_n: int = 10) -> List[Tuple]:
+        """
+        Wrapper method: Identifies key entities mentioned across group articles.
+        Delegates implementation to haystack_db module.
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                return haystack_db.get_key_entities_for_group(conn, article_ids, top_n)
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_formatted_related_events(self, entity_ids: List[int], limit: int = 15) -> List[str]:
+        """
+        Wrapper method: Retrieves and formats events related to key entities.
+        Delegates implementation to haystack_db module.
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                # Get raw data
+                events_raw = haystack_db.get_related_events(
+                    conn, entity_ids, limit)
+                # Format data
+                return [haystack_db._format_event(event) for event in events_raw]
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_formatted_related_policies(self, entity_ids: List[int], limit: int = 15) -> List[str]:
+        """
+        Wrapper method: Retrieves and formats policies related to key entities.
+        Delegates implementation to haystack_db module.
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                # Get raw data
+                policies_raw = haystack_db.get_related_policies(
+                    conn, entity_ids, limit)
+                # Format data
+                return [haystack_db._format_policy(policy) for policy in policies_raw]
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def get_formatted_related_relationships(self, entity_ids: List[int], limit: int = 20) -> List[str]:
+        """
+        Wrapper method: Retrieves and formats relationships involving key entities.
+        Delegates implementation to haystack_db module.
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                # Get raw data
+                relationships_raw = haystack_db.get_related_relationships(
+                    conn, entity_ids, limit)
+                # Format data
+                return [haystack_db._format_relationship(relationship) for relationship in relationships_raw]
+            finally:
+                self.release_connection(conn)
+        return []
+
+    def save_essay(self, essay_data: Dict[str, Any]) -> Optional[int]:
+        """
+        Wrapper method: Saves a generated essay to the database.
+        Delegates implementation to haystack_db module.
+        Handles connection and transaction management.
+        """
+        conn = self.get_connection()
+        if conn:
+            try:
+                # Delegate saving to the module function
+                essay_id = haystack_db.save_essay(conn, essay_data)
+                # Commit/Rollback is handled within save_essay for this specific operation
+                return essay_id
+            except Exception as e:
+                # Log the error at the client level as well
+                logger.error(
+                    f"Error during save_essay wrapper execution: {e}", exc_info=True)
+                # Ensure rollback happens if save_essay failed before commit/rollback
+                try:
+                    conn.rollback()
+                except Exception as rb_e:
+                    logger.error(
+                        f"Error during rollback in save_essay wrapper: {rb_e}")
+                return None
+            finally:
+                self.release_connection(conn)
+        return None
+
+    # --- End of Haystack RAG Methods (Wrappers) ---

@@ -822,7 +822,7 @@ def get_recent_day_unprocessed_articles(conn, limit: Optional[int] = None) -> Li
             AND content IS NOT NULL
             AND content != 'ERROR'
             AND pub_date >= (CURRENT_DATE - INTERVAL '1 DAY')
-            AND pub_date <= CURRENT_DATE
+            AND pub_date < (CURRENT_DATE + INTERVAL '1 DAY')
             ORDER BY pub_date DESC
         """
 
