@@ -134,7 +134,7 @@ async def analyze_articles_with_prompt(
                 parts=[google_genai_types.Part(text=full_prompt_text)],
                 role="user"  # Assuming the prompt is user input
             )],
-            generation_config=gen_config,
+            config=gen_config,
             # Pass system_instruction if the client method supports it directly
             # Otherwise, it might need to be part of the 'contents' list
             # Check google-genai docs for system instruction handling
@@ -256,7 +256,8 @@ async def generate_text_from_prompt(
         # --- NEW API CALL using passed client ---
         api_call_start_time = asyncio.get_event_loop().time()
         # Structure contents, potentially including system instruction
-        contents = [google_genai_types.Part(text=full_prompt_text)]
+        contents = [google_genai_types.Content(
+            parts=[google_genai_types.Part(text=full_prompt_text)])]
         # How system instructions are handled in google-genai needs verification.
         # Option 1: Client parameter (if supported)
         # Option 2: Model parameter (if supported)
@@ -269,7 +270,7 @@ async def generate_text_from_prompt(
         response = await client.aio.models.generate_content(
             model=f'models/{model_name}',
             contents=contents,
-            generation_config=gen_config
+            config=gen_config
             # system_instruction=actual_system_instruction # Check if valid
         )
         api_call_duration = asyncio.get_event_loop().time() - api_call_start_time

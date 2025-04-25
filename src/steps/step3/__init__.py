@@ -36,24 +36,9 @@ DAYS_LOOKBACK = int(os.getenv("ENTITY_LOOKBACK_DAYS", "3"))
 ARTICLE_LIMIT = int(os.getenv("ENTITY_MAX_PRIORITY_ARTICLES", "2000"))
 BATCH_SIZE = int(os.getenv("ENTITY_EXTRACTION_BATCH_SIZE", "10"))
 
-# Tier-specific models and fallbacks
-TIER_MODELS = {
-    0: {  # Tier 0 (highest priority) - Top 30%
-        'primary': 'models/gemini-2.0-flash-thinking-exp-01-21',
-        'fallback': 'models/gemini-2.0-flash'
-    },
-    1: {  # Tier 1 (medium priority) - Next 50%
-        'primary': 'models/gemini-2.0-flash-exp',
-        'fallback': 'models/gemini-2.0-flash'
-    },
-    2: {  # Tier 2 (lowest priority) - Bottom 20%
-        'primary': 'models/gemini-2.0-flash',
-        'fallback': 'models/gemini-2.0-flash-lite'
-    }
-}
-
-# Global fallback model
-FALLBACK_MODEL = 'models/gemini-2.0-flash-lite'
+# Tier-specific models and fallbacks (REMOVED HARDCODED VALUES)
+# TIER_MODELS = { ... }
+# FALLBACK_MODEL = '...'
 
 # Error handling constants
 MAX_CONSECUTIVE_FAILURES = 3
@@ -98,6 +83,32 @@ async def run() -> Dict[str, Any]:
         gemini_client = GeminiClient()
         # Initialize a single TaskManager instance for the entire process
         task_manager = TaskManager()
+
+        # --- Load Model IDs from Environment --- #
+        # Tier 0 (Highest): Flash Exp primary, Flash fallback
+        tier0_primary_model = os.getenv(
+            "GEMINI_FLASH_EXP_MODEL_ID", "gemini-2.0-flash-exp")
+        tier0_fallback_model = os.getenv(
+            "GEMINI_FLASH_MODEL_ID", "gemini-2.0-flash")
+        # Tier 1 (Medium): Flash primary, Lite fallback
+        tier1_primary_model = os.getenv(
+            "GEMINI_FLASH_MODEL_ID", "gemini-2.0-flash")
+        tier1_fallback_model = os.getenv(
+            "GEMINI_FLASH_LITE_MODEL_ID", "gemini-2.0-flash-lite")
+        # Tier 2 (Lowest): Flash primary, Lite fallback
+        tier2_primary_model = os.getenv(
+            "GEMINI_FLASH_MODEL_ID", "gemini-2.0-flash")
+        tier2_fallback_model = os.getenv(
+            "GEMINI_FLASH_LITE_MODEL_ID", "gemini-2.0-flash-lite")
+
+        # Log the models being used for each tier
+        logger.info(
+            f"Tier 0 Models: Primary={tier0_primary_model}, Fallback={tier0_fallback_model}")
+        logger.info(
+            f"Tier 1 Models: Primary={tier1_primary_model}, Fallback={tier1_fallback_model}")
+        logger.info(
+            f"Tier 2 Models: Primary={tier2_primary_model}, Fallback={tier2_fallback_model}")
+        # -------------------------------------- #
 
         # For circuit breaker pattern
         consecutive_failures = 0
@@ -225,9 +236,16 @@ async def run() -> Dict[str, Any]:
                 # Default to tier 2 if missing
                 tier = article.get('processing_tier', 2)
 
-                # Assign primary and fallback models based on tier
-                article['model_to_use'] = TIER_MODELS[tier]['primary']
-                article['fallback_model'] = TIER_MODELS[tier]['fallback']
+                # Assign primary and fallback models based on tier using loaded env vars
+                if tier == 0:
+                    article['model_to_use'] = tier0_primary_model
+                    article['fallback_model'] = tier0_fallback_model
+                elif tier == 1:
+                    article['model_to_use'] = tier1_primary_model
+                    article['fallback_model'] = tier1_fallback_model
+                else:  # Tier 2 or default
+                    article['model_to_use'] = tier2_primary_model
+                    article['fallback_model'] = tier2_fallback_model
 
             # Log detailed information about tier distribution
             was_rebalanced = any(
@@ -345,7 +363,10 @@ async def run() -> Dict[str, Any]:
             # Add a delay between batches to allow rate limits to reset
             # Log rate limiter status for all models
             logger.info(f"Rate limiter status before cooling period:")
-            for model_name in gemini_client.ALL_MODEL_RPMS.keys():
+            # Iterate over models configured in the rate limiter
+            rate_limited_models = gemini_client.rate_limiter.model_rpm_limits.keys() if hasattr(
+                gemini_client, 'rate_limiter') and gemini_client.rate_limiter else []
+            for model_name in rate_limited_models:
                 if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
                     current_rpm = gemini_client.rate_limiter.get_current_rpm(
                         model_name)
@@ -557,14 +578,42 @@ async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Di
     # Create task definitions for each article
     tasks_definitions = []
 
+    # Get model preferences from client
+    preferred_models = gemini_client.preferred_model_ids
+    fallback_model_id = gemini_client.fallback_model_id
+    num_preferred = len(preferred_models)
+
     for article in articles:
         article_id = article.get('id')
         content = article.get('content')
-        tier = article.get('processing_tier')
-        model_to_use = article.get(
-            'model_to_use', TIER_MODELS[tier]['primary'])
-        fallback_model = article.get(
-            'fallback_model', TIER_MODELS[tier]['fallback'])
+        tier = article.get('processing_tier')  # Tier 0, 1, or 2
+
+        # --- Determine model_to_use and fallback_model based on tier ---
+        model_to_use = fallback_model_id  # Default to fallback
+        fallback_model = fallback_model_id  # Default to fallback
+
+        if tier == 0:  # Highest priority tier
+            model_to_use = preferred_models[0] if num_preferred > 0 else fallback_model_id
+            # Fallback for tier 0 is the second preference or the global fallback
+            if num_preferred > 1:
+                fallback_model = preferred_models[1]
+            else:
+                fallback_model = fallback_model_id
+        elif tier == 1:  # Medium priority tier
+            # Use second preference or global fallback as primary
+            if num_preferred > 1:
+                model_to_use = preferred_models[1]
+            else:
+                model_to_use = fallback_model_id
+            # Fallback for tier 1 is always the global fallback
+            fallback_model = fallback_model_id
+        # Tier 2 uses fallback_model_id for both primary and fallback (already set as default)
+
+        # model_to_use = article.get( # Old logic using TIER_MODELS
+        #     'model_to_use', TIER_MODELS[tier]['primary'])
+        # fallback_model = article.get(
+        #     'fallback_model', TIER_MODELS[tier]['fallback'])
+        # --- End model selection ---
 
         if not article_id or not content:
             logger.warning(
@@ -595,12 +644,13 @@ async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Di
         extraction_results = await task_manager.run_tasks(gemini_client, tasks_definitions)
 
         # Log rate limiter status after batch completion
-        if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
-            for model in gemini_client.ALL_MODEL_RPMS.keys():
-                current_rpm = gemini_client.rate_limiter.get_current_rpm(model)
-                wait_time = gemini_client.rate_limiter.get_wait_time(model)
-                logger.info(
-                    f"Rate limiter status - Model: {model}, Current RPM: {current_rpm}, Wait time: {wait_time:.2f}s")
+        # if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
+        #     for model in gemini_client.ALL_MODEL_RPMS.keys(): # Old way
+        #         current_rpm = gemini_client.rate_limiter.get_current_rpm(model)
+        #         wait_time = gemini_client.rate_limiter.get_wait_time(model)
+        #         logger.info(
+        #             f"Rate limiter status - Model: {model}, Current RPM: {current_rpm}, Wait time: {wait_time:.2f}s")
+        # ^^^ This logging is now done inside the main run loop, removed from here ^^^
 
         # Merge with skipped results
         extraction_results.update(skipped_results)

@@ -73,8 +73,7 @@ class RateLimiter:
             # Check if there's a limit for this model
             limit = self.model_rpm_limits.get(model_name)
             if limit is None:
-                logger.debug(
-                    f"RateLimiter [{model_name}]: No limit configured, no wait time needed.")
+                # logger.debug(f"RateLimiter [{model_name}]: No limit configured, no wait time needed.") # Removed debug log
                 return 0.0  # No wait needed if no limit is defined
 
             # Clean up old timestamps
@@ -92,7 +91,8 @@ class RateLimiter:
                 return 0.0
 
             if not timestamps:  # Should not happen if current_count >= limit, but safe check
-                logger.debug(
+                logger.warning(
+                    # Changed to WARNING
                     f"RateLimiter [{model_name}]: No timestamps found during wait time calculation.")
                 return 0.0
 
@@ -214,7 +214,8 @@ class RateLimiter:
             with self.lock:
                 timestamps = self.call_timestamps[model_name]
                 if not timestamps:  # Should not happen if is_allowed is False, but safe check
-                    logger.debug(
+                    logger.warning(
+                        # Changed to WARNING
                         f"RateLimiter [{model_name}]: No timestamps found while waiting, breaking wait loop.")
                     break
                 # Calculate how long to wait until the oldest call expires
@@ -239,15 +240,13 @@ class RateLimiter:
             model_name (str): The name of the model to check.
         """
         while not self.is_allowed(model_name):
-            # Added logging
-            logger.debug(
-                f"RateLimiter [{model_name}]: Acquiring lock for wait check...")
+            # logger.debug(f"RateLimiter [{model_name}]: Acquiring lock for wait check...") # Removed debug log
             with self.lock:
-                logger.debug(
-                    f"RateLimiter [{model_name}]: Acquired lock for wait check.")
+                # logger.debug(f"RateLimiter [{model_name}]: Acquired lock for wait check.") # Removed debug log
                 timestamps = self.call_timestamps[model_name]
                 if not timestamps:  # Should not happen if is_allowed is False, but safe check
-                    logger.debug(
+                    logger.warning(
+                        # Changed to WARNING
                         f"RateLimiter [{model_name}]: No timestamps found while waiting, breaking wait loop.")
                     break
                 # Calculate how long to wait until the oldest call expires
@@ -267,7 +266,6 @@ class RateLimiter:
             # Sleep outside the lock
             if wait_time > 0:
                 await asyncio.sleep(wait_time)
-                # Added logging
                 logger.debug(
                     f"RateLimiter [{model_name}]: Finished sleep of {wait_time:.2f}s. Re-checking limit...")
             else:

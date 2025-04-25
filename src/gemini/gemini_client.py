@@ -78,38 +78,13 @@ class GeminiClient:
     Includes model selection, rate limiting, and retry logic.
     """
 
-    # Define model preferences and fallback logic
-    # Order matters: Best/Preferred first
-    GENERATION_MODELS_CONFIG = {
-        # Use short IDs as keys for rate limiter consistency
-        # Updated to 2.0 versions based on logs
-        # RPM - Assuming this is a valid ID, check API/library docs if needed
-        'gemini-2.0-flash-thinking-exp-01-21': 10,
-        'gemini-2.0-flash-exp': 10,               # RPM - Assuming this is a valid ID
-        'gemini-2.0-flash': 15,            # RPM - Assuming this is the base 2.0 flash
-    }
-    # Use short ID
-    # Updated to 2.0 version based on logs
-    FALLBACK_MODEL = 'gemini-2.0-flash'
-    FALLBACK_MODEL_RPM = 30
-
-    # Combined dict for RateLimiter initialization using SHORT IDs
-    ALL_MODEL_RPMS = {
-        **GENERATION_MODELS_CONFIG,
-        FALLBACK_MODEL: FALLBACK_MODEL_RPM
-    }
-    # Add embedding model SHORT ID and RPM
-    # Extract short ID from the potentially prefixed env var
-    embedding_model_full = os.getenv(
-        "GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
-    embedding_model_short_id = embedding_model_full.split('/')[-1]
-    # Default to 150 RPM for embedding model if ENV VAR not set, matching observed API limit
-    embedding_rpm_limit = int(
-        os.getenv("GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE", "150"))
-    ALL_MODEL_RPMS[embedding_model_short_id] = embedding_rpm_limit
-    # Log the effective limit being used
-    # Temp variable for logging in __init__
-    _log_initial_rate_limit = embedding_rpm_limit
+    # --- REMOVED Hardcoded Model Config --- #
+    # GENERATION_MODELS_CONFIG = { ... }
+    # FALLBACK_MODEL = '...'
+    # FALLBACK_MODEL_RPM = ...
+    # ALL_MODEL_RPMS = { ... }
+    # _log_initial_rate_limit = ...
+    # --- END REMOVED Hardcoded Model Config --- #
 
     DEFAULT_PROMPT_PATH = "src/prompts/entity_extraction_prompt.txt"
 
@@ -119,20 +94,20 @@ class GeminiClient:
     def __init__(self):
         """
         Initialize the google-genai API client.
-        Loads the API key from environment variables, creates the client,
-        and initializes the rate limiter with model RPMs (using short model IDs).
+        Loads API key, model IDs, RPM limits, and token limits from environment variables.
+        Initializes the client and the rate limiter.
         """
         # Load environment variables
         load_dotenv()
 
-        # Get API key from environment
+        # --- API Key --- #
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             error_msg = "GEMINI_API_KEY environment variable not set"
             logger.critical(error_msg)
             raise ValueError(error_msg)
 
-        # Initialize the google-genai client
+        # --- Initialize the google-genai client --- #
         try:
             self.client = google_genai.Client(api_key=api_key)
             logger.info("google-genai client initialized successfully.")
@@ -141,38 +116,118 @@ class GeminiClient:
             logger.critical(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
 
-        # Embedding model configuration
-        self.embedding_model = os.getenv(
-            "GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
-        # Keep the full name with prefix for API calls, but use short ID for rate limiter
-        self.embedding_model_short_id = self.embedding_model.split('/')[-1]
-        # Store the full name separately if needed for API calls
-        # self.embedding_model_full = self.embedding_model
-
+        # --- Embedding Model Configuration --- #
+        # Note: Embedding model ID now includes models/ prefix from env var
+        self.embedding_model_id = os.getenv(
+            "GEMINI_EMBEDDING_MODEL_ID", "models/text-embedding-004")
+        self.embedding_rpm_limit = int(
+            os.getenv("GEMINI_EMBEDDING_RPM", "1500"))
         self.default_task_type = os.getenv(
-            "GEMINI_EMBEDDING_TASK_TYPE", "CLUSTERING")
+            "GEMINI_EMBEDDING_TASK_TYPE", "CLUSTERING")  # Still used for default
         self.embedding_input_token_limit = int(
             os.getenv("GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT", "2048"))
 
-        # Rate limit wait configuration
+        # --- Generation Model Configuration (Read all defined models) --- #
+        self.gen_input_token_limit = int(
+            os.getenv("GEMINI_GEN_INPUT_TOKEN_LIMIT", "1048576"))
+        self.gen_output_token_limit = int(
+            os.getenv("GEMINI_GEN_OUTPUT_TOKEN_LIMIT", "8192"))
+
+        # Dictionary to store model details (ID -> RPM)
+        model_rpm_limits = {}
+
+        # Embedding model
+        if self.embedding_model_id:
+            model_rpm_limits[self.embedding_model_id] = self.embedding_rpm_limit
+            logger.info(
+                f"Loaded Embedding Model: {self.embedding_model_id} (RPM: {self.embedding_rpm_limit})")
+
+        # Generation models (load if ID and RPM are defined)
+        gen_model_configs = [
+            # Removed: ("GEMINI_FLASH_THINKING_EXP", "gemini-2.0-flash-thinking-exp", 10),
+            # Added Flash Exp, using 10 RPM as proxy
+            ("GEMINI_FLASH_EXP", "gemini-2.0-flash-exp", 10),
+            ("GEMINI_FLASH", "gemini-2.0-flash", 15),
+            ("GEMINI_FLASH_LITE", "gemini-2.0-flash-lite", 30),
+            ("GEMINI_PREVIEW", "gemini-2.5-flash-preview-04-17", 10)  # Future use
+        ]
+
+        self.available_gen_models = []  # Store available model IDs
+        for prefix, default_id, default_rpm in gen_model_configs:
+            model_id = os.getenv(f"{prefix}_MODEL_ID", default_id)
+            rpm_str = os.getenv(f"{prefix}_RPM")
+            if model_id and rpm_str:
+                try:
+                    rpm = int(rpm_str)
+                    model_rpm_limits[model_id] = rpm
+                    self.available_gen_models.append(model_id)
+                    logger.info(
+                        f"Loaded Generation Model: {model_id} (RPM: {rpm})")
+                except ValueError:
+                    logger.warning(
+                        f"Invalid RPM value '{rpm_str}' for {prefix}_RPM env var. Skipping model {model_id}.")
+            elif model_id:
+                logger.warning(
+                    f"{prefix}_RPM environment variable not set for model {model_id}. Using hardcoded default RPM: {default_rpm}")
+                model_rpm_limits[model_id] = default_rpm
+                self.available_gen_models.append(model_id)
+
+        # --- Preferred Model Order and Fallback (IDs WITHOUT prefix)--- #
+        # pref_1 = os.getenv("GEMINI_MODEL_PREF_1", # Old default
+        #                    "gemini-2.0-flash-thinking-exp")
+        pref_1 = os.getenv("GEMINI_MODEL_PREF_1",  # New default
+                           "gemini-2.0-flash-exp")
+        pref_2 = os.getenv("GEMINI_MODEL_PREF_2", "gemini-2.0-flash")
+        pref_3 = os.getenv("GEMINI_MODEL_PREF_3", "gemini-2.0-flash-lite")
+        self.fallback_model_id = os.getenv(
+            "GEMINI_FALLBACK_MODEL_ID", "gemini-2.0-flash")
+
+        # Build the preferred model list dynamically based on availability
+        self.preferred_model_ids = []
+        for pref_model in [pref_1, pref_2, pref_3]:
+            if pref_model in model_rpm_limits:
+                self.preferred_model_ids.append(pref_model)
+            else:
+                logger.warning(
+                    f"Preferred model {pref_model} not found in loaded configs. Skipping.")
+
+        # Ensure fallback model is available and has an RPM limit
+        if self.fallback_model_id not in model_rpm_limits:
+            logger.warning(
+                f"Fallback model {self.fallback_model_id} specified in env var is not available or has no RPM limit. Attempting to use first preferred model as fallback.")
+            if self.preferred_model_ids:
+                self.fallback_model_id = self.preferred_model_ids[0]
+                logger.info(f"Using {self.fallback_model_id} as fallback.")
+            else:
+                # Critical fallback if no models configured properly
+                logger.error(
+                    "No valid generation models configured with RPM limits. Rate limiting will be ineffective.")
+                # Assign a dummy fallback ID to avoid errors, but log the issue
+                self.fallback_model_id = "gemini-2.0-flash"  # Default dummy
+                if self.fallback_model_id not in model_rpm_limits:
+                    # Add dummy limit
+                    model_rpm_limits[self.fallback_model_id] = 15
+
+        logger.info(f"Preferred model order: {self.preferred_model_ids}")
+        logger.info(f"Fallback model: {self.fallback_model_id}")
+
+        # --- Rate Limit Configuration --- #
         self.max_rate_limit_wait_seconds = float(os.getenv(
             "GEMINI_MAX_WAIT_SECONDS", str(self.DEFAULT_MAX_RATE_LIMIT_WAIT_SECONDS)))
         logger.info(
             f"Maximum rate limit wait time set to {self.max_rate_limit_wait_seconds} seconds")
 
-        # Initialize Rate Limiter if available
+        # --- Initialize Rate Limiter --- #
         if RateLimiter:
-            self.rate_limiter = RateLimiter(self.ALL_MODEL_RPMS)
+            self.rate_limiter = RateLimiter(
+                model_rpm_limits)  # Use dynamically built dict
             logger.info(
-                f"GeminiClient initialized with RateLimiter. Config: {self.ALL_MODEL_RPMS}")
-            # Log the specific embedding limit being used (accessing the stored value)
-            logger.info(
-                f"Effective rate limit for embedding model '{self.embedding_model_short_id}': {self.ALL_MODEL_RPMS.get(self.embedding_model_short_id, 'N/A')} RPM")
+                f"GeminiClient initialized with RateLimiter. Config: {model_rpm_limits}")
         else:
             self.rate_limiter = None
             logger.warning("GeminiClient initialized WITHOUT RateLimiter.")
 
-        # Load the generation prompt template
+        # --- Load Prompt Template --- #
         self.prompt_template = self._load_prompt_template()
 
     def _load_prompt_template(self, prompt_path: str = DEFAULT_PROMPT_PATH) -> Optional[str]:
@@ -200,9 +255,11 @@ class GeminiClient:
         # Use task_type from argument or default from environment
         task_type = task_type or self.default_task_type
         delay = initial_delay
-        model_to_use_for_api = self.embedding_model  # Full name for API call
+        # Use stored ID directly (contains models/)
+        model_to_use_for_api = self.embedding_model_id
         # Short name for rate limiter
-        model_to_use_for_limiter = self.embedding_model_short_id
+        # Use the ID with prefix for rate limiter key consistency
+        model_to_use_for_limiter = self.embedding_model_id
 
         # Validate input text
         if not text or not isinstance(text, str) or len(text.strip()) == 0:
@@ -227,7 +284,7 @@ class GeminiClient:
                 if self.rate_limiter:
                     self.rate_limiter.wait_if_needed(model_to_use_for_limiter)
 
-                # Generate embedding using the new client and method (use full name)
+                # Generate embedding using the new client and method (use full name/ID directly)
                 result = self.client.models.embed_content(
                     model=model_to_use_for_api,
                     contents=text
@@ -327,47 +384,47 @@ class GeminiClient:
         full_prompt = self.prompt_template.replace(
             "{ARTICLE_CONTENT_HERE}", article_content)
 
-        # --- Model Selection Logic (mirrors async version but uses IDs) ---
-        if model_override and model_override.startswith("models/"):
-            model_override_id = model_override.split('/')[-1]
-            preferred_models = [model_override_id]
-            all_models_to_try_ids = preferred_models + \
-                [m.split('/')[-1] for m in self.GENERATION_MODELS_CONFIG.keys()] + \
-                [self.FALLBACK_MODEL.split('/')[-1]]
+        # --- Model Selection Logic (Uses instance vars) --- #
+        if model_override and model_override in self.available_gen_models:
+            all_models_to_try_ids = [
+                model_override] + self.preferred_model_ids + [self.fallback_model_id]
+            all_models_to_try_ids = list(dict.fromkeys(all_models_to_try_ids))
+        elif model_override:
+            logger.warning(
+                f"Model override '{model_override}' not found in available models. Using default preference order.")
+            all_models_to_try_ids = self.preferred_model_ids + \
+                [self.fallback_model_id]
             all_models_to_try_ids = list(dict.fromkeys(all_models_to_try_ids))
         else:
-            preferred_models = [m.split('/')[-1]
-                                for m in self.GENERATION_MODELS_CONFIG.keys()]
-            all_models_to_try_ids = preferred_models + \
-                [self.FALLBACK_MODEL.split('/')[-1]]
+            all_models_to_try_ids = self.preferred_model_ids + \
+                [self.fallback_model_id]
             all_models_to_try_ids = list(dict.fromkeys(all_models_to_try_ids))
+
         logger.debug(f"SYNC: Model sequence to try: {all_models_to_try_ids}")
-        # --- End Model Selection ---
+        # --- End Model Selection --- #
 
         current_delay = initial_delay
         total_attempts = 0
         rate_limited_models = set()
 
         for model_id in all_models_to_try_ids:
-            logger.debug(
-                f"SYNC: Attempting text generation with model: {model_id}")
+            # logger.debug(f"SYNC: Attempting text generation with model: {model_id}") # Removed debug log
 
-            # --- Emergency Bailout (sync version) ---
-            fallback_model_id = self.FALLBACK_MODEL.split('/')[-1]
-            if len(rate_limited_models) >= len(all_models_to_try_ids) - 1 and model_id == fallback_model_id:
+            # --- Emergency Bailout (sync version) --- #
+            if len(rate_limited_models) >= len(all_models_to_try_ids) - 1 and model_id == self.fallback_model_id:
                 logger.warning(
-                    f"SYNC: Forcing use of fallback model {fallback_model_id}...")
+                    f"SYNC: Forcing use of fallback model {self.fallback_model_id}...")
                 if self.rate_limiter:
                     # Wait potentially long time for fallback (sync)
                     max_wait = 120
                     start_time = time.monotonic()
                     while time.monotonic() - start_time < max_wait:
                         wait_time = self.rate_limiter.get_wait_time(
-                            fallback_model_id)
+                            self.fallback_model_id)
                         if wait_time <= 0:
                             break
                         time.sleep(min(wait_time, 5))
-                    self.rate_limiter.wait_if_needed(fallback_model_id)
+                    # self.rate_limiter.wait_if_needed(self.fallback_model_id) # This wait happens below anyway
             # --- End Bailout ---
 
             # --- Rate Limit Check (sync) ---
@@ -376,8 +433,7 @@ class GeminiClient:
                 if not is_allowed:
                     wait_time = self.rate_limiter.get_wait_time(model_id)
                     if 0 < wait_time <= max_wait_threshold:
-                        logger.debug(
-                            f"SYNC: Rate limit hit for {model_id}. Waiting {wait_time:.2f}s...")
+                        # logger.debug(f"SYNC: Rate limit hit for {model_id}. Waiting {wait_time:.2f}s...") # Removed debug log
                         self.rate_limiter.wait_if_needed(model_id)
                     else:
                         logger.warning(
@@ -392,8 +448,7 @@ class GeminiClient:
             while model_attempt < max_model_retries and total_attempts < retries:
                 total_attempts += 1
                 model_attempt += 1
-                logger.debug(
-                    f"SYNC: Attempt {model_attempt}/{max_model_retries} for model {model_id}, total attempt {total_attempts}/{retries}")
+                # logger.debug(f"SYNC: Attempt {model_attempt}/{max_model_retries} for model {model_id}, total attempt {total_attempts}/{retries}") # Removed debug log
 
                 try:
                     if self.rate_limiter:
@@ -413,12 +468,11 @@ class GeminiClient:
                     )
                     # --- END NEW SYNC API CALL ---
 
-                    logger.debug(
-                        f"SYNC: [RESPONSE] Full response from {model_id}: {response}")
+                    # logger.debug(f"SYNC: [RESPONSE] Full response from {model_id}: {response}") # Removed debug log
                     usage_metadata = getattr(response, 'usage_metadata', None)
                     if usage_metadata:
-                        logger.debug(
-                            f"SYNC: [USAGE] {model_id} usage metadata: {usage_metadata}")
+                        # logger.debug(f"SYNC: [USAGE] {model_id} usage metadata: {usage_metadata}") # Removed debug log
+                        pass  # Keep structure, log removed
 
                     if self.rate_limiter:
                         self.rate_limiter.register_call(
@@ -536,31 +590,31 @@ class GeminiClient:
             if fallback_model_id and fallback_model_id not in preferred_models:
                 preferred_models.append(fallback_model_id)
             all_models_to_try_ids = preferred_models + \
-                [m.split('/')[-1] for m in self.GENERATION_MODELS_CONFIG.keys()] + \
-                [self.FALLBACK_MODEL.split('/')[-1]]
+                [m.split('/')[-1] for m in self.available_gen_models] + \
+                [self.fallback_model_id]
             all_models_to_try_ids = list(dict.fromkeys(all_models_to_try_ids))
         else:
             # Default selection
             preferred_models = [m.split('/')[-1]
-                                for m in self.GENERATION_MODELS_CONFIG.keys()]
+                                for m in self.available_gen_models]
             fallback_model_id = fallback_model.split(
                 '/')[-1] if fallback_model else None
             if fallback_model_id and fallback_model_id not in preferred_models:
                 preferred_models.insert(0, fallback_model_id)
             all_models_to_try_ids = preferred_models + \
-                [self.FALLBACK_MODEL.split('/')[-1]]
+                [self.fallback_model_id]
             all_models_to_try_ids = list(dict.fromkeys(all_models_to_try_ids))
-        logger.debug(f"Model sequence to try: {all_models_to_try_ids}")
+        # logger.debug(f"Model sequence to try: {all_models_to_try_ids}") # Removed debug log
 
         current_delay = initial_delay
         total_attempts = 0
         rate_limited_models = set()
 
         for model_id in all_models_to_try_ids:  # Iterate through model IDs
-            logger.debug(f"Attempting text generation with model: {model_id}")
+            # logger.debug(f"Attempting text generation with model: {model_id}") # Removed debug log
 
             # Emergency bailout - if all models are rate limited except fallback, force use of fallback
-            fallback_model_id = self.FALLBACK_MODEL.split('/')[-1]
+            fallback_model_id = self.fallback_model_id
             if len(rate_limited_models) >= len(all_models_to_try_ids) - 1 and model_id == fallback_model_id:
                 logger.warning(
                     f"Forcing use of fallback model {fallback_model_id}...")
@@ -583,7 +637,7 @@ class GeminiClient:
                         await asyncio.sleep(min(wait_time, 5))
 
                     # Even if we're still rate limited, we'll try anyway since this is our last resort
-                    await self.rate_limiter.wait_if_needed_async(fallback_model_id)
+                    # await self.rate_limiter.wait_if_needed_async(fallback_model_id) # Wait happens below anyway
 
             # Check rate limit *before* attempting the call (using model_id)
             if self.rate_limiter:
@@ -591,17 +645,15 @@ class GeminiClient:
                 if not is_allowed:
                     wait_time = await self.rate_limiter.get_wait_time_async(model_id)
                     if 0 < wait_time <= max_wait_threshold:
-                        logger.debug(
-                            f"Rate limit hit for {model_id}. Waiting {wait_time:.2f}s...")
+                        # logger.debug(f"Rate limit hit for {model_id}. Waiting {wait_time:.2f}s...") # Removed debug log
                         await self.rate_limiter.wait_if_needed_async(model_id)
                     else:
                         logger.warning(
                             f"Rate limit wait for {model_id} ({wait_time:.2f}s) > threshold ({max_wait_threshold}s). Skipping.")
                         rate_limited_models.add(model_id)
                         continue
-            else:
-                logger.debug(
-                    "Rate limiter not available, proceeding without check.")
+            # else: # Removed unnecessary else block
+                # logger.debug("Rate limiter not available, proceeding without check.") # Removed debug log
 
             model_attempt = 0
             max_model_retries = 2
@@ -610,21 +662,17 @@ class GeminiClient:
                 total_attempts += 1
                 model_attempt += 1
                 task_start_time = time.monotonic()
-                logger.debug(
-                    f"Attempt {model_attempt}/{max_model_retries} for model {model_id}, total attempt {total_attempts}/{retries}")
+                # logger.debug(f"Attempt {model_attempt}/{max_model_retries} for model {model_id}, total attempt {total_attempts}/{retries}") # Removed debug log
 
                 try:
                     if self.rate_limiter:
-                        logger.debug(
-                            f"[{model_id}] Attempt {model_attempt}: Checking/Waiting for rate limit...")
+                        # logger.debug(f"[{model_id}] Attempt {model_attempt}: Checking/Waiting for rate limit...") # Removed debug log
                         await self.rate_limiter.wait_if_needed_async(model_id)
-                        logger.debug(
-                            f"[{model_id}] Attempt {model_attempt}: Rate limit check passed/wait finished.")
+                        # logger.debug(f"[{model_id}] Attempt {model_attempt}: Rate limit check passed/wait finished.") # Removed debug log
 
                     # --- NEW API CALL ---
                     api_call_timeout_seconds = 120
-                    logger.debug(
-                        f"[{model_id}] Attempt {model_attempt}: Calling generate_content_async (timeout={api_call_timeout_seconds}s)...")
+                    # logger.debug(f"[{model_id}] Attempt {model_attempt}: Calling generate_content_async (timeout={api_call_timeout_seconds}s)...") # Removed debug log
 
                     # Define generation config using new types if necessary
                     # Check google-genai docs for exact config class & parameters
@@ -648,17 +696,15 @@ class GeminiClient:
                         timeout=api_call_timeout_seconds
                     )
                     call_duration = time.monotonic() - task_start_time
-                    logger.debug(
-                        f"[{model_id}] Attempt {model_attempt}: generate_content_async call succeeded in {call_duration:.2f}s.")
+                    # logger.debug(f"[{model_id}] Attempt {model_attempt}: generate_content_async call succeeded in {call_duration:.2f}s.") # Removed debug log
                     # --- END NEW API CALL ---
 
-                    logger.debug(
-                        f"[RESPONSE] Full response from {model_id}: {response}")
+                    # logger.debug(f"[RESPONSE] Full response from {model_id}: {response}") # Removed debug log
                     # Check new response structure
                     usage_metadata = getattr(response, 'usage_metadata', None)
                     if usage_metadata:
-                        logger.debug(
-                            f"[USAGE] {model_id} usage metadata: {usage_metadata}")
+                        # logger.debug(f"[USAGE] {model_id} usage metadata: {usage_metadata}") # Removed debug log
+                        pass  # Keep structure, log removed
                     # ... (Rate limiter registration call remains the same) ...
                     if self.rate_limiter:
                         await self.rate_limiter.register_call_async(model_id)
@@ -766,16 +812,21 @@ class GeminiClient:
 
     async def analyze_articles_with_prompt(self, articles_data: List[Dict[str, Any]],
                                            prompt_file_path: str,
-                                           model_name: str,  # Ensure this is a valid model ID like 'gemini-1.5-flash-latest'
+                                           model_name: str,  # Expecting model ID like 'gemini-1.5-flash-latest'
                                            system_instruction: Optional[str] = None,
                                            temperature: float = 0.2,
-                                           max_output_tokens: int = 8192,
+                                           # Made Optional
+                                           max_output_tokens: Optional[int] = None,
                                            retries: int = 3,
                                            initial_delay: float = 1.0) -> Optional[str]:
         """
         Delegates article analysis to the generator module.
         Ensures the model name/ID passed is compatible with the generator module's expectations.
+        Uses the configured output token limit as default if not specified.
         """
+        # Determine effective output token limit
+        effective_max_output_tokens = max_output_tokens if max_output_tokens is not None else self.gen_output_token_limit
+
         model_id = model_name.split('/')[-1]
         # Define default system instruction here
         default_system_instruction = """The AI agent should adopt an academic persona—specifically."""
@@ -789,7 +840,7 @@ class GeminiClient:
             model_name=model_id,  # Pass the ID
             system_instruction=actual_system_instruction,
             temperature=temperature,
-            max_output_tokens=max_output_tokens,
+            max_output_tokens=effective_max_output_tokens,
             # Retries now handled within GeminiClient methods calling this
             # retries=retries,
             # initial_delay=initial_delay,
@@ -801,17 +852,23 @@ class GeminiClient:
                                          model_name: Optional[str] = None,
                                          system_instruction: Optional[str] = None,
                                          temperature: float = 0.7,
-                                         max_output_tokens: int = 8192,
+                                         # Made Optional
+                                         max_output_tokens: Optional[int] = None,
                                          save_debug_info: bool = True,
                                          debug_info_prefix: str = "essay_prompt") -> Optional[str]:
         """
         Delegates essay generation to the generator module.
         Ensures the model name/ID passed is compatible with the generator module's expectations.
+        Uses the configured preferred model and output token limit as defaults.
         """
-        default_gen_model_id = os.getenv("GEMINI_FLASH_THINKING_MODEL",
-                                         "gemini-1.5-flash-latest").split('/')[-1]
+        # Determine effective model and output token limit
+        # Default to first preferred model if available, else fallback
+        default_gen_model_id = self.preferred_model_ids[
+            0] if self.preferred_model_ids else self.fallback_model_id
         effective_model_id = model_name.split(
             '/')[-1] if model_name else default_gen_model_id
+        effective_max_output_tokens = max_output_tokens if max_output_tokens is not None else self.gen_output_token_limit
+
         # Define default system instruction here
         default_essay_system_instruction = """You are an expert analytical writer tasked with synthesizing information. Follow the instructions precisely and generate a coherent, well-structured text based *only* on the provided context."""
         actual_system_instruction = system_instruction or default_essay_system_instruction
@@ -823,7 +880,7 @@ class GeminiClient:
             model_name=effective_model_id,  # Pass the ID
             system_instruction=actual_system_instruction,
             temperature=temperature,
-            max_output_tokens=max_output_tokens,
+            max_output_tokens=effective_max_output_tokens,
             rate_limiter=self.rate_limiter,
             save_debug_info=save_debug_info,
             debug_info_prefix=debug_info_prefix

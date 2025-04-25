@@ -45,42 +45,65 @@ services:
       MAX_WORKERS: 4 # Number of parallel workers for processing
       DB_UPDATE_BATCH_SIZE: 20 # Batch size for DB inserts in Step 1.4
       CHECKPOINT_INTERVAL_SECONDS: 60 # Interval for DB updates
-      # Gemini API settings
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-YOUR_API_KEY_HERE}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-models/text-embedding-004}
-      GEMINI_EMBEDDING_TASK_TYPE: ${GEMINI_EMBEDDING_TASK_TYPE:-CLUSTERING}
-      GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT: ${GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT:-2048}
-      GEMINI_EMBEDDING_OUTPUT_DIMENSION: ${GEMINI_EMBEDDING_OUTPUT_DIMENSION:-768}
-      GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE: ${GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE:-1500}
 
-      # --- Gemini Generation Models --- #
-      # Shared limits
+      # --- Gemini API Key ---
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-YOUR_API_KEY_HERE}
+
+      # --- Gemini Embedding Model ---
+      GEMINI_EMBEDDING_MODEL_ID: ${GEMINI_EMBEDDING_MODEL_ID:-models/text-embedding-004}
+      GEMINI_EMBEDDING_RPM: ${GEMINI_EMBEDDING_RPM:-1500} # Default RPM
+      GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT: ${GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT:-2048} # For warnings
+      GEMINI_EMBEDDING_TASK_TYPE: ${GEMINI_EMBEDDING_TASK_TYPE:-CLUSTERING}
+      GEMINI_EMBEDDING_OUTPUT_DIMENSION: ${GEMINI_EMBEDDING_OUTPUT_DIMENSION:-768}
+      # Note: TPM/RPD not typically limited for embedding models in the same way
+
+      # --- Gemini Generation Models (Current Use) ---
+      # Shared Limits
       GEMINI_GEN_INPUT_TOKEN_LIMIT: ${GEMINI_GEN_INPUT_TOKEN_LIMIT:-1048576}
       GEMINI_GEN_OUTPUT_TOKEN_LIMIT: ${GEMINI_GEN_OUTPUT_TOKEN_LIMIT:-8192}
-      # Model: gemini-2.0-flash (Default)
-      GEMINI_FLASH_MODEL: ${GEMINI_FLASH_MODEL:-gemini-1.5-flash-latest}
-      # GEMINI_FLASH_RPM: ${GEMINI_FLASH_RPM:-15}
-      # GEMINI_FLASH_TPM: ${GEMINI_FLASH_TPM:-1000000}
-      # GEMINI_FLASH_RPD: ${GEMINI_FLASH_RPD:-1500}
-      # Model: gemini-2.0-flash-thinking-exp-01-21
-      GEMINI_FLASH_THINKING_MODEL: ${GEMINI_FLASH_THINKING_MODEL:-gemini-1.5-flash-latest}
-      # GEMINI_FLASH_THINKING_RPM: ${GEMINI_FLASH_THINKING_RPM:-10}
-      # GEMINI_FLASH_THINKING_TPM: ${GEMINI_FLASH_THINKING_TPM:-4000000}
-      # GEMINI_FLASH_THINKING_RPD: ${GEMINI_FLASH_THINKING_RPD:-1500}
-      # Model: gemini-2.0-flash-exp
-      # GEMINI_FLASH_EXP_MODEL: ${GEMINI_FLASH_EXP_MODEL:-models/gemini-2.0-flash-exp}
-      # GEMINI_FLASH_EXP_RPM: ${GEMINI_FLASH_EXP_RPM:-10}
-      # GEMINI_FLASH_EXP_TPM: ${GEMINI_FLASH_EXP_TPM:-1000000}
-      # GEMINI_FLASH_EXP_RPD: ${GEMINI_FLASH_EXP_RPD:-1500}
-      # Model: gemini-2.0-flash-lite (Fallback)
-      GEMINI_FLASH_LITE_MODEL: ${GEMINI_FLASH_LITE_MODEL:-gemini-1.5-flash-latest}
-      # GEMINI_FLASH_LITE_RPM: ${GEMINI_FLASH_LITE_RPM:-30}
-      # GEMINI_FLASH_LITE_TPM: ${GEMINI_FLASH_LITE_TPM:-1000000}
-      # GEMINI_FLASH_LITE_RPD: ${GEMINI_FLASH_LITE_RPD:-1500}
-      # Rate limit wait settings for intelligent model selection
-      GEMINI_MAX_WAIT_SECONDS: ${GEMINI_MAX_WAIT_SECONDS:-40}
 
-      # --- Other Settings --- #
+      # Model: gemini-2.0-flash-exp (Now highest priority)
+      GEMINI_FLASH_EXP_MODEL_ID: ${GEMINI_FLASH_EXP_MODEL_ID:-gemini-2.0-flash-exp}
+      GEMINI_FLASH_EXP_RPM: ${GEMINI_FLASH_EXP_RPM:-10} # Using thinking-exp RPM as proxy
+      GEMINI_FLASH_EXP_TPM: ${GEMINI_FLASH_EXP_TPM:-4000000} # Using thinking-exp TPM as proxy
+      GEMINI_FLASH_EXP_RPD: ${GEMINI_FLASH_EXP_RPD:-1500} # Using thinking-exp RPD as proxy
+      GEMINI_FLASH_EXP_THINKING: ${GEMINI_FLASH_EXP_THINKING:-true} # Assuming true like thinking-exp
+      GEMINI_FLASH_EXP_GROUNDING: ${GEMINI_FLASH_EXP_GROUNDING:-true} # Assuming true like thinking-exp
+
+      # Model: gemini-2.0-flash (Now medium priority)
+      GEMINI_FLASH_MODEL_ID: ${GEMINI_FLASH_MODEL_ID:-gemini-2.0-flash}
+      GEMINI_FLASH_RPM: ${GEMINI_FLASH_RPM:-15}
+      GEMINI_FLASH_TPM: ${GEMINI_FLASH_TPM:-1000000}
+      GEMINI_FLASH_RPD: ${GEMINI_FLASH_RPD:-1500}
+      GEMINI_FLASH_THINKING: ${GEMINI_FLASH_THINKING:-true}
+      GEMINI_FLASH_GROUNDING: ${GEMINI_FLASH_GROUNDING:-true}
+
+      # Model: gemini-2.0-flash-lite
+      GEMINI_FLASH_LITE_MODEL_ID: ${GEMINI_FLASH_LITE_MODEL_ID:-gemini-2.0-flash-lite}
+      GEMINI_FLASH_LITE_RPM: ${GEMINI_FLASH_LITE_RPM:-30}
+      GEMINI_FLASH_LITE_TPM: ${GEMINI_FLASH_LITE_TPM:-1000000}
+      GEMINI_FLASH_LITE_RPD: ${GEMINI_FLASH_LITE_RPD:-1500}
+      GEMINI_FLASH_LITE_THINKING: ${GEMINI_FLASH_LITE_THINKING:-false}
+      GEMINI_FLASH_LITE_GROUNDING: ${GEMINI_FLASH_LITE_GROUNDING:-false}
+
+      # --- Gemini Generation Models (Future Use) ---
+      # Model: gemini-2.5-flash-preview-04-17
+      GEMINI_PREVIEW_MODEL_ID: ${GEMINI_PREVIEW_MODEL_ID:-gemini-2.5-flash-preview-04-17}
+      GEMINI_PREVIEW_RPM: ${GEMINI_PREVIEW_RPM:-10}
+      GEMINI_PREVIEW_TPM: ${GEMINI_PREVIEW_TPM:-250000}
+      GEMINI_PREVIEW_RPD: ${GEMINI_PREVIEW_RPD:-500}
+      GEMINI_PREVIEW_THINKING: ${GEMINI_PREVIEW_THINKING:-true}
+      GEMINI_PREVIEW_GROUNDING: ${GEMINI_PREVIEW_GROUNDING:-true}
+      GEMINI_PREVIEW_OUTPUT_TOKEN_LIMIT: ${GEMINI_PREVIEW_OUTPUT_TOKEN_LIMIT:-65536}
+
+      # --- Model Selection Preferences ---
+      GEMINI_MODEL_PREF_1: ${GEMINI_MODEL_PREF_1:-gemini-2.0-flash-exp} # NEW Highest priority
+      GEMINI_MODEL_PREF_2: ${GEMINI_MODEL_PREF_2:-gemini-2.0-flash} # Medium priority
+      GEMINI_MODEL_PREF_3: ${GEMINI_MODEL_PREF_3:-gemini-2.0-flash-lite} # Lowest priority
+      GEMINI_FALLBACK_MODEL_ID: ${GEMINI_FALLBACK_MODEL_ID:-gemini-2.0-flash} # Fallback
+
+      # --- Other Settings (Rate Limiting & General) ---
+      GEMINI_MAX_WAIT_SECONDS: ${GEMINI_MAX_WAIT_SECONDS:-40}
       # Python path for Google imports
       PYTHONPATH: /app
       # Debug flag for imports
