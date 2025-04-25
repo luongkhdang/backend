@@ -243,6 +243,7 @@ def run_article_retrieval_and_ranking(query_text: str, article_ids: List[int]) -
                 'title': item.get('title'),
                 'domain': item.get('domain'),
                 'pub_date': str(item.get('pub_date')) if item.get('pub_date') else None,
+                'frame_phrases': item.get('frame_phrases'),
                 # Add other relevant metadata from articles table if needed
             }
             # Create Document, ensuring content is a string

@@ -50,10 +50,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_GROUP_FILE = "src/steps/step5/group.json"
 DEFAULT_OUTPUT_DIR = "src/output/essays"
 DEFAULT_PROMPT_TEMPLATE = "src/prompts/haystack_prompt.txt"
-CONTEXT_SELECTION_LIMIT = 20  # Total items (historical docs + structured data)
-MAX_HISTORICAL_DOCS_IN_CONTEXT = 10
+CONTEXT_SELECTION_LIMIT = 40  # Total items (historical docs + structured data)
+MAX_HISTORICAL_DOCS_IN_CONTEXT = 20
 # Max each for events, policies, relationships
-MAX_STRUCTURED_ITEMS_IN_CONTEXT = 10
+MAX_STRUCTURED_ITEMS_IN_CONTEXT = 20
 
 
 def load_group_data(group_file_path: str) -> Optional[Dict[str, Any]]:
@@ -288,7 +288,6 @@ def assemble_final_context(group_rationale: str,
 
     # Format Historical articles context into a detailed string
     # Requires fetching extra details for the selected historical docs
-    db_client_temp = ReaderDBClient()  # Need a DB client instance here
     TARGET_FRAME_PHRASES = {"Intriguing_angles",
                             "Theories_and_interpretations"}
     MAX_ENTITIES_PER_ARTICLE = 5
@@ -297,67 +296,74 @@ def assemble_final_context(group_rationale: str,
     try:
         for i, doc in enumerate(selected_historical_docs):
             article_id = doc.meta.get('id')
-            if not article_id:
-                logger.warning(
-                    f"Skipping historical document at index {i}: Missing ID in metadata.")
-                continue
+            # Use title/domain/pub_date directly from doc.meta
+            title = doc.meta.get('title', 'N/A')
+            domain = doc.meta.get('domain', 'N/A')
+            pub_date = doc.meta.get('pub_date', 'N/A')
+            # Get frame_phrases directly from doc.meta
+            frame_phrases = doc.meta.get(
+                'frame_phrases', [])  # Default to empty list
 
-            # Fetch full article data (needed for frames and potentially checking content)
-            article_data = db_client_temp.get_article_by_id(article_id)
-            if not article_data:
-                logger.warning(
-                    f"Could not retrieve full data for historical article ID: {article_id}")
-                # Fallback to using only info from Haystack Document
-                s = f"Historical Article {i+1} (ID: {article_id}):\n"
-                s += f"  Title: {doc.meta.get('title', 'N/A')}\n"
-                s += f"  Source: {doc.meta.get('domain', 'N/A')} ({doc.meta.get('pub_date', 'N/A')})\n"
-                s += f"  Content: {doc.content}\n"
-                historical_articles_str_list.append(s)
-                continue
+            s = f"Historical Article {i+1} (ID: {article_id if article_id else 'N/A'}):\n"
+            s += f"  Title: {title}\n"
+            s += f"  Source: {domain} ({pub_date})\n"
 
-            # Format using fetched data
-            s = f"Historical Article {i+1} (ID: {article_id}):\n"
-            s += f"  Title: {article_data.get('title', 'N/A')}\n"
-            s += f"  Source: {article_data.get('domain', 'N/A')} ({str(article_data.get('pub_date')) if article_data.get('pub_date') else 'N/A'})\n"
-
-            # Add filtered frame phrases
-            frame_phrases = article_data.get("frame_phrases", [])
-            if frame_phrases:
+            # Add filtered frame phrases (using phrases from meta)
+            if frame_phrases:  # Check if list is not None and not empty
                 filtered_frames = [phrase for phrase in frame_phrases
                                    if any(target in phrase for target in TARGET_FRAME_PHRASES)]
                 if filtered_frames:
                     s += f"  Narrative Frames: {'; '.join(filtered_frames)}\n"
+            # else: # Optional: log if frame_phrases were expected but missing
+            #     logger.debug(f"No frame_phrases found in metadata for historical article ID: {article_id}")
 
-            # Add top entities and snippets
-            top_entities = db_client_temp.get_top_entities_with_influence_flag(
-                article_id, limit=MAX_ENTITIES_PER_ARTICLE)
-            if top_entities:
-                s += "  Key Entities Mentioned:\n"
-                for entity_info in top_entities:
-                    entity_id = entity_info.get('entity_id')
-                    entity_name = entity_info.get('name', 'Unknown Entity')
-                    if not entity_id:
-                        continue
+            # --- Keep the logic for fetching Entities + Snippets using the main db_client ---
+            # Need the main db_client passed into this function, or recreate it here if necessary.
+            # Assuming db_client is available in this scope or passed in.
+            # If not, we need to adjust how db_client is accessed.
+            # For now, assuming db_client exists (e.g., passed from process_group)
 
-                    snippets = db_client_temp.get_article_entity_snippets(
-                        article_id=article_id, entity_id=entity_id)
-                    snippet_texts = [
-                        snip.get('snippet', '') for snip in snippets if snip and snip.get('snippet')]
+            # Re-instantiate db_client if needed within the loop, or pass it in.
+            # For simplicity here, let's assume db_client needs to be instantiated per loop iteration for now
+            # Ideally, pass the main db_client instance to this function.
+            # Re-creating - TODO: Refactor to pass main client
+            db_client_temp = ReaderDBClient()
+            try:
+                if article_id:  # Only fetch entities if we have an ID
+                    top_entities = db_client_temp.get_top_entities_with_influence_flag(
+                        article_id, limit=MAX_ENTITIES_PER_ARTICLE)
+                    if top_entities:
+                        s += "  Key Entities Mentioned:\n"
+                        for entity_info in top_entities:
+                            entity_id = entity_info.get('entity_id')
+                            entity_name = entity_info.get(
+                                'name', 'Unknown Entity')
+                            if not entity_id:
+                                continue
 
-                    s += f"    - {entity_name}:\n"
-                    if snippet_texts:
-                        for snippet in snippet_texts:
-                            s += f"      > Snippet: {snippet}\n"
-                    else:
-                        s += "      (No specific snippets retrieved for this entity in this article)\n"
+                            snippets = db_client_temp.get_article_entity_snippets(
+                                article_id=article_id, entity_id=entity_id)
+                            snippet_texts = [
+                                snip.get('snippet', '') for snip in snippets if snip and snip.get('snippet')]
+
+                            s += f"    - {entity_name}:\n"
+                            if snippet_texts:
+                                for snippet in snippet_texts:
+                                    s += f"      > Snippet: {snippet}\n"
+                            else:
+                                s += "      (No specific snippets retrieved for this entity in this article)\n"
+            finally:
+                db_client_temp.close()  # Close the temporary client
+            # --- End Entities/Snippets ---
 
             # Add content (use content from the Haystack Document as it was retrieved)
             s += f"  Content: {doc.content}\n"
             historical_articles_str_list.append(s)
 
     finally:
-        # Ensure temporary DB client is closed
-        db_client_temp.close()
+        # Remove the final close for the removed temporary client
+        # db_client_temp.close()
+        pass  # No temporary client to close here anymore
 
     historical_context_str = "\n---\n".join(
         historical_articles_str_list) if historical_articles_str_list else "No relevant historical articles found or processed."

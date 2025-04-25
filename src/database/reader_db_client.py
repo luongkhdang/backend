@@ -689,6 +689,7 @@ class ReaderDBClient:
                         a.content, -- Include content for Haystack Document
                         a.pub_date, 
                         a.domain, 
+                        a.frame_phrases,
                         1 - (e.embedding <=> %s::vector) as similarity -- Ensure type casting if needed
                     FROM embeddings e
                     JOIN articles a ON e.article_id = a.id
