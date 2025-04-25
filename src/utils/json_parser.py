@@ -52,7 +52,6 @@ def parse_json(
         return json5.loads(json_str), None
     except Exception as e:
         json5_error = f"json5 parsing error: {str(e)}"
-        logger.debug(json5_error)
 
         # Fall back to standard json if configured
         if fallback_to_standard:

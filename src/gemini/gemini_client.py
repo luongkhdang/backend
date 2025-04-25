@@ -139,12 +139,11 @@ class GeminiClient:
         # Embedding model
         if self.embedding_model_id:
             model_rpm_limits[self.embedding_model_id] = self.embedding_rpm_limit
-            logger.info(
+            logger.debug(
                 f"Loaded Embedding Model: {self.embedding_model_id} (RPM: {self.embedding_rpm_limit})")
 
         # Generation models (load if ID and RPM are defined)
         gen_model_configs = [
-            # Removed: ("GEMINI_FLASH_THINKING_EXP", "gemini-2.0-flash-thinking-exp", 10),
             # Added Flash Exp, using 10 RPM as proxy
             ("GEMINI_FLASH_EXP", "gemini-2.0-flash-exp", 10),
             ("GEMINI_FLASH", "gemini-2.0-flash", 15),
@@ -161,7 +160,7 @@ class GeminiClient:
                     rpm = int(rpm_str)
                     model_rpm_limits[model_id] = rpm
                     self.available_gen_models.append(model_id)
-                    logger.info(
+                    logger.debug(
                         f"Loaded Generation Model: {model_id} (RPM: {rpm})")
                 except ValueError:
                     logger.warning(
@@ -173,8 +172,7 @@ class GeminiClient:
                 self.available_gen_models.append(model_id)
 
         # --- Preferred Model Order and Fallback (IDs WITHOUT prefix)--- #
-        # pref_1 = os.getenv("GEMINI_MODEL_PREF_1", # Old default
-        #                    "gemini-2.0-flash-thinking-exp")
+
         pref_1 = os.getenv("GEMINI_MODEL_PREF_1",  # New default
                            "gemini-2.0-flash-exp")
         pref_2 = os.getenv("GEMINI_MODEL_PREF_2", "gemini-2.0-flash")
@@ -197,7 +195,7 @@ class GeminiClient:
                 f"Fallback model {self.fallback_model_id} specified in env var is not available or has no RPM limit. Attempting to use first preferred model as fallback.")
             if self.preferred_model_ids:
                 self.fallback_model_id = self.preferred_model_ids[0]
-                logger.info(f"Using {self.fallback_model_id} as fallback.")
+                logger.debug(f"Using {self.fallback_model_id} as fallback.")
             else:
                 # Critical fallback if no models configured properly
                 logger.error(
@@ -208,20 +206,27 @@ class GeminiClient:
                     # Add dummy limit
                     model_rpm_limits[self.fallback_model_id] = 15
 
-        logger.info(f"Preferred model order: {self.preferred_model_ids}")
-        logger.info(f"Fallback model: {self.fallback_model_id}")
+        logger.debug(f"Preferred model order: {self.preferred_model_ids}")
+        logger.debug(f"Fallback model: {self.fallback_model_id}")
 
         # --- Rate Limit Configuration --- #
         self.max_rate_limit_wait_seconds = float(os.getenv(
             "GEMINI_MAX_WAIT_SECONDS", str(self.DEFAULT_MAX_RATE_LIMIT_WAIT_SECONDS)))
-        logger.info(
+        self.emergency_fallback_wait_seconds = float(
+            os.getenv("EMERGENCY_FALLBACK_WAIT_SECONDS", "120.0"))
+        logger.debug(
             f"Maximum rate limit wait time set to {self.max_rate_limit_wait_seconds} seconds")
+        # Add reserved slots for emergency fallback
+        self.reserved_fallback_slots = int(
+            os.getenv("GEMINI_RESERVED_FALLBACK_SLOTS", "2"))
+        logger.debug(
+            f"Reserving {self.reserved_fallback_slots} RPM slots for fallback model {self.fallback_model_id}")
 
         # --- Initialize Rate Limiter --- #
         if RateLimiter:
             self.rate_limiter = RateLimiter(
-                model_rpm_limits)  # Use dynamically built dict
-            logger.info(
+                model_rpm_limits, client_instance=self)  # Pass self
+            logger.debug(
                 f"GeminiClient initialized with RateLimiter. Config: {model_rpm_limits}")
         else:
             self.rate_limiter = None
@@ -235,7 +240,7 @@ class GeminiClient:
         try:
             with open(prompt_path, 'r', encoding='utf-8') as f:
                 template = f.read()
-            logger.info(
+            logger.debug(
                 f"Successfully loaded prompt template from {prompt_path}")
             return template
         except FileNotFoundError:
@@ -277,7 +282,7 @@ class GeminiClient:
             try:
                 # Log only on first attempt or if we've had failures
                 if attempt > 0:
-                    logger.info(
+                    logger.debug(
                         f"Retry attempt {attempt+1}/{retries} for embedding generation using {model_to_use_for_api}")
 
                 # Apply rate limiting if a rate limiter is provided (use short ID)
@@ -290,15 +295,11 @@ class GeminiClient:
                     contents=text
                 )
 
-                # Log the raw API response for debugging (result is likely a Pydantic object or dict)
-                logger.debug(
-                    f"google-genai raw embedding response for model {model_to_use_for_api}: {result}")
-
                 # Log usage metadata if available
                 usage_metadata = getattr(result, 'usage_metadata', None) or result.get(
                     'usage_metadata', None) if isinstance(result, dict) else None
                 if usage_metadata:
-                    logger.info(
+                    logger.debug(
                         f"[USAGE] Embedding usage metadata: {usage_metadata}")
 
                 # Register this call with the rate limiter if provided (use short ID)
@@ -553,14 +554,23 @@ class GeminiClient:
             f"SYNC: Failed to generate text after trying all models and {retries} total attempts.")
         return None
 
+    def set_max_rate_limit_wait_seconds(self, seconds: float) -> None:
+        """Set the maximum time to wait for rate limiting before giving up."""
+        self.max_rate_limit_wait_seconds = seconds
+        logger.debug(f"Set max_rate_limit_wait_seconds to {seconds}s")
+
+    def set_emergency_wait_seconds(self, seconds: float) -> None:
+        """Set the emergency wait time for extreme rate limiting situations."""
+        self.emergency_fallback_wait_seconds = seconds
+        logger.debug(f"Set emergency_fallback_wait_seconds to {seconds}s")
+
     async def generate_text_with_prompt_async(self, article_content: str, processing_tier: int,
                                               retries: int = 6, initial_delay: float = 1.0,
                                               model_override: Optional[str] = None,
                                               fallback_model: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Asynchronously generates text (e.g., entity extraction JSON) using google-genai.
-        Uses self.client.generate_content_async() with model selection and fallback logic.
-        Handles retries and rate limiting.
+        Async version of generate_text_with_prompt. Generates structured entity data from an article.
+        Uses model selection, fallback, rate limiting with max wait times, and retries.
         """
         if not self.prompt_template:
             logger.error(
@@ -571,244 +581,287 @@ class GeminiClient:
                 "Invalid article content provided for text generation.")
             return None
 
-        # Set maximum wait time to 40 seconds to prefer waiting for better models
-        max_wait_threshold = self.max_rate_limit_wait_seconds
-
         # Construct the full prompt
         full_prompt = self.prompt_template.replace(
             "{ARTICLE_CONTENT_HERE}", article_content)
 
-        # Define model preference order, handling model_override and fallback_model
-        if model_override and model_override.startswith("models/"):
-            # Ensure model names are just the ID, not starting with "models/" if the new client adds it
-            # Example: client.generate_content(model='gemini-1.5-flash-latest', ...)
-            # Adjust model_override and fallback_model if needed
-            model_override_id = model_override.split('/')[-1]
-            fallback_model_id = fallback_model.split(
-                '/')[-1] if fallback_model else None
-            preferred_models = [model_override_id]
-            if fallback_model_id and fallback_model_id not in preferred_models:
-                preferred_models.append(fallback_model_id)
-            all_models_to_try_ids = preferred_models + \
-                [m.split('/')[-1] for m in self.available_gen_models] + \
-                [self.fallback_model_id]
-            all_models_to_try_ids = list(dict.fromkeys(all_models_to_try_ids))
-        else:
-            # Default selection
-            preferred_models = [m.split('/')[-1]
-                                for m in self.available_gen_models]
-            fallback_model_id = fallback_model.split(
-                '/')[-1] if fallback_model else None
-            if fallback_model_id and fallback_model_id not in preferred_models:
-                preferred_models.insert(0, fallback_model_id)
-            all_models_to_try_ids = preferred_models + \
-                [self.fallback_model_id]
-            all_models_to_try_ids = list(dict.fromkeys(all_models_to_try_ids))
-        # logger.debug(f"Model sequence to try: {all_models_to_try_ids}") # Removed debug log
+        # Define model preference order
+        # Handle model IDs (ensure they are short IDs, not prefixed with "models/")
+        def clean_model_id(mid: Optional[str]) -> Optional[str]:
+            return mid.split('/')[-1] if mid else None
+
+        model_override_id = clean_model_id(model_override)
+        fallback_model_id = clean_model_id(fallback_model)
+
+        # Start with override if provided and valid
+        all_models_to_try_ids = []
+        if model_override_id and model_override_id in self.available_gen_models:
+            all_models_to_try_ids.append(model_override_id)
+        elif model_override_id:
+            logger.warning(
+                f"Model override '{model_override_id}' not found in available models. Ignoring.")
+
+        # Add the passed fallback model next, if it's valid and different from override
+        if fallback_model_id and fallback_model_id in self.available_gen_models and fallback_model_id != model_override_id:
+            all_models_to_try_ids.append(fallback_model_id)
+        elif fallback_model_id and fallback_model_id != model_override_id:
+            logger.warning(
+                f"Provided fallback model '{fallback_model_id}' not found in available models. Ignoring.")
+
+        # Add remaining available models (excluding those already added)
+        for model in self.available_gen_models:
+            clean_id = clean_model_id(model)
+            if clean_id not in all_models_to_try_ids:
+                all_models_to_try_ids.append(clean_id)
+
+        # Ensure the instance fallback model is last (if not already included)
+        instance_fallback_id = clean_model_id(self.fallback_model_id)
+        if instance_fallback_id and instance_fallback_id not in all_models_to_try_ids:
+            all_models_to_try_ids.append(instance_fallback_id)
+        elif not instance_fallback_id:
+            logger.error(
+                "Instance fallback model ID is not configured correctly!")
+
+        logger.debug(f"Model sequence to try: {all_models_to_try_ids}")
+        if not all_models_to_try_ids:
+            logger.error("No valid models available to attempt generation.")
+            return None
 
         current_delay = initial_delay
-        total_attempts = 0
-        rate_limited_models = set()
+        total_attempts_across_models = 0
+        max_total_attempts = retries  # Overall limit across all models
+        parsed_json_result = None
 
-        for model_id in all_models_to_try_ids:  # Iterate through model IDs
-            # logger.debug(f"Attempting text generation with model: {model_id}") # Removed debug log
+        for model_id in all_models_to_try_ids:
+            logger.info(f"Attempting text generation with model: {model_id}")
 
-            # Emergency bailout - if all models are rate limited except fallback, force use of fallback
-            fallback_model_id = self.fallback_model_id
-            if len(rate_limited_models) >= len(all_models_to_try_ids) - 1 and model_id == fallback_model_id:
-                logger.warning(
-                    f"Forcing use of fallback model {fallback_model_id}...")
-                if self.rate_limiter:
-                    # We will wait however long needed for the fallback model
-                    logger.info(
-                        f"Waiting up to 120 seconds for fallback model {fallback_model_id} to be available...")
-                    # Wait up to 2 minutes for the fallback model
-                    max_wait = 120
-                    start_time = time.monotonic()
-                    while time.monotonic() - start_time < max_wait:
-                        wait_time = await self.rate_limiter.get_wait_time_async(fallback_model_id)
-                        if wait_time <= 0:
-                            logger.info(
-                                f"Fallback model {fallback_model_id} is now available after waiting")
-                            break
-                        logger.debug(
-                            f"Fallback still rate limited, waiting {min(wait_time, 5)}s...")
-                        # Wait the lesser of wait_time or 5s
-                        await asyncio.sleep(min(wait_time, 5))
-
-                    # Even if we're still rate limited, we'll try anyway since this is our last resort
-                    # await self.rate_limiter.wait_if_needed_async(fallback_model_id) # Wait happens below anyway
-
-            # Check rate limit *before* attempting the call (using model_id)
-            if self.rate_limiter:
-                is_allowed = self.rate_limiter.is_allowed(model_id)
-                if not is_allowed:
-                    wait_time = await self.rate_limiter.get_wait_time_async(model_id)
-                    if 0 < wait_time <= max_wait_threshold:
-                        # logger.debug(f"Rate limit hit for {model_id}. Waiting {wait_time:.2f}s...") # Removed debug log
-                        await self.rate_limiter.wait_if_needed_async(model_id)
-                    else:
-                        logger.warning(
-                            f"Rate limit wait for {model_id} ({wait_time:.2f}s) > threshold ({max_wait_threshold}s). Skipping.")
-                        rate_limited_models.add(model_id)
-                        continue
-            # else: # Removed unnecessary else block
-                # logger.debug("Rate limiter not available, proceeding without check.") # Removed debug log
-
-            model_attempt = 0
+            # Max retries per specific model for non-rate-limit errors
             max_model_retries = 2
+            model_attempt = 0
 
-            while model_attempt < max_model_retries and total_attempts < retries:
-                total_attempts += 1
+            while model_attempt < max_model_retries and total_attempts_across_models < max_total_attempts:
+                total_attempts_across_models += 1
                 model_attempt += 1
                 task_start_time = time.monotonic()
-                # logger.debug(f"Attempt {model_attempt}/{max_model_retries} for model {model_id}, total attempt {total_attempts}/{retries}") # Removed debug log
+                logger.debug(
+                    f"[{model_id}] Model Attempt {model_attempt}/{max_model_retries}, Total Attempt {total_attempts_across_models}/{max_total_attempts}")
 
                 try:
+                    # --- Start: Rate Limit Check using Atomic Reservation ---
+                    slot_reserved = False
                     if self.rate_limiter:
-                        # logger.debug(f"[{model_id}] Attempt {model_attempt}: Checking/Waiting for rate limit...") # Removed debug log
-                        await self.rate_limiter.wait_if_needed_async(model_id)
-                        # logger.debug(f"[{model_id}] Attempt {model_attempt}: Rate limit check passed/wait finished.") # Removed debug log
+                        logger.debug(
+                            f"[{model_id}] Attempting to reserve rate limit slot...")
+                        # Try to atomically reserve a slot for this model
+                        slot_reserved = await self.rate_limiter.reserve_and_register_call_async(model_id)
 
-                    # --- NEW API CALL ---
-                    api_call_timeout_seconds = 120
-                    # logger.debug(f"[{model_id}] Attempt {model_attempt}: Calling generate_content_async (timeout={api_call_timeout_seconds}s)...") # Removed debug log
+                        if not slot_reserved:
+                            # No slot available, try waiting if within threshold
+                            wait_time = await self.rate_limiter.get_wait_time_async(model_id)
+                            if 0 < wait_time <= self.max_rate_limit_wait_seconds:
+                                logger.debug(
+                                    f"[{model_id}] Rate limit hit. Waiting {wait_time:.2f}s...")
+                                await asyncio.sleep(wait_time)
+                                # Try reserving again after waiting
+                                slot_reserved = await self.rate_limiter.reserve_and_register_call_async(model_id)
+                                if not slot_reserved:
+                                    logger.warning(
+                                        f"[{model_id}] Still rate limited after waiting. Skipping attempt for this model.")
+                                    # Break inner loop to try the next model in the preference list
+                                    break
+                            else:
+                                logger.warning(
+                                    f"[{model_id}] Wait time {wait_time:.2f}s exceeds threshold or is zero. Skipping attempt for this model.")
+                                # Break inner loop to try the next model
+                                break
+                        else:
+                            logger.debug(
+                                f"[{model_id}] Rate limit slot successfully reserved.")
+                    else:
+                        # No rate limiter configured, proceed without reservation
+                        slot_reserved = True
 
-                    # Define generation config using new types if necessary
-                    # Check google-genai docs for exact config class & parameters
+                    # If no slot could be reserved/acquired, break the inner loop to try the next model
+                    if not slot_reserved:
+                        continue  # Skip the API call for this model attempt
+                    # --- End: Rate Limit Check using Atomic Reservation ---
+
+                    # --- API Call (Slot is reserved) ---
+                    api_call_timeout_seconds = 120  # Timeout for the API call itself
                     gen_config = google_genai.types.GenerateContentConfig(
                         temperature=0.1,
-                        automatic_function_calling={'disable': True},
-                        # max_output_tokens=... # Add if needed, defaults might be sufficient
-                        # response_mime_type="application/json" # If supported and desired
+                        automatic_function_calling={'disable': True}
                     )
 
-                    # Use the client directly, assuming generate_content_async exists
-                    # The `contents` parameter expects an iterable (like a list)
                     response = await asyncio.wait_for(
                         self.client.aio.models.generate_content(
-                            # Prepend models/ prefix if client expects it
+                            # Client expects prefix
                             model=f'models/{model_id}',
-                            contents=[full_prompt],  # Pass prompt in a list
+                            contents=[full_prompt],
                             config=gen_config
-                            # safety_settings=... # Add if needed
                         ),
                         timeout=api_call_timeout_seconds
                     )
                     call_duration = time.monotonic() - task_start_time
-                    # logger.debug(f"[{model_id}] Attempt {model_attempt}: generate_content_async call succeeded in {call_duration:.2f}s.") # Removed debug log
-                    # --- END NEW API CALL ---
+                    logger.debug(
+                        f"[{model_id}] API call succeeded in {call_duration:.2f}s.")
 
-                    # logger.debug(f"[RESPONSE] Full response from {model_id}: {response}") # Removed debug log
-                    # Check new response structure
-                    usage_metadata = getattr(response, 'usage_metadata', None)
-                    if usage_metadata:
-                        # logger.debug(f"[USAGE] {model_id} usage metadata: {usage_metadata}") # Removed debug log
-                        pass  # Keep structure, log removed
-                    # ... (Rate limiter registration call remains the same) ...
-                    if self.rate_limiter:
-                        await self.rate_limiter.register_call_async(model_id)
+                    # No need to register call here, it was done atomically during reservation
+                    # if self.rate_limiter:
+                    #    await self.rate_limiter.register_call_async(model_id)
+                    # --- End API Call ---
 
-                    # --- Process Response (New Structure) ---
+                    # --- Process Response ---
                     generated_text = None
-                    # Check common ways to access text in new SDK response objects
                     if hasattr(response, 'text'):
                         generated_text = response.text
                     elif hasattr(response, 'parts') and response.parts and hasattr(response.parts[0], 'text'):
                         generated_text = "".join(
                             part.text for part in response.parts if hasattr(part, 'text'))
-                    # Add other checks based on actual response object structure if needed
 
                     if generated_text:
-                        # ... (JSON parsing logic remains the same) ...
                         parsed_json, error = parse_json(generated_text)
                         if not error:
                             logger.info(
                                 f"Successfully parsed JSON response from {model_id}")
-                            return parsed_json
+                            parsed_json_result = parsed_json
+                            break  # Success! Exit inner loop
                         else:
                             logger.warning(
-                                f"JSON parsing failed for {model_id}: {error}")
-                            # Try extraction
+                                f"[{model_id}] JSON parsing failed: {error}")
                             extracted_json, extract_error = extract_json_from_text(
                                 generated_text)
                             if not extract_error:
                                 parsed_json, error = parse_json(extracted_json)
                                 if not error and parsed_json:
                                     logger.info(
-                                        f"Successfully parsed extracted JSON response from {model_id}")
-                                    return parsed_json
+                                        f"Successfully parsed EXTRACTED JSON response from {model_id}")
+                                    parsed_json_result = parsed_json
+                                    break  # Success! Exit inner loop
                                 else:
                                     logger.warning(
-                                        f"Extracted JSON parsing failed for {model_id}: {error or 'Empty JSON'}")
+                                        f"[{model_id}] Extracted JSON parsing failed: {error or 'Empty JSON'}")
                             else:
                                 logger.warning(
-                                    f"JSON extraction failed for {model_id}: {extract_error}")
-                        # If parsing/extraction failed, continue to next attempt/model
+                                    f"[{model_id}] JSON extraction failed: {extract_error}")
+                            # If parsing/extraction failed, continue to next attempt for this model
                     else:
-                        # Check for prompt feedback / finish reason if no text
                         finish_reason = getattr(response, 'prompt_feedback', None) or getattr(
                             response, 'finish_reason', None)
                         logger.warning(
-                            f"Received no generated text from {model_id}. Finish reason/Feedback: {finish_reason}")
+                            f"[{model_id}] Received no generated text. Finish reason/Feedback: {finish_reason}")
+                    # --- End Process Response ---
 
                 except asyncio.TimeoutError:
                     logger.warning(
-                        f"Timeout error caught for {model_id} Attempt {model_attempt}. Breaking inner loop.")
-                    break  # Exit inner loop for this model
-                except google.api_core.exceptions.ResourceExhausted as e:  # Catch specific rate limit exception
+                        f"[{model_id}] API call timeout after {api_call_timeout_seconds}s (Attempt {model_attempt}/{max_model_retries}). Retrying if possible.")
+                    # Continue to next attempt for this model if retries remain
+                except google.api_core.exceptions.ResourceExhausted as e:
                     logger.warning(
-                        f"[{model_id}] ResourceExhausted (Rate Limit/Quota) (Attempt {model_attempt}/{max_model_retries}): {e}")
-                    if model_attempt < max_model_retries and total_attempts < retries:
-                        if self.rate_limiter:
-                            logger.warning(
-                                f"Waiting based on rate limiter for {model_id}...")
-                            await self.rate_limiter.wait_if_needed_async(model_id)
-                            logger.info(
-                                f"Finished rate limit wait for {model_id}. Retrying...")
-                            continue
-                        else:  # Fallback sleep
-                            await asyncio.sleep(current_delay * (random.random()*0.5+0.5))
-                            continue
+                        f"[{model_id}] ResourceExhausted (Rate Limit/Quota) during API call (Attempt {model_attempt}/{max_model_retries}). Skipping model.")
+                    # Break inner loop immediately, move to next model
+                    break
+                except google.api_core.exceptions.GoogleAPIError as e:
+                    logger.warning(
+                        f"[{model_id}] Google API error during call (Attempt {model_attempt}/{max_model_retries}): {e}", exc_info=False)
+                    # Retry for this model if attempts remain
+                    if model_attempt < max_model_retries:
+                        await asyncio.sleep(current_delay * (random.random()*0.5+0.5))
+                        current_delay *= 1.5
+                        continue  # Retry with same model
                     else:
                         logger.error(
-                            f"Rate limit/Quota error with {model_id}, retries exhausted. Switching model.")
-                        # Mark as rate limited before breaking
-                        rate_limited_models.add(model_id)
-                        break  # Exit inner loop
-                except google.api_core.exceptions.GoogleAPIError as e:  # Catch other general Google API errors
-                    logger.warning(
-                        f"[{model_id}] Google API error (Attempt {model_attempt}/{max_model_retries}): {e}", exc_info=False)
-                    # Retry logic for general API errors
-                    if model_attempt < max_model_retries and total_attempts < retries:
-                        await asyncio.sleep(current_delay * (random.random()*0.5+0.5))
-                        continue
-                    else:
-                        break  # Exhausted retries
+                            f"[{model_id}] Exhausted retries due to GoogleAPIError. Skipping model.")
+                        break  # Skip to next model
                 except Exception as e:
                     logger.warning(
-                        f"Generic error (Attempt {model_attempt}/{max_model_retries}) using {model_id}: {e}", exc_info=True)
-                    # Exponential backoff for non-rate-limit errors
-                    if model_attempt < max_model_retries and total_attempts < retries:
-                        jitter = random.random() * 0.5 + 0.5
-                        sleep_time = current_delay * jitter
-                        logger.debug(
-                            f"Non-rate-limit error. Waiting {sleep_time:.2f}s before retrying {model_id}.")
-                        await asyncio.sleep(sleep_time)
+                        f"[{model_id}] Generic error during call (Attempt {model_attempt}/{max_model_retries}): {e}", exc_info=True)
+                    # Retry for this model if attempts remain
+                    if model_attempt < max_model_retries:
+                        await asyncio.sleep(current_delay * (random.random()*0.5+0.5))
                         current_delay *= 1.5
-                        continue
+                        continue  # Retry with same model
                     else:
                         logger.error(
-                            f"Failed on {model_id} after {model_attempt} attempts due to non-rate-limit error: {e}")
-                        break  # Exit inner loop
+                            f"[{model_id}] Exhausted retries due to generic error. Skipping model.")
+                        break  # Skip to next model
 
-            # Break outer loop if result was returned successfully in inner loop
-            # (This check is technically redundant due to `return` statement but safe)
-            # if parsed_json: break
+            # If we successfully got a result, break the outer loop
+            if parsed_json_result is not None:
+                logger.info(f"Successfully obtained result using {model_id}.")
+                break
 
-        logger.error(
-            f"Failed to generate text after trying all models and {retries} total attempts.")
-        return None
+        # --- Emergency Fallback Attempt ---
+        if parsed_json_result is None and total_attempts_across_models >= max_total_attempts:
+            logger.warning(
+                f"All attempts failed after {max_total_attempts} total tries across models. Triggering emergency fallback.")
+            emergency_model_id = clean_model_id(
+                self.fallback_model_id)  # Use the instance fallback
+            if emergency_model_id and self.rate_limiter:
+                logger.info(
+                    f"Attempting emergency fallback with {emergency_model_id} using emergency wait time: {self.emergency_fallback_wait_seconds}s")
+                try:
+                    await self.rate_limiter.wait_if_needed_async(emergency_model_id, max_wait_seconds=self.emergency_fallback_wait_seconds)
+                    if self.rate_limiter.is_allowed(emergency_model_id):
+                        logger.info(
+                            f"[{emergency_model_id}] Emergency Rate limit check passed. Making final API call attempt.")
+                        # --- Final API Call Attempt ---
+                        api_call_timeout_seconds = 120
+                        gen_config = google_genai.types.GenerateContentConfig(
+                            temperature=0.1, automatic_function_calling={'disable': True})
+                        response = await asyncio.wait_for(
+                            self.client.aio.models.generate_content(
+                                model=f'models/{emergency_model_id}', contents=[full_prompt], config=gen_config),
+                            timeout=api_call_timeout_seconds
+                        )
+                        await self.rate_limiter.register_call_async(emergency_model_id)
+                        # --- Process Emergency Response ---
+                        generated_text = None
+                        if hasattr(response, 'text'):
+                            generated_text = response.text
+                        elif hasattr(response, 'parts') and response.parts and hasattr(response.parts[0], 'text'):
+                            generated_text = "".join(
+                                part.text for part in response.parts if hasattr(part, 'text'))
+
+                        if generated_text:
+                            parsed_json, error = parse_json(generated_text)
+                            if not error:
+                                logger.info(
+                                    f"Successfully parsed JSON response from EMERGENCY FALLBACK {emergency_model_id}")
+                                parsed_json_result = parsed_json
+                            else:  # Try extraction on fallback
+                                extracted_json, extract_error = extract_json_from_text(
+                                    generated_text)
+                                if not extract_error:
+                                    parsed_json, error = parse_json(
+                                        extracted_json)
+                                    if not error and parsed_json:
+                                        logger.info(
+                                            f"Successfully parsed EXTRACTED JSON response from EMERGENCY FALLBACK {emergency_model_id}")
+                                        parsed_json_result = parsed_json
+                        if not parsed_json_result:
+                            logger.error(
+                                f"[{emergency_model_id}] Emergency fallback attempt failed to produce parsable JSON.")
+                        # --- End Process Emergency Response ---
+                    else:
+                        logger.error(
+                            f"[{emergency_model_id}] Still rate limited even after emergency wait. Cannot proceed.")
+                except Exception as e:
+                    logger.error(
+                        f"[{emergency_model_id}] Error during emergency fallback attempt: {e}", exc_info=True)
+            elif not emergency_model_id:
+                logger.error(
+                    "Cannot perform emergency fallback: Instance fallback model ID is not configured.")
+            elif not self.rate_limiter:
+                logger.warning(
+                    "Cannot perform emergency fallback rate limit check: RateLimiter not available.")
+        # --- End Emergency Fallback Attempt ---
+
+        if parsed_json_result is None:
+            logger.error(
+                f"Failed to generate text after trying all models and {total_attempts_across_models} total attempts (max: {max_total_attempts}).")
+
+        return parsed_json_result
 
     async def analyze_articles_with_prompt(self, articles_data: List[Dict[str, Any]],
                                            prompt_file_path: str,

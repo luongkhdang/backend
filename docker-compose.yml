@@ -110,11 +110,11 @@ services:
       PYTHONDEBUG: "1"
       # Step Execution Control
       RUN_PHASE_1_STEPS: ${RUN_PHASE_1_STEPS:-true} # Master switch for steps 1-4
-      RUN_STEP1: ${RUN_STEP1:-true} # Controls Step 1
-      RUN_STEP2: ${RUN_STEP2:-true} # Controls Step 2 (Clustering)
+      RUN_STEP1: ${RUN_STEP1:-false} # Controls Step 1
+      RUN_STEP2: ${RUN_STEP2:-false} # Controls Step 2 (Clustering)
       RUN_STEP3: ${RUN_STEP3:-true} # Controls Step 3 (Entity Extraction)
-      RUN_STEP4: ${RUN_STEP4:-true} # Controls Step 4 (Data Export)
-      RUN_PHASE_2_STEPS: ${RUN_PHASE_2_STEPS:-true} # Master switch for step 5 (Essay Gen)
+      RUN_STEP4: ${RUN_STEP4:-false} # Controls Step 4 (Data Export)
+      RUN_PHASE_2_STEPS: ${RUN_PHASE_2_STEPS:-false} # Master switch for step 5 (Essay Gen)
       RUN_STEP5: ${RUN_STEP5:-true} # Controls Step 5 (RAG Essay Generation)
       # Local NLP Settings (Step 1.7 - Now always runs if Step 1 runs)
       LOCAL_NLP_MODEL: ${LOCAL_NLP_MODEL:-"facebook/bart-large-cnn"}

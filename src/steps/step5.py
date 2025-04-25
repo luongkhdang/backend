@@ -515,7 +515,7 @@ async def process_group(group_id: str, group_info: Dict[str, Any], db_client: Re
     # The client method `generate_essay_from_prompt` selects the default.
     # We capture the default used by `generate_essay_from_prompt` for storage.
     intended_model_name = os.getenv("GEMINI_FLASH_THINKING_MODEL",
-                                    "models/gemini-2.0-flash-thinking-exp-01-21")
+                                    "models/gemini-2.0-flash-exp")
 
     essay_text = await gemini_client.generate_essay_from_prompt(
         full_prompt_text=final_prompt

@@ -66,84 +66,76 @@ async def run() -> Dict[str, Any]:
 
     This function:
     1. Retrieves domain goodness scores
-    2. Fetches and prioritizes unprocessed articles
-    3. Divides articles into processing tiers
-    4. Creates balanced batches with articles from each tier
-    5. Extracts entities using Gemini API with tier-based model selection
-    6. Stores entity results in the database
+    2. Fetches and prioritizes recent unprocessed articles
+    3. Extracts entities using Gemini API with tier-based model selection using TaskManager for concurrency
+    4. Stores entity results in the database
+    5. Updates article processing status
 
     Returns:
         Dict[str, Any]: Status report containing metrics about the extraction process
     """
-    start_time = time.time()
+    start_time = time.monotonic()
+    batch_index = 0
+    processed_count = 0
+    empty_passes = 0
+    consecutive_failures = 0
+    entity_counter = 0
+
+    # Collect environment variables for configuration
+    max_wait_seconds = float(os.getenv("GEMINI_MAX_WAIT_SECONDS", "60.0"))
+    emergency_fallback_wait = float(
+        os.getenv("EMERGENCY_FALLBACK_WAIT_SECONDS", "120.0"))
+    # Update logging to show our wait time configuration
+    logger.debug(f"Entity extraction configured with max_wait_seconds={max_wait_seconds}s, "
+                 f"emergency_fallback_wait={emergency_fallback_wait}s")
+
+    # Load model IDs from environment variables
+    # Tier 0 (highest priority) models
+    tier0_primary_model = os.getenv(
+        "GEMINI_MODEL_PREF_1", "gemini-2.0-flash-exp")
+    tier0_fallback_model = os.getenv("GEMINI_MODEL_PREF_2", "gemini-2.0-flash")
+
+    # Tier 1 (medium priority) models
+    tier1_primary_model = os.getenv("GEMINI_MODEL_PREF_2", "gemini-2.0-flash")
+    tier1_fallback_model = os.getenv(
+        "GEMINI_MODEL_PREF_3", "gemini-2.0-flash-lite")
+
+    # Tier 2 (lowest priority) models
+    tier2_primary_model = os.getenv(
+        "GEMINI_MODEL_PREF_3", "gemini-2.0-flash-lite")
+    tier2_fallback_model = os.getenv(
+        "GEMINI_FALLBACK_MODEL_ID", "gemini-2.0-flash")
 
     try:
-        # Initialize clients
+        # Initialize DB and API clients
         db_client = ReaderDBClient()
         gemini_client = GeminiClient()
-        # Initialize a single TaskManager instance for the entire process
         task_manager = TaskManager()
 
-        # --- Load Model IDs from Environment --- #
-        # Tier 0 (Highest): Flash Exp primary, Flash fallback
-        tier0_primary_model = os.getenv(
-            "GEMINI_FLASH_EXP_MODEL_ID", "gemini-2.0-flash-exp")
-        tier0_fallback_model = os.getenv(
-            "GEMINI_FLASH_MODEL_ID", "gemini-2.0-flash")
-        # Tier 1 (Medium): Flash primary, Lite fallback
-        tier1_primary_model = os.getenv(
-            "GEMINI_FLASH_MODEL_ID", "gemini-2.0-flash")
-        tier1_fallback_model = os.getenv(
-            "GEMINI_FLASH_LITE_MODEL_ID", "gemini-2.0-flash-lite")
-        # Tier 2 (Lowest): Flash primary, Lite fallback
-        tier2_primary_model = os.getenv(
-            "GEMINI_FLASH_MODEL_ID", "gemini-2.0-flash")
-        tier2_fallback_model = os.getenv(
-            "GEMINI_FLASH_LITE_MODEL_ID", "gemini-2.0-flash-lite")
+        # Configure the GeminiClient with wait time settings
+        gemini_client.set_max_rate_limit_wait_seconds(max_wait_seconds)
+        gemini_client.set_emergency_wait_seconds(emergency_fallback_wait)
 
-        # Log the models being used for each tier
-        logger.info(
-            f"Tier 0 Models: Primary={tier0_primary_model}, Fallback={tier0_fallback_model}")
-        logger.info(
-            f"Tier 1 Models: Primary={tier1_primary_model}, Fallback={tier1_fallback_model}")
-        logger.info(
-            f"Tier 2 Models: Primary={tier2_primary_model}, Fallback={tier2_fallback_model}")
-        # -------------------------------------- #
-
-        # For circuit breaker pattern
-        consecutive_failures = 0
-
-        # Step 1: Get domain goodness scores
+        # Get domain goodness scores
         domain_scores = _get_domain_goodness_scores(db_client)
 
-        # Step 2: Fetch and prioritize articles - already assigns tiers
-        prioritized_articles = _prioritize_articles(db_client, domain_scores)
-
-        if not prioritized_articles:
-            logger.info("No articles to process.")
+        # Prioritize articles based on domain and cluster scores
+        articles = _prioritize_articles(db_client, domain_scores)
+        if not articles:
+            logger.warning("No articles needing entity extraction. Exiting.")
             return {
                 "success": True,
-                "articles_found": 0,
                 "processed": 0,
                 "entity_links_created": 0,
-                "snippets_stored": 0,
-                "errors": 0,
-                "runtime_seconds": time.time() - start_time
+                "runtime_seconds": 0
             }
 
-        # Step 3: Divide articles into three tiers based on assigned processing_tier
-        tier0_articles = [
-            a for a in prioritized_articles if a.get('processing_tier') == 0]
-        tier1_articles = [
-            a for a in prioritized_articles if a.get('processing_tier') == 1]
-        tier2_articles = [
-            a for a in prioritized_articles if a.get('processing_tier') == 2]
-
-        logger.info(f"Articles by tier: {len(tier0_articles)} in tier 0, "
-                    f"{len(tier1_articles)} in tier 1, {len(tier2_articles)} in tier 2")
+        total_articles = len(articles)
+        logger.info(
+            f"Starting entity extraction for {total_articles} prioritized articles")
 
         # Calculate initial total articles and estimate total batches
-        total_articles_to_process = len(prioritized_articles)
+        total_articles_to_process = len(articles)
         # Estimate total batches based on average batch size (adjust if needed)
         estimated_total_batches = (
             total_articles_to_process + BATCH_SIZE - 1) // BATCH_SIZE if BATCH_SIZE > 0 else 1
@@ -165,94 +157,119 @@ async def run() -> Dict[str, Any]:
         total_time_processed = 0.0
 
         # Process articles in balanced batches until all tiers are empty
-        while tier0_articles or tier1_articles or tier2_articles:
+        while articles:
             batch_start_time = time.time()  # Record batch start time
             batch_index += 1
 
-            # Compose a balanced batch with the defined ratio (4/5/1)
-            current_batch = []
-            target_batch_size = 10
+            # --- Start: Dynamic Batch Sizing ---
+            adjusted_batch_size = BATCH_SIZE  # Start with default
+            if batch_index > 1 and gemini_client.rate_limiter:  # Check after the first batch if limiter exists
+                rate_limited_models_count = 0
+                total_models_checked = 0
+                # Check current rate limit status for generation models
+                for model_name in gemini_client.available_gen_models:
+                    total_models_checked += 1
+                    current_rpm = gemini_client.rate_limiter.get_current_rpm(
+                        model_name)
+                    limit = gemini_client.rate_limiter.model_rpm_limits.get(
+                        model_name, 0)
+                    available_slots = max(0, limit - current_rpm)
+                    # Consider a model rate-limited if less than ~1/3rd of batch size slots are available
+                    if available_slots < BATCH_SIZE / 3:
+                        rate_limited_models_count += 1
 
-            # Initialize counters for original and rebalanced tier counts
+                # If a significant portion of models are rate-limited, reduce batch size
+                # E.g., if 50% or more models are limited
+                if total_models_checked > 0 and rate_limited_models_count / total_models_checked >= 0.5:
+                    previous_adjusted_batch_size = adjusted_batch_size
+                    # Reduce batch size by half, minimum 3
+                    adjusted_batch_size = max(3, BATCH_SIZE // 2)
+                    if adjusted_batch_size < previous_adjusted_batch_size:
+                        logger.info(
+                            f"Reduced batch size from {previous_adjusted_batch_size} to {adjusted_batch_size} due to rate limit pressure ({rate_limited_models_count}/{total_models_checked} models limited).")
+            # --- End: Dynamic Batch Sizing ---
+
+            # Use adjusted_batch_size for composing the batch
+            target_batch_size = adjusted_batch_size
+
+            # Compose a balanced batch with the defined ratio (4/5/1) up to target_batch_size
+            current_batch = []
             original_tier_counts = {0: 0, 1: 0, 2: 0}
             rebalanced_tier_counts = {0: 0, 1: 0, 2: 0}
 
-            # Add up to 4 articles from tier 0
-            tier0_to_add = min(4, len(tier0_articles))
-            if tier0_to_add > 0:
-                current_batch.extend(tier0_articles[:tier0_to_add])
-                tier0_articles = tier0_articles[tier0_to_add:]
-                original_tier_counts[0] = tier0_to_add
+            # --- Tier 0 ---
+            tier0_target = int(target_batch_size * 0.4)  # Approx 40%
+            tier0_added = 0
+            temp_articles_tier0 = []
+            remaining_articles_after_tier0 = []
+            for article in articles:
+                if article.get('processing_tier') == 0 and tier0_added < tier0_target:
+                    temp_articles_tier0.append(article)
+                    tier0_added += 1
+                else:
+                    remaining_articles_after_tier0.append(article)
+            current_batch.extend(temp_articles_tier0)
+            original_tier_counts[0] = tier0_added
+            articles = remaining_articles_after_tier0  # Update remaining articles
 
-            # Add up to 5 articles from tier 1
-            tier1_to_add = min(5, len(tier1_articles))
-            if tier1_to_add > 0:
-                current_batch.extend(tier1_articles[:tier1_to_add])
-                tier1_articles = tier1_articles[tier1_to_add:]
-                original_tier_counts[1] = tier1_to_add
+            # --- Tier 1 ---
+            tier1_target = int(target_batch_size * 0.5)  # Approx 50%
+            tier1_added = 0
+            temp_articles_tier1 = []
+            remaining_articles_after_tier1 = []
+            for article in articles:
+                if article.get('processing_tier') == 1 and tier1_added < tier1_target:
+                    temp_articles_tier1.append(article)
+                    tier1_added += 1
+                else:
+                    remaining_articles_after_tier1.append(article)
+            current_batch.extend(temp_articles_tier1)
+            original_tier_counts[1] = tier1_added
+            articles = remaining_articles_after_tier1  # Update remaining articles
 
-            # Add up to 1 article from tier 2
-            tier2_to_add = min(1, len(tier2_articles))
-            if tier2_to_add > 0:
-                current_batch.extend(tier2_articles[:tier2_to_add])
-                tier2_articles = tier2_articles[tier2_to_add:]
-                original_tier_counts[2] = tier2_to_add
+            # --- Tier 2 ---
+            tier2_target = target_batch_size - \
+                len(current_batch)  # Fill remaining
+            tier2_added = 0
+            temp_articles_tier2 = []
+            remaining_articles_after_tier2 = []
+            for article in articles:
+                if article.get('processing_tier') == 2 and tier2_added < tier2_target:
+                    temp_articles_tier2.append(article)
+                    tier2_added += 1
+                else:
+                    remaining_articles_after_tier2.append(article)
+            current_batch.extend(temp_articles_tier2)
+            original_tier_counts[2] = tier2_added
+            articles = remaining_articles_after_tier2  # Update remaining articles
 
-            # Smart rebalancing logic
+            # Smart rebalancing logic (fill remaining slots if batch is not full)
             remaining_slots = target_batch_size - len(current_batch)
-            if remaining_slots > 0:
-                # First, try to fill with tier 0 (highest priority)
-                if len(tier0_articles) > 0:
-                    additional_tier0 = min(
-                        remaining_slots, len(tier0_articles))
-                    current_batch.extend(tier0_articles[:additional_tier0])
-                    tier0_articles = tier0_articles[additional_tier0:]
-                    remaining_slots -= additional_tier0
-                    rebalanced_tier_counts[0] = additional_tier0
+            if remaining_slots > 0 and articles:
+                logger.debug(
+                    f"Rebalancing: {remaining_slots} slots left in batch {batch_index}. Filling from remaining {len(articles)} articles.")
+                # Prioritize filling with remaining articles regardless of original tier (already sorted by priority)
+                fill_count = min(remaining_slots, len(articles))
+                articles_to_add_rebalance = articles[:fill_count]
+                current_batch.extend(articles_to_add_rebalance)
+                articles = articles[fill_count:]
 
-                # Then, try to fill with tier 1 (medium priority)
-                if remaining_slots > 0 and len(tier1_articles) > 0:
-                    additional_tier1 = min(
-                        remaining_slots, len(tier1_articles))
-                    current_batch.extend(tier1_articles[:additional_tier1])
-                    tier1_articles = tier1_articles[additional_tier1:]
-                    remaining_slots -= additional_tier1
-                    rebalanced_tier_counts[1] = additional_tier1
-
-                # Finally, try to fill with tier 2 (lowest priority)
-                if remaining_slots > 0 and len(tier2_articles) > 0:
-                    additional_tier2 = min(
-                        remaining_slots, len(tier2_articles))
-                    current_batch.extend(tier2_articles[:additional_tier2])
-                    tier2_articles = tier2_articles[additional_tier2:]
-                    rebalanced_tier_counts[2] = additional_tier2
+                # Update rebalancing counts for logging
+                for article in articles_to_add_rebalance:
+                    # Default to tier 2 if missing
+                    tier = article.get('processing_tier', 2)
+                    rebalanced_tier_counts[tier] += 1
 
             # If no articles were added to the batch, we're done
             if not current_batch:
                 break
-
-            # Assign specific models based on tier
-            for article in current_batch:
-                # Default to tier 2 if missing
-                tier = article.get('processing_tier', 2)
-
-                # Assign primary and fallback models based on tier using loaded env vars
-                if tier == 0:
-                    article['model_to_use'] = tier0_primary_model
-                    article['fallback_model'] = tier0_fallback_model
-                elif tier == 1:
-                    article['model_to_use'] = tier1_primary_model
-                    article['fallback_model'] = tier1_fallback_model
-                else:  # Tier 2 or default
-                    article['model_to_use'] = tier2_primary_model
-                    article['fallback_model'] = tier2_fallback_model
 
             # Log detailed information about tier distribution
             was_rebalanced = any(
                 count > 0 for count in rebalanced_tier_counts.values())
 
             if was_rebalanced:
-                logger.info(
+                logger.debug(
                     f"Processing batch {batch_index} with {len(current_batch)} articles | "
                     f"Original distribution: Tier 0: {original_tier_counts[0]}, "
                     f"Tier 1: {original_tier_counts[1]}, Tier 2: {original_tier_counts[2]} | "
@@ -260,18 +277,36 @@ async def run() -> Dict[str, Any]:
                     f"Tier 1: {rebalanced_tier_counts[1]}, Tier 2: {rebalanced_tier_counts[2]}"
                 )
             else:
-                logger.info(
+                logger.debug(
                     f"Processing batch {batch_index} with {len(current_batch)} articles | "
                     f"Standard distribution: Tier 0: {original_tier_counts[0]}, "
                     f"Tier 1: {original_tier_counts[1]}, Tier 2: {original_tier_counts[2]}"
                 )
 
+            # Assign appropriate models to each article based on tier
+            for article in current_batch:
+                tier = article.get('processing_tier')
+                if tier == 0:
+                    article['model_to_use'] = tier0_primary_model
+                    article['fallback_model'] = tier0_fallback_model
+                elif tier == 1:
+                    article['model_to_use'] = tier1_primary_model
+                    article['fallback_model'] = tier1_fallback_model
+                elif tier == 2:
+                    article['model_to_use'] = tier2_primary_model
+                    article['fallback_model'] = tier2_fallback_model
+                else:
+                    # Default to tier 1 models if tier is missing or invalid
+                    logger.warning(
+                        f"Article {article.get('id')} has invalid tier {tier}. Defaulting to tier 1 models.")
+                    article['model_to_use'] = tier1_primary_model
+                    article['fallback_model'] = tier1_fallback_model
+
             # Heartbeat logging (modified)
             current_time = time.time()
             if current_time - last_heartbeat >= heartbeat_interval:
                 processed_count = total_processed  # Use current total processed count
-                remaining_articles = len(
-                    tier0_articles) + len(tier1_articles) + len(tier2_articles)
+                remaining_articles = len(articles)
                 progress = ((processed_count) / total_articles_to_process) * \
                     100 if total_articles_to_process > 0 else 0
 
@@ -360,30 +395,46 @@ async def run() -> Dict[str, Any]:
             total_batches_processed += 1
             total_time_processed += batch_duration
 
-            # Add a delay between batches to allow rate limits to reset
-            # Log rate limiter status for all models
-            logger.info(f"Rate limiter status before cooling period:")
-            # Iterate over models configured in the rate limiter
-            rate_limited_models = gemini_client.rate_limiter.model_rpm_limits.keys() if hasattr(
-                gemini_client, 'rate_limiter') and gemini_client.rate_limiter else []
-            for model_name in rate_limited_models:
-                if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
-                    current_rpm = gemini_client.rate_limiter.get_current_rpm(
-                        model_name)
-                    wait_time = gemini_client.rate_limiter.get_wait_time(
-                        model_name)
-                    logger.info(
-                        f"  Model: {model_name}, Current RPM: {current_rpm}, Wait time: {wait_time:.2f}s")
+            # --- Start: Improved Inter-Batch Cooldown ---
+            # Calculate max wait time needed across all models
+            max_model_wait_time = 0.0
+            if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
+                # Use available_gen_models from the client to check relevant models
+                models_to_check = gemini_client.available_gen_models
+                for model_name in models_to_check:
+                    try:
+                        wait_time = gemini_client.rate_limiter.get_wait_time(
+                            model_name)
+                        max_model_wait_time = max(
+                            max_model_wait_time, wait_time)
+                        logger.debug(
+                            f"Cooldown Check: Model {model_name} needs {wait_time:.2f}s wait.")
+                    except Exception as e:
+                        logger.warning(
+                            f"Error getting wait time for model {model_name}: {e}")
 
-            # Add cooling period between batches
-            logger.info(
-                f"Adding cooling period of {INTER_BATCH_DELAY_SECONDS} seconds between batches")
-            await asyncio.sleep(INTER_BATCH_DELAY_SECONDS)
+            # Determine cooldown duration
+            cooldown_duration = INTER_BATCH_DELAY_SECONDS  # Default cooldown
+            if max_model_wait_time > INTER_BATCH_DELAY_SECONDS:
+                # If any model needs more time than the default, increase cooldown
+                # Cap the dynamic cooldown to avoid excessively long waits (e.g., 30 seconds max)
+                # Add 1s buffer, cap at 30s
+                cooldown_duration = min(max_model_wait_time + 1.0, 30.0)
+                logger.info(
+                    f"Extended inter-batch cooldown to {cooldown_duration:.2f}s based on model rate limits (max needed: {max_model_wait_time:.2f}s).")
+            else:
+                logger.info(
+                    f"Using standard inter-batch cooldown of {cooldown_duration}s.")
+
+            # Apply the calculated cooldown
+            if cooldown_duration > 0:
+                await asyncio.sleep(cooldown_duration)
+            # --- End: Improved Inter-Batch Cooldown ---
 
         # Prepare final status report
         status = {
             "success": True,
-            "articles_found": len(prioritized_articles),
+            "articles_found": len(articles),
             "processed": total_processed,
             "entity_links_created": total_entity_links,
             "snippets_stored": total_snippets,
@@ -562,103 +613,179 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
 async def _extract_entities_batch(gemini_client: GeminiClient, articles: List[Dict[str, Any]],
                                   task_manager: TaskManager) -> Dict[int, Any]:
     """
-    Extract entities from a batch of articles using Gemini API concurrently.
+    Extracts entities from a batch of articles using the TaskManager and GeminiClient.
+    Implements batch-level model pre-allocation based on rate limits.
 
     Args:
-        gemini_client: Initialized GeminiClient instance
-        articles: Batch of article dictionaries to process
-        task_manager: TaskManager instance to use for concurrent processing
+        gemini_client: The GeminiClient for API calls
+        articles: List of article dictionaries
+        task_manager: The TaskManager for concurrent API calls
 
     Returns:
-        Dictionary mapping article IDs to their extracted entity data (or error dict)
+        Dict[int, Any]: Dictionary mapping article IDs to their extraction results
     """
     logger.debug(
-        f"Preparing to extract entities for {len(articles)} articles using TaskManager")
+        f"Entering _extract_entities_batch for {len(articles)} articles.")
+    if not articles:
+        logger.warning("Empty batch passed to _extract_entities_batch")
+        return {}
 
-    # Create task definitions for each article
-    tasks_definitions = []
-
-    # Get model preferences from client
-    preferred_models = gemini_client.preferred_model_ids
-    fallback_model_id = gemini_client.fallback_model_id
-    num_preferred = len(preferred_models)
-
+    # --- Start: Refactored Pre-allocation Logic (No explicit lock acquisition here) ---
+    # Group articles by their assigned model_to_use
+    model_groups = {}
     for article in articles:
-        article_id = article.get('id')
-        content = article.get('content')
-        tier = article.get('processing_tier')  # Tier 0, 1, or 2
-
-        # --- Determine model_to_use and fallback_model based on tier ---
-        model_to_use = fallback_model_id  # Default to fallback
-        fallback_model = fallback_model_id  # Default to fallback
-
-        if tier == 0:  # Highest priority tier
-            model_to_use = preferred_models[0] if num_preferred > 0 else fallback_model_id
-            # Fallback for tier 0 is the second preference or the global fallback
-            if num_preferred > 1:
-                fallback_model = preferred_models[1]
-            else:
-                fallback_model = fallback_model_id
-        elif tier == 1:  # Medium priority tier
-            # Use second preference or global fallback as primary
-            if num_preferred > 1:
-                model_to_use = preferred_models[1]
-            else:
-                model_to_use = fallback_model_id
-            # Fallback for tier 1 is always the global fallback
-            fallback_model = fallback_model_id
-        # Tier 2 uses fallback_model_id for both primary and fallback (already set as default)
-
-        # model_to_use = article.get( # Old logic using TIER_MODELS
-        #     'model_to_use', TIER_MODELS[tier]['primary'])
-        # fallback_model = article.get(
-        #     'fallback_model', TIER_MODELS[tier]['fallback'])
-        # --- End model selection ---
-
-        if not article_id or not content:
+        model = article.get('model_to_use')
+        if model:
+            if model not in model_groups:
+                model_groups[model] = []
+            model_groups[model].append(article)
+        else:
             logger.warning(
-                f"Skipping article {article_id} with missing ID or content.")
-            # We'll handle these separately since they're not valid tasks
-            continue
+                f"Article {article.get('id')} missing 'model_to_use' assignment. Skipping.")
 
-        # Create a task definition dictionary with all necessary data
-        task_definition = {
-            'article_id': article_id,
-            'content': content,
-            'processing_tier': tier,
-            'model_to_use': model_to_use,
-            'fallback_model': fallback_model
-        }
-        tasks_definitions.append(task_definition)
+    # Check if any articles have assigned models
+    if not model_groups:
+        logger.warning("No articles with assigned models in the batch.")
+        return {}
 
-    # Special handling for skipped articles (missing ID/content)
-    skipped_results = {}
-    for article in articles:
-        article_id = article.get('id')
-        if article_id and (not article.get('content')):
-            skipped_results[article_id] = {"error": "Missing ID or content"}
+    # Estimate available slots without holding lock for long periods
+    revised_articles = []
+    # Removed available_slots_cache
 
-    # Use TaskManager to run the tasks concurrently
-    if tasks_definitions:
-        # Use the provided TaskManager instance
-        extraction_results = await task_manager.run_tasks(gemini_client, tasks_definitions)
+    for model_name, model_articles in model_groups.items():
+        estimated_slots_available = 0
+        limit = 0  # Initialize limit
+        if gemini_client.rate_limiter:
+            # Get limit for the model
+            limit = gemini_client.rate_limiter.model_rpm_limits.get(
+                model_name, 0)
+            # Get current RPM (method handles its own brief lock)
+            try:
+                current_rpm = gemini_client.rate_limiter.get_current_rpm(
+                    model_name)
+                estimated_slots_available = max(0, limit - current_rpm)
+            except Exception as e:
+                logger.error(
+                    f"Error getting current RPM for {model_name}: {e}. Assuming 0 slots.", exc_info=True)
+                estimated_slots_available = 0  # Assume 0 if error occurs
+        else:
+            # No rate limiter, assume infinite slots (or handle as error)
+            estimated_slots_available = len(model_articles)
+            limit = estimated_slots_available  # Set limit for logging clarity
+            logger.warning(
+                "No rate limiter available, assuming all slots are open.")
 
-        # Log rate limiter status after batch completion
-        # if hasattr(gemini_client, 'rate_limiter') and gemini_client.rate_limiter:
-        #     for model in gemini_client.ALL_MODEL_RPMS.keys(): # Old way
-        #         current_rpm = gemini_client.rate_limiter.get_current_rpm(model)
-        #         wait_time = gemini_client.rate_limiter.get_wait_time(model)
-        #         logger.info(
-        #             f"Rate limiter status - Model: {model}, Current RPM: {current_rpm}, Wait time: {wait_time:.2f}s")
-        # ^^^ This logging is now done inside the main run loop, removed from here ^^^
+        logger.debug(
+            f"Model {model_name}: Limit={limit}, Est. Current RPM based estimate={current_rpm if gemini_client.rate_limiter else 'N/A'}, Est. Available Slots={estimated_slots_available}")
 
-        # Merge with skipped results
-        extraction_results.update(skipped_results)
+        articles_reassigned = 0
+        for i, article in enumerate(model_articles):
+            # Check based on ESTIMATED slots
+            if i < estimated_slots_available:
+                # Enough estimated slots, keep original model
+                revised_articles.append(article)
+            else:
+                # Rate limit *likely* hit for the primary model based on estimate, try fallback or alternatives
+                articles_reassigned += 1
+                tier = article.get('processing_tier')
+                fallback_model = article.get('fallback_model')
+                reassigned = False
 
-        return extraction_results
-    else:
-        logger.warning("No valid articles to process in batch")
-        return skipped_results
+                # 1. Try Fallback Model
+                if fallback_model and fallback_model != model_name:
+                    # Estimate slots for fallback
+                    fallback_slots = 0
+                    if gemini_client.rate_limiter:
+                        try:
+                            fallback_limit = gemini_client.rate_limiter.model_rpm_limits.get(
+                                fallback_model, 0)
+                            fallback_rpm = gemini_client.rate_limiter.get_current_rpm(
+                                fallback_model)
+                            fallback_slots = max(
+                                0, fallback_limit - fallback_rpm)
+                        except Exception as e:
+                            logger.error(
+                                f"Error getting current RPM for fallback {fallback_model}: {e}. Assuming 0 slots.", exc_info=True)
+                            fallback_slots = 0
+                    else:
+                        fallback_slots = 1  # Assume at least one slot if no limiter
+
+                    # Use the estimate
+                    if fallback_slots > 0:
+                        article['model_to_use'] = fallback_model
+                        revised_articles.append(article)
+                        # Decrementing the estimate locally for this loop's check
+                        estimated_slots_available -= 1  # Decrement original model slot estimate implicitly
+                        # We don't decrement fallback_slots estimate as it's just a check
+                        logger.info(
+                            f"Article {article.get('id')} reassigned from {model_name} to fallback {fallback_model} due to ESTIMATED rate limit.")
+                        reassigned = True
+
+                # 2. Try Other Available Models (if fallback failed or wasn't applicable)
+                if not reassigned and gemini_client.rate_limiter:
+                    for alt_model, alt_limit in gemini_client.rate_limiter.model_rpm_limits.items():
+                        # Skip the original and fallback models
+                        if alt_model != model_name and alt_model != fallback_model:
+                            alt_slots = 0
+                            try:
+                                alt_rpm = gemini_client.rate_limiter.get_current_rpm(
+                                    alt_model)
+                                alt_slots = max(0, alt_limit - alt_rpm)
+                            except Exception as e:
+                                logger.error(
+                                    f"Error getting current RPM for alternative {alt_model}: {e}. Assuming 0 slots.", exc_info=True)
+                                alt_slots = 0
+
+                            # Use the estimate
+                            if alt_slots > 0:
+                                article['model_to_use'] = alt_model
+                                revised_articles.append(article)
+                                # Decrementing the estimate locally
+                                estimated_slots_available -= 1  # Decrement original model slot estimate implicitly
+                                # We don't decrement alt_slots estimate
+                                logger.info(
+                                    f"Article {article.get('id')} reassigned from {model_name} to alternative {alt_model} due to ESTIMATED rate limits.")
+                                reassigned = True
+                                break  # Found an alternative
+
+                # 3. If still not reassigned, keep original but log warning
+                if not reassigned:
+                    logger.warning(
+                        f"Article {article.get('id')} could not be reassigned from estimated rate-limited model {model_name}. Keeping original assignment, may face delays.")
+                    # Keep original, task manager will handle wait
+                    revised_articles.append(article)
+
+        if articles_reassigned > 0:
+            logger.info(
+                f"Reassigned {articles_reassigned} articles originally intended for model {model_name} based on rate limit estimates.")
+
+    # --- End: Refactored Pre-allocation Logic ---
+
+    if not revised_articles:
+        logger.warning(
+            f"No articles remaining after pre-allocation checks. Skipping batch.")
+        return {}
+
+    logger.debug(
+        f"Processing batch with {len(revised_articles)} articles after pre-allocation.")
+    # Pass the list with potentially revised model assignments to the task manager
+    logger.info(
+        f"Calling task_manager.run_tasks for {len(revised_articles)} articles...")
+    results = await task_manager.run_tasks(gemini_client, revised_articles)
+    logger.info(
+        f"task_manager.run_tasks completed for batch. Received {len(results)} results.")
+
+    # Check for rate limiting errors (still useful for monitoring)
+    rate_limit_errors = sum(1 for result in results.values()
+                            if isinstance(result, dict) and
+                            result.get('error', '').startswith(('API Rate Limit', 'Resource exhausted')))
+
+    if rate_limit_errors > 0:
+        logger.warning(
+            f"Encountered {rate_limit_errors} rate limit errors during task execution in batch of {len(revised_articles)}")
+
+    logger.debug(f"Exiting _extract_entities_batch.")
+    return results
 
 
 def _extract_entities(gemini_client: GeminiClient, articles: List[Dict[str, Any]]) -> Dict[int, Any]:
@@ -746,7 +873,7 @@ def _store_results(db_client: ReaderDBClient, entity_results: Dict[int, Any]) ->
                     unique_entity_types.add(entity_type)
 
     # Add all unique entity types to the database with default weights
-    logger.info(
+    logger.debug(
         f"Adding {len(unique_entity_types)} unique entity types to the database")
     for entity_type in unique_entity_types:
         try:

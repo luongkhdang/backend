@@ -54,31 +54,41 @@ class TaskManager:
         Returns:
             Tuple[int, Any]: Article ID and the result (parsed entities or error dictionary)
         """
-        article_id = task_data.get('article_id')
+        article_id = task_data.get('id')
         content = task_data.get('content', '')
         tier = task_data.get('processing_tier', 0)
-        # Model override is optional; client selects if not provided
         model_override = task_data.get('model_to_use')
 
-        content_length = len(content) if content else 0
-        log_model = model_override if model_override else "client-selected"
+        # Log entry point with essential details
         self.logger.debug(
-            f"Task for article {article_id}: Using {log_model} model (tier {tier}), content length {content_length}")
+            f"[_run_single_task Entry] article_id={article_id}, tier={tier}, model_override='{model_override}'")
 
+        # --- Enhanced Check for article_id ---
         if not article_id:
-            self.logger.error("Task missing article_id")
-            # Return a placeholder or raise an error? Returning error dict for now.
-            return (-1, {"error": "Task missing article_id"})
+            self.logger.error(
+                f"[_run_single_task Error] Task missing article ID (key 'id'). Task data: {task_data}")
+            # Log exit point for error case
+            self.logger.debug(
+                f"[_run_single_task Exit - Error] article_id=None, returning error dict")
+            return (-1, {"error": "Task missing article ID (key 'id')"})
+        # --- End Enhanced Check ---
 
+        content_length = len(content) if content else 0
         if not content or content_length == 0:
-            self.logger.warning(f"Empty content for article {article_id}")
+            self.logger.warning(
+                f"[_run_single_task Warning] Empty content for article {article_id}. Returning error dict.")
+            # Log exit point for warning/error case
+            self.logger.debug(
+                f"[_run_single_task Exit - Error] article_id={article_id}, returning error dict")
             return (article_id, {"error": "Empty content"})
 
         try:
-            # Call the GeminiClient's async method directly.
-            # It handles model selection, fallback, retries, and rate limiting internally.
-            self.logger.debug(
-                f"Starting API call via GeminiClient for article {article_id}")
+            # Log before the actual API call attempt
+            log_model = model_override if model_override else "client-selected"
+            self.logger.info(
+                f"[_run_single_task] Attempting API call for article {article_id} (model: {log_model}, tier: {tier}) via GeminiClient")
+
+            start_time = time.monotonic()
 
             # Add timeout for the entire client call (including its internal retries)
             extraction_result = await asyncio.wait_for(
@@ -86,51 +96,71 @@ class TaskManager:
                     article_content=content,
                     processing_tier=tier,
                     model_override=model_override
-                    # Removed fallback_model - client handles this
                 ),
                 timeout=180  # 3 minute timeout for the overall task attempt
             )
 
-            # Removed internal rate limit check/cooldown logic
+            end_time = time.monotonic()
+            duration = end_time - start_time
+            self.logger.info(
+                f"[_run_single_task] API call for article {article_id} completed in {duration:.2f}s.")
 
             if extraction_result:
-                # Client returns the already parsed dictionary
                 entity_count = len(extraction_result.get('entities', []))
                 self.logger.debug(
-                    f"Successfully processed article {article_id}, found {entity_count} entities.")
+                    f"[_run_single_task Success] Processed article {article_id}, found {entity_count} entities.")
+                # Log exit point for success case
+                self.logger.debug(
+                    f"[_run_single_task Exit - Success] article_id={article_id}, returning data")
                 return (article_id, extraction_result)
             else:
-                # This case might indicate an issue within the client or an unexpected empty response
                 self.logger.warning(
-                    f"GeminiClient returned None or empty result for article {article_id}")
-                # Check client logs for more details if this occurs
+                    f"[_run_single_task Warning] GeminiClient returned None/empty result for article {article_id}")
+                # Log exit point for warning/error case
+                self.logger.debug(
+                    f"[_run_single_task Exit - Error] article_id={article_id}, returning error dict")
                 return (article_id, {
                     "error": "Client returned no result (check GeminiClient logs)"
                 })
 
         except asyncio.TimeoutError:
+            elapsed_time = time.monotonic() - start_time
             self.logger.error(
-                f"Overall task timeout for article {article_id} after 180 seconds")
+                f"[_run_single_task Error] Overall task timeout for article {article_id} after {elapsed_time:.2f}s (limit 180s)")
+            # Log exit point for timeout error
+            self.logger.debug(
+                f"[_run_single_task Exit - Error] article_id={article_id}, returning error dict")
             return (article_id, {
                 "error": f"Task timeout after 180 seconds"
             })
-        # Catch specific Google API errors if needed for distinct handling
         except google.api_core.exceptions.ResourceExhausted as rate_limit_err:
+            elapsed_time = time.monotonic() - start_time
             self.logger.error(
-                f"Gemini API rate limit/quota error for article {article_id}: {rate_limit_err}", exc_info=False)
+                f"[_run_single_task Error] Gemini API rate limit/quota error for article {article_id} after {elapsed_time:.2f}s: {rate_limit_err}", exc_info=False)
+            # Log exit point for rate limit error
+            self.logger.debug(
+                f"[_run_single_task Exit - Error] article_id={article_id}, returning error dict")
             return (article_id, {
                 "error": f"API Rate Limit/Quota Error: {str(rate_limit_err)}"
             })
         except google.api_core.exceptions.GoogleAPIError as api_err:
+            elapsed_time = time.monotonic() - start_time
             self.logger.error(
-                f"Google API error for article {article_id}: {api_err}", exc_info=True)
+                f"[_run_single_task Error] Google API error for article {article_id} after {elapsed_time:.2f}s: {api_err}", exc_info=True)
+            # Log exit point for Google API error
+            self.logger.debug(
+                f"[_run_single_task Exit - Error] article_id={article_id}, returning error dict")
             return (article_id, {
                 "error": f"Google API Error: {str(api_err)}"
             })
         except Exception as e:
-            # Catch any other unexpected errors during the client call
+            elapsed_time = time.monotonic() - start_time
+            # Catch any other unexpected errors
             self.logger.error(
-                f"Unexpected error processing article {article_id}: {e}", exc_info=True)
+                f"[_run_single_task Error] Unexpected error processing article {article_id} after {elapsed_time:.2f}s: {e}", exc_info=True)
+            # Log exit point for unexpected error
+            self.logger.debug(
+                f"[_run_single_task Exit - Error] article_id={article_id}, returning error dict")
             return (article_id, {
                 "error": f"Unexpected task error: {str(e)}"
             })
@@ -146,72 +176,99 @@ class TaskManager:
         Returns:
             Dict[int, Any]: Dictionary mapping article IDs to their results (or error dicts)
         """
-        if not tasks_definitions:
-            self.logger.warning("No tasks provided to run_tasks")
-            return {}
+        num_tasks_received = len(tasks_definitions)
+        self.logger.debug(
+            f"[run_tasks Entry] Received {num_tasks_received} task definitions.")
 
-        self.logger.info(
-            f"Preparing to run {len(tasks_definitions)} tasks concurrently using asyncio.gather")
+        if not tasks_definitions:
+            self.logger.warning(
+                "[run_tasks] No tasks provided. Returning empty dict.")
+            return {}
 
         # Create list of coroutines
         awaitables = []
-        for task_data in tasks_definitions:
-            if not task_data.get('article_id'):
-                self.logger.warning("Skipping task without article_id")
-                continue
-            # Create coroutine for each task
-            awaitables.append(self._run_single_task(gemini_client, task_data))
+        valid_task_indices = []  # Keep track of original indices of valid tasks
+        skipped_tasks_count = 0
 
+        self.logger.debug(
+            f"[run_tasks] Preparing awaitables for {num_tasks_received} tasks.")
+        for i, task_data in enumerate(tasks_definitions):
+            article_id_check = task_data.get('id')
+            if not article_id_check:
+                self.logger.warning(
+                    f"[run_tasks] Skipping task at index {i} due to missing/falsy ID (key 'id'). Data: {task_data}")
+                skipped_tasks_count += 1
+                continue
+
+            # Create coroutine for each valid task
+            awaitables.append(self._run_single_task(gemini_client, task_data))
+            valid_task_indices.append(i)  # Store the original index
+
+        num_awaitables = len(awaitables)
         if not awaitables:
-            self.logger.warning("No valid tasks to run")
+            self.logger.warning(
+                f"[run_tasks] No valid tasks to run after checking {num_tasks_received} definitions (skipped {skipped_tasks_count}). Returning empty dict.")
             return {}
 
+        self.logger.info(
+            f"[run_tasks] Starting asyncio.gather for {num_awaitables} tasks (skipped {skipped_tasks_count}).")
+        start_gather_time = time.monotonic()
+
         # Run tasks concurrently using asyncio.gather
-        # return_exceptions=True allows us to capture errors from individual tasks
-        # without stopping the entire batch.
         results = await asyncio.gather(*awaitables, return_exceptions=True)
+
+        end_gather_time = time.monotonic()
+        gather_duration = end_gather_time - start_gather_time
+        num_results = len(results)
+        self.logger.info(
+            f"[run_tasks] asyncio.gather completed in {gather_duration:.2f} seconds.")
 
         # Process results and handle potential exceptions from gather
         final_results = {}
-        task_idx = 0
-        valid_task_defs = [t for t in tasks_definitions if t.get(
-            'article_id')]  # Keep track of original task defs
+        exceptions_count = 0
+        successful_count = 0
+        error_results_count = 0
 
-        for result in results:
-            original_task_data = valid_task_defs[task_idx]
-            article_id = original_task_data.get(
-                'article_id', -1)  # Should always have ID here
+        self.logger.debug(
+            f"[run_tasks] Processing {num_results} results from asyncio.gather.")
+        for i, gather_result in enumerate(results):
+            original_task_index = valid_task_indices[i]
+            original_task_data = tasks_definitions[original_task_index]
+            # Use a default (-1 or similar) if ID is somehow missing again, though it was checked before
+            article_id_from_original = original_task_data.get(
+                'id', f'MISSING_ID_at_index_{original_task_index}')
 
-            if isinstance(result, Exception):
-                # An unexpected exception occurred within asyncio.gather or the task itself
+            if isinstance(gather_result, Exception):
+                # This exception was raised within _run_single_task OR asyncio.gather itself
+                exceptions_count += 1
                 self.logger.error(
-                    f"Task for article {article_id} failed with exception in gather: {result}", exc_info=result)
-                final_results[article_id] = {
-                    "error": f"Task failed in gather: {str(result)}"}
-            elif isinstance(result, tuple) and len(result) == 2:
-                # Normal result format: (article_id, result_data)
-                res_article_id, res_data = result
-                if res_article_id != article_id and article_id != -1:
-                    # Log mismatch, but use ID from result if valid
-                    self.logger.warning(
-                        f"Article ID mismatch! Task def ID: {article_id}, Result ID: {res_article_id}. Using result ID.")
-                    final_results[res_article_id] = res_data
-                elif res_article_id == -1 and article_id != -1:
-                    # Result indicates error before ID was confirmed, use task def ID
-                    final_results[article_id] = res_data
-                else:  # IDs match or task def ID was missing
-                    final_results[res_article_id] = res_data
+                    # Log stack trace if it's an actual exception object
+                    f"[run_tasks] Task for article_id '{article_id_from_original}' (original index {original_task_index}) resulted in an exception caught by gather: {gather_result}", exc_info=(isinstance(gather_result, Exception)))
+                final_results[article_id_from_original] = {
+                    "error": f"Task failed with exception: {str(gather_result)}"}
             else:
-                # Unexpected result format from _run_single_task
-                self.logger.error(
-                    f"Unexpected result format for article {article_id}: {result}")
-                final_results[article_id] = {
-                    "error": "Unexpected result format from task"}
+                # gather_result should be the tuple (article_id, result_dict) from _run_single_task
+                task_article_id, task_result = gather_result
+                # Verify the article ID matches if possible (handle potential -1 case)
+                if task_article_id != -1 and task_article_id != article_id_from_original:
+                    self.logger.warning(
+                        f"[run_tasks] Mismatch between original article ID ({article_id_from_original}) and task result ID ({task_article_id}). Using original ID for key.")
+                elif task_article_id == -1:
+                    self.logger.warning(
+                        f"[run_tasks] Task result for original article ID ({article_id_from_original}) indicates an internal error (ID -1). Storing error under original ID.")
 
-            task_idx += 1
+                # Check if the result dictionary contains an 'error' key
+                if isinstance(task_result, dict) and 'error' in task_result:
+                    error_results_count += 1
+                    self.logger.warning(
+                        f"[run_tasks] Task for article_id '{article_id_from_original}' completed with an error state: {task_result['error']}")
+                else:
+                    successful_count += 1
+                    # self.logger.debug(f"[run_tasks] Task for article_id '{article_id_from_original}' completed successfully.") # Optional: too verbose?
 
-        self.logger.info(f"Finished processing {len(results)} tasks.")
-        # Log summary of model usage from GeminiClient's perspective if possible/needed
-        # (Requires GeminiClient to expose this info or log it effectively)
+                # Store result using original ID as key
+                final_results[article_id_from_original] = task_result
 
+        self.logger.info(
+            f"[run_tasks Exit] Processed {num_results} results: {successful_count} successful, {error_results_count} with errors, {exceptions_count} exceptions caught by gather.")
         return final_results
