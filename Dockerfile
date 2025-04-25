@@ -13,7 +13,7 @@ COPY . .
 RUN mkdir -p /app/src/output && chmod 777 /app/src/output
 
 # Install json5 dependency needed by the copied code
-RUN pip install --no-cache-dir json5
+RUN pip install --no-cache-dir json5 hf_xet
 
 # Set environment variables
 ENV READER_DB_HOST=postgres

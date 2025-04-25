@@ -26,17 +26,28 @@ try:
     import psycopg2
     from psycopg2 import pool
     from psycopg2.extensions import connection as Connection
+    from pgvector.psycopg2 import register_vector
     PSYCOPG2_AVAILABLE = True
 except ImportError:
     logging.warning(
-        "psycopg2 not available; database functionality will be limited")
+        "psycopg2 or pgvector not available; database functionality will be limited")
     psycopg2 = None
     pool = None
     Connection = None
+    register_vector = None
     PSYCOPG2_AVAILABLE = False
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Register the pgvector adapter globally if psycopg2 is available
+if PSYCOPG2_AVAILABLE and register_vector:
+    try:
+        register_vector()
+        logger.info(
+            "Successfully registered pgvector adapter for psycopg2 globally.")
+    except Exception as e:
+        logger.error(f"Failed to register pgvector adapter globally: {e}")
 
 
 def initialize_connection_pool(db_config: Dict[str, Any]) -> Optional[Any]:
@@ -91,6 +102,7 @@ def initialize_connection_pool(db_config: Dict[str, Any]) -> Optional[Any]:
 def get_connection(connection_pool) -> Optional[Connection]:
     """
     Get a connection from the pool.
+    Also registers the pgvector type adapter for the connection.
 
     Args:
         connection_pool: The ThreadedConnectionPool to get a connection from
@@ -103,7 +115,18 @@ def get_connection(connection_pool) -> Optional[Connection]:
         return None
 
     try:
-        return connection_pool.getconn()
+        conn = connection_pool.getconn()
+        if conn and register_vector:  # Ensure register_vector was imported
+            try:
+                # Register vector type for this specific connection
+                register_vector(conn)
+                logger.debug(
+                    "pgvector adapter registered for retrieved connection.")
+            except Exception as e:
+                # Log error but still return the connection if obtained
+                logger.error(
+                    f"Failed to register pgvector adapter for connection: {e}")
+        return conn
     except Exception as e:
         logger.error(f"Error getting connection from pool: {e}")
         return None

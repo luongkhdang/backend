@@ -1,173 +1,56 @@
 """
-haystack_client.py - Haystack RAG Pipeline Client
+haystack_client.py - Haystack RAG Pipeline Client (Refactored)
 
-This module provides an interface to Haystack 2.x components for building and running
-retrieval-augmented generation pipelines. It handles document retrieval, ranking,
-and integration with the Gemini API for essay generation.
+This module provides an interface primarily focused on using Haystack 2.x components
+for **ranking** retrieved documents and potentially preparing prompts for essay generation.
+It assumes **retrieval** is handled externally (e.g., via ReaderDBClient) based on custom logic.
 
 Exported functions:
-- get_document_store(): Returns configured PgvectorDocumentStore
-- get_text_embedder(): Returns GeminiTextEmbedder
-- get_embedding_retriever(document_store): Returns PgvectorEmbeddingRetriever
-- get_ranker(): Returns configured Ranker component
-- get_prompt_builder(template_path): Returns PromptBuilder component
-- get_gemini_generator(): Returns GoogleAIGeminiGenerator component
-- build_retrieval_pipeline(embedder, retriever): Builds retrieval pipeline
-- build_retrieval_ranking_pipeline(embedder, retriever, ranker): Builds retrieval+ranking pipeline
-- run_article_retrieval(query_text): Runs retrieval pipeline for a query
-- run_article_retrieval_and_ranking(query_text): Runs retrieval+ranking pipeline for a query
+- get_ranker(): Returns configured Ranker component (TransformersSimilarityRanker).
+- get_prompt_builder(template_path): Returns PromptBuilder component.
+- get_gemini_generator(): Returns GoogleAIGeminiGenerator component (kept for potential use in Step 5).
+- run_article_retrieval_and_ranking(query_text, article_ids): Implements the new custom retrieval and ranking strategy.
 
 Related files:
-- src/database/modules/haystack_db.py: Database integration module
-- src/gemini/gemini_client.py: Gemini API client for model access
-- src/prompts/haystack_prompt.txt: Template for essay generation
-- src/steps/step5.py: Main script that uses this client
+- src/database/reader_db_client.py: Database client, now responsible for retrieval.
+- src/gemini/gemini_client.py: Gemini API client for model access.
+- src/prompts/haystack_prompt.txt: Template for essay generation.
+- src/steps/step5.py: Main script that uses this client.
 """
 
 import os
 import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+import numpy as np  # Added for embedding averaging
 
-# Haystack imports
-from haystack import Pipeline, component
-from haystack.utils import Secret
+# Haystack imports (only necessary ones)
 from haystack.dataclasses import Document
 from haystack.components.rankers import TransformersSimilarityRanker
 from haystack.components.builders import PromptBuilder
 
-# Haystack integrations
-from haystack_integrations.document_stores.pgvector import PgvectorDocumentStore
-from haystack_integrations.components.retrievers.pgvector import PgvectorEmbeddingRetriever
+# Haystack integrations (only necessary ones)
 from haystack_integrations.components.generators.google_ai import GoogleAIGeminiGenerator
 
-# Import GeminiClient for the custom embedder
-from src.gemini.gemini_client import GeminiClient
+# Import ReaderDBClient for custom retrieval
+from src.database.reader_db_client import ReaderDBClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Custom Haystack Component for Gemini Embeddings
+
+# Removed GeminiTextEmbedder custom component as it's no longer used
 
 
-@component
-class GeminiTextEmbedder:
-    """
-    Custom Haystack component to generate text embeddings using the Gemini API via GeminiClient.
-    """
-
-    def __init__(self, client: Optional[GeminiClient] = None, model_name: Optional[str] = None, task_type: Optional[str] = None):
-        """
-        Initializes the GeminiTextEmbedder.
-
-        Args:
-            client: An initialized GeminiClient instance (optional, will be created if None).
-            model_name: The specific Gemini embedding model name (optional, defaults from client/env).
-            task_type: The task type for embedding (optional, defaults from client/env).
-        """
-        self.client = client or GeminiClient()
-        # Use provided model/task or let GeminiClient use its defaults from env
-        self.model_name = model_name or self.client.embedding_model
-        self.task_type = task_type or self.client.default_task_type
-        logger.info(
-            f"GeminiTextEmbedder initialized with model {self.model_name}, task {self.task_type}")
-
-    @component.output_types(embedding=List[float])
-    def run(self, text: str):
-        """
-        Generates the embedding for the input text.
-
-        Args:
-            text: The text to embed.
-
-        Returns:
-            A dictionary with the key "embedding" containing the generated embedding list.
-        """
-        if not text or not isinstance(text, str):
-            logger.warning("GeminiTextEmbedder received invalid text input.")
-            # Return zero vector of appropriate dimension as fallback? Or raise error?
-            # Returning empty list might cause issues downstream. Let's return None and handle upstream if needed.
-            # For now, let's return an empty dict which might signal failure better in Haystack.
-            # Or maybe just return an empty list, but log it clearly.
-            # Let's try returning an empty embedding list
-            logger.warning(
-                "Returning empty embedding list due to invalid input.")
-            return {"embedding": []}  # Return empty list
-
-        embedding = self.client.generate_embedding(
-            text=text,
-            task_type=self.task_type
-            # Let generate_embedding handle retries internally
-        )
-
-        if embedding is None:
-            logger.error(
-                f"Failed to generate embedding for text: {text[:100]}...")
-            return {"embedding": []}  # Return empty list on failure
-
-        return {"embedding": embedding}
+# Removed get_document_store function
 
 
-def get_document_store() -> PgvectorDocumentStore:
-    """
-    Initialize and return the PgvectorDocumentStore to connect to your 
-    PostgreSQL database with pgvector extension.
-
-    Returns:
-        PgvectorDocumentStore: Configured document store instance
-    """
-    # Get connection string from environment variable
-    pg_conn_str = os.getenv(
-        "PG_CONN_STR", "postgresql://postgres:postgres@postgres:5432/reader_db")
-
-    # Initialize and return document store
-    document_store = PgvectorDocumentStore(
-        connection_string=pg_conn_str,
-        table_name="articles",  # Table containing articles with embedding column
-        embedding_dimension=768,  # Dimension of text-embedding-004 embeddings
-        vector_function="cosine_similarity",  # Use cosine similarity for search
-        recreate_table=False,  # Don't recreate the table, assume it exists
-        embedding_field="embedding"  # Name of the vector column in articles table
-    )
-
-    logger.info("Initialized PgvectorDocumentStore")
-    return document_store
+# Removed get_text_embedder function
 
 
-def get_text_embedder() -> GeminiTextEmbedder:
-    """
-    Initialize and return the custom GeminiTextEmbedder.
-
-    Returns:
-        GeminiTextEmbedder: Configured text embedder instance
-    """
-    # Initialize the custom embedder (it will use env vars via GeminiClient)
-    embedder = GeminiTextEmbedder()
-
-    logger.info(f"Initialized GeminiTextEmbedder")
-    return embedder
-
-
-def get_embedding_retriever(document_store: PgvectorDocumentStore) -> PgvectorEmbeddingRetriever:
-    """
-    Initialize and return a retriever for the specified document store.
-
-    Args:
-        document_store: Initialized PgvectorDocumentStore
-
-    Returns:
-        PgvectorEmbeddingRetriever: Configured retriever instance
-    """
-    # Initialize the retriever with the document store
-    retriever = PgvectorEmbeddingRetriever(
-        document_store=document_store,
-        top_k=50  # Retrieve top 50 documents initially
-    )
-
-    logger.info("Initialized PgvectorEmbeddingRetriever")
-    return retriever
+# Removed get_embedding_retriever function
 
 
 def get_ranker() -> TransformersSimilarityRanker:
@@ -222,6 +105,7 @@ def get_prompt_builder(template_path: str = "src/prompts/haystack_prompt.txt") -
 def get_gemini_generator() -> GoogleAIGeminiGenerator:
     """
     Initialize and return a GoogleAIGeminiGenerator for text generation.
+    (Kept for potential use in Step 5, though GeminiClient might be used directly)
 
     Returns:
         GoogleAIGeminiGenerator: Configured generator instance
@@ -252,123 +136,153 @@ def get_gemini_generator() -> GoogleAIGeminiGenerator:
     return generator
 
 
-def build_retrieval_pipeline(embedder, retriever) -> Pipeline:
+# Removed build_retrieval_pipeline function
+
+
+# Removed build_retrieval_ranking_pipeline function
+
+
+# Removed run_article_retrieval function
+
+
+def run_article_retrieval_and_ranking(query_text: str, article_ids: List[int]) -> List[Document]:
     """
-    Build and return a Haystack pipeline for document retrieval.
+    Implements the new custom retrieval and ranking strategy:
+    1. Fetches embeddings for the given article_ids from the database.
+    2. Calculates the average embedding for the group.
+    3. Uses the average embedding to find similar articles via ReaderDBClient.
+    4. Converts the results to Haystack Document objects.
+    5. Ranks the resulting documents using TransformersSimilarityRanker based on the query_text.
 
     Args:
-        embedder: Initialized text embedder (GeminiTextEmbedder)
-        retriever: Initialized document retriever
+        query_text: The original query text (e.g., group rationale) used for ranking relevance.
+        article_ids: List of article IDs forming the current group, used to calculate the average embedding.
 
     Returns:
-        Pipeline: Configured Haystack pipeline
+        List[Document]: Retrieved and ranked documents.
     """
-    pipeline = Pipeline()
-
-    # Add components
-    pipeline.add_component("embedder", embedder)
-    pipeline.add_component("retriever", retriever)
-
-    # Connect components
-    pipeline.connect("embedder.embedding", "retriever.query_embedding")
-
-    logger.info("Built retrieval pipeline")
-    return pipeline
-
-
-def build_retrieval_ranking_pipeline(embedder, retriever, ranker) -> Pipeline:
-    """
-    Build and return a Haystack pipeline for document retrieval with ranking.
-
-    Args:
-        embedder: Initialized text embedder (GeminiTextEmbedder)
-        retriever: Initialized document retriever
-        ranker: Initialized document ranker
-
-    Returns:
-        Pipeline: Configured Haystack pipeline
-    """
-    pipeline = Pipeline()
-
-    # Add components
-    pipeline.add_component("embedder", embedder)
-    pipeline.add_component("retriever", retriever)
-    pipeline.add_component("ranker", ranker)
-
-    # Connect components
-    pipeline.connect("embedder.embedding", "retriever.query_embedding")
-    pipeline.connect("retriever.documents", "ranker.documents")
-
-    logger.info("Built retrieval and ranking pipeline")
-    return pipeline
-
-
-def run_article_retrieval(query_text: str) -> List[Document]:
-    """
-    Run the retrieval pipeline to get relevant documents for a query.
-
-    Args:
-        query_text: The query text to search for
-
-    Returns:
-        List[Document]: Retrieved documents
-    """
+    db_client = None
     try:
-        # Initialize components
-        document_store = get_document_store()
-        embedder = get_text_embedder()
-        retriever = get_embedding_retriever(document_store)
-
-        # Build pipeline
-        pipeline = build_retrieval_pipeline(embedder, retriever)
-
-        # Run pipeline
-        result = pipeline.run({"embedder": {"text": query_text}})
-
-        # Return documents
-        documents = result["retriever"]["documents"]
-        logger.info(f"Retrieved {len(documents)} documents for query")
-        return documents
-
-    except Exception as e:
-        logger.error(f"Error in article retrieval: {e}", exc_info=True)
-        return []
-
-
-def run_article_retrieval_and_ranking(query_text: str) -> List[Document]:
-    """
-    Run the retrieval and ranking pipeline to get relevant documents for a query.
-
-    Args:
-        query_text: The query text to search for
-
-    Returns:
-        List[Document]: Retrieved and ranked documents
-    """
-    try:
-        # Initialize components
-        document_store = get_document_store()
-        embedder = get_text_embedder()
-        retriever = get_embedding_retriever(document_store)
-        ranker = get_ranker()
-
-        # Build pipeline
-        pipeline = build_retrieval_ranking_pipeline(
-            embedder, retriever, ranker)
-
-        # Run pipeline
-        result = pipeline.run({
-            "embedder": {"text": query_text},
-            "ranker": {"query": query_text}
-        })
-
-        # Return documents
-        documents = result["ranker"]["documents"]
         logger.info(
-            f"Retrieved and ranked {len(documents)} documents for query")
-        return documents
+            f"Starting custom retrieval and ranking for {len(article_ids)} articles.")
+
+        # 1. & 2. Fetch and Average Group Embeddings
+        db_client = ReaderDBClient()  # Initialize DB client
+        logger.debug(f"Fetching embeddings for article IDs: {article_ids}")
+        # Assuming get_embeddings_for_articles returns a list of dicts like [{'article_id': id, 'embedding': [..]}, ...]
+        # Use the newly added method from ReaderDBClient
+        group_embeddings_data = db_client.get_embeddings_for_articles(
+            article_ids)
+
+        if not group_embeddings_data:
+            logger.warning(
+                f"No embeddings found for article IDs: {article_ids}. Cannot perform retrieval.")
+            return []
+
+        # Safely extract valid embeddings, checking type and iterating over dictionary values
+        valid_embeddings = []
+        # group_embeddings_data is a Dict[int, Dict[str, Any]]
+        for data in group_embeddings_data.values():  # Iterate over the dictionary values
+            embedding = data.get('embedding') if isinstance(
+                data, dict) else None
+            # Check existence and non-emptiness explicitly
+            if embedding is not None and len(embedding) > 0:
+                valid_embeddings.append(embedding)
+            else:
+                # Handle cases where data might not be a dict or embedding is invalid
+                if isinstance(data, dict):
+                    # Data is a dict, but embedding is invalid/missing
+                    logger.warning(
+                        # Added note about missing ID
+                        f"Skipping invalid or missing embedding data for article {data.get('article_id', 'UNKNOWN - data has no ID')}: type={type(embedding)}")
+                else:
+                    # Data is not a dict, log its type and value
+                    logger.warning(
+                        # Log first 100 chars
+                        f"Skipping unexpected item in group_embeddings_data values. Expected dict, got {type(data)}: {str(data)[:100]}")
+
+        if not valid_embeddings:
+            logger.warning(
+                f"No *valid* embeddings found for article IDs: {article_ids} after filtering. Cannot perform retrieval.")
+            return []
+
+        logger.info(
+            f"Found {len(valid_embeddings)} valid embeddings for averaging.")
+        # Calculate average embedding
+        average_embedding = np.mean(valid_embeddings, axis=0).tolist()
+        logger.debug(
+            f"Calculated average embedding (first 3 dims): {average_embedding[:3]}")
+
+        # 3. Perform Similarity Search using DB Client
+        # find_similar_articles should query embeddings table and JOIN articles
+        logger.info("Performing similarity search using average embedding...")
+        retrieved_articles_data = db_client.find_similar_articles(
+            embedding=average_embedding, limit=50)  # Use 'limit' instead of 'top_k'
+
+        if not retrieved_articles_data:
+            logger.info(
+                "No similar articles found via custom database retrieval.")
+            return []
+
+        logger.info(
+            f"Retrieved {len(retrieved_articles_data)} candidate articles from DB.")
+
+        # 4. Convert to Haystack Documents, filtering out ERROR articles
+        retrieved_haystack_docs: List[Document] = []
+        skipped_error_count = 0
+        for item in retrieved_articles_data:
+            article_content = item.get('content', '')
+            # Skip articles marked as ERROR
+            if article_content == 'ERROR':
+                skipped_error_count += 1
+                continue
+
+            # Construct meta, carefully handling missing keys
+            meta_data = {
+                'id': item.get('id'),
+                'title': item.get('title'),
+                'domain': item.get('domain'),
+                'pub_date': str(item.get('pub_date')) if item.get('pub_date') else None,
+                # Add other relevant metadata from articles table if needed
+            }
+            # Create Document, ensuring content is a string
+            doc = Document(
+                content=str(article_content),  # Use the variable
+                meta=meta_data,
+                score=item.get('similarity')  # Similarity score from DB query
+            )
+            retrieved_haystack_docs.append(doc)
+
+        if skipped_error_count > 0:
+            logger.info(
+                f"Skipped {skipped_error_count} articles with 'ERROR' content.")
+
+        logger.debug(
+            f"Converted {len(retrieved_haystack_docs)} valid results to Haystack Documents.")
+
+        # 5. Rank documents using Haystack Ranker
+        ranker = get_ranker()
+        logger.info("Warming up the ranker...")
+        ranker.warm_up()
+        logger.info(
+            f"Ranking {len(retrieved_haystack_docs)} documents with query: '{query_text[:50]}...'")
+        # The ranker component's run method expects kwargs matching its input sockets
+        ranking_result = ranker.run(
+            query=query_text, documents=retrieved_haystack_docs)
+
+        # Extract ranked documents
+        ranked_documents = ranking_result.get('documents', [])
+
+        logger.info(
+            f"Ranking complete. Returning {len(ranked_documents)} documents.")
+        return ranked_documents
 
     except Exception as e:
         logger.error(
-            f"Error in article retrieval and ranking: {e}", exc_info=True)
+            f"Error in custom article retrieval and ranking: {e}", exc_info=True)
         return []
+    finally:
+        # Ensure DB client connection is closed/released if it was opened
+        if db_client:
+            db_client.close()
+            logger.debug("Closed ReaderDBClient connection.")

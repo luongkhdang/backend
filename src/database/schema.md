@@ -86,26 +86,35 @@
 
 (Managed by `src/database/modules/essays.py`)
 
-| Column        | Type        | Constraints                             | Default             | Description                                    |
-| ------------- | ----------- | --------------------------------------- | ------------------- | ---------------------------------------------- |
-| `id`          | `SERIAL`    | `PRIMARY KEY`                           |                     | Unique identifier for the essay                |
-| `type`        | `TEXT`      |                                         |                     | Type of essay (e.g., summary, analysis)        |
-| `article_id`  | `INTEGER`   |                                         |                     | Related article ID (optional, not FK enforced) |
-| `title`       | `TEXT`      |                                         |                     | Title of the essay                             |
-| `content`     | `TEXT`      |                                         |                     | Content of the essay                           |
-| `layer_depth` | `INTEGER`   |                                         |                     | Depth or layer if part of a hierarchy          |
-| `cluster_id`  | `INTEGER`   | `FK to clusters(id) ON DELETE SET NULL` |                     | Associated cluster ID                          |
-| `created_at`  | `TIMESTAMP` |                                         | `CURRENT_TIMESTAMP` | Timestamp when the essay was created           |
-| `tags`        | `TEXT[]`    |                                         |                     | Array of text tags associated with the essay   |
+| Column                 | Type        | Constraints                             | Default             | Description                                  |
+| :--------------------- | :---------- | :-------------------------------------- | :------------------ | :------------------------------------------- |
+| `id`                   | `SERIAL`    | `PRIMARY KEY`                           |                     | Unique identifier                            |
+| `group_id`             | `TEXT`      | `NOT NULL` (If using group identifiers) |                     | Identifier from group.json (e.g., "group_1") |
+| `cluster_id`           | `INTEGER`   | `FK to clusters(id) ON DELETE SET NULL` |                     | Associated cluster ID (if applicable)        |
+| `type`                 | `TEXT`      | `NOT NULL`                              |                     | e.g., "rag_historical_essay"                 |
+| `title`                | `TEXT`      |                                         |                     | Generated title                              |
+| `content`              | `TEXT`      |                                         |                     | Generated essay text                         |
+| `source_article_ids`   | `INTEGER[]` |                                         |                     | Array of article IDs used as input source    |
+| `model_name`           | `TEXT`      |                                         |                     | LLM used for generation                      |
+| `generation_settings`  | `JSONB`     |                                         | `'{}'::jsonb`       | Parameters used for RAG & generation         |
+| `input_token_count`    | `INTEGER`   |                                         |                     | Approx. input tokens used                    |
+| `output_token_count`   | `INTEGER`   |                                         |                     | Approx. output tokens generated              |
+| `created_at`           | `TIMESTAMP` |                                         | `CURRENT_TIMESTAMP` | Timestamp of generation                      |
+| `tags`                 | `TEXT[]`    |                                         |                     | Optional tags                                |
+| `prompt_template_hash` | `TEXT`      |                                         |                     | Hash of the prompt template used             |
 
 ### `essay_entities` (Junction Table)
 
 (Managed by `src/database/modules/essays.py`)
+_Note: Assumes linking entities mentioned **in** the essay content._
 
-| Column      | Type      | Constraints                                           | Default | Description             |
-| ----------- | --------- | ----------------------------------------------------- | ------- | ----------------------- |
-| `essay_id`  | `INTEGER` | `PRIMARY KEY`, `FK to essays(id) ON DELETE CASCADE`   |         | ID of the essay         |
-| `entity_id` | `INTEGER` | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE` |         | ID of the linked entity |
+| Column                   | Type      | Constraints                                           | Default | Description                                      |
+| :----------------------- | :-------- | :---------------------------------------------------- | :------ | :----------------------------------------------- |
+| `essay_id`               | `INTEGER` | `PRIMARY KEY`, `FK to essays(id) ON DELETE CASCADE`   |         | ID of the essay                                  |
+| `entity_id`              | `INTEGER` | `PRIMARY KEY`, `FK to entities(id) ON DELETE CASCADE` |         | ID of the entity mentioned in the essay          |
+| `mention_count_in_essay` | `INTEGER` | `DEFAULT 1`                                           | `1`     | Number of times entity mentioned in this essay   |
+| `relevance_score`        | `FLOAT`   |                                                       |         | Calculated relevance of entity within this essay |
+| `first_mention_offset`   | `INTEGER` |                                                       |         | Character offset of the first mention (optional) |
 
 ### `events`
 

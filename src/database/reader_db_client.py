@@ -10,7 +10,8 @@ These frame phrases represent the dominant narrative framing used in each articl
 
 Exported classes:
 - ReaderDBClient: Main client class for database operations
-  - __init__(self, host, port, dbname, user, password, max_retries, retry_delay)
+  - __init__(self, host, port, dbname, user,
+             password, max_retries, retry_delay)
   - initialize_tables(self) -> bool
   - get_connection(self) -> Connection
   - release_connection(self, conn) -> None
@@ -158,11 +159,11 @@ class ReaderDBClient:
 
                 # Get table counts
                 cursor.execute("""
-                    SELECT table_name, 
-                           (SELECT count(*) FROM information_schema.columns 
+                    SELECT table_name,
+                           (SELECT count(*) FROM information_schema.columns
                             WHERE table_name = t.table_name) as column_count
                     FROM (
-                        SELECT table_name FROM information_schema.tables 
+                        SELECT table_name FROM information_schema.tables
                         WHERE table_schema = 'public'
                     ) t;
                 """)
@@ -403,7 +404,7 @@ class ReaderDBClient:
         """
         Get publication dates for a list of article IDs.
 
-        This is the implementation required by the step2 refactoring to delegate 
+        This is the implementation required by the step2 refactoring to delegate
         DB operations to the ReaderDBClient.
 
         Args:
@@ -501,40 +502,82 @@ class ReaderDBClient:
     # Embedding operations
     def insert_embedding(self, article_id: int, embedding_data: Dict[str, Any]) -> bool:
         """
-        Insert an embedding for an article.
+        Insert an embedding for an article into the 'embeddings' table.
+        (Removed synchronization with 'articles.embedding' column).
 
         Args:
             article_id: ID of the article
-            embedding_data: Data containing the embedding vector and metadata
+            embedding_data: Data containing the embedding vector and metadata.
+                            Expected to have an 'embedding' key with the vector list.
 
         Returns:
-            bool: True if successful, False otherwise
+            bool: True if successful in inserting into the embeddings table, False otherwise.
         """
         conn = self.get_connection()
         if conn:
             try:
-                return embeddings.insert_embedding(conn, article_id, embedding_data)
+                # Extract the embedding vector (still useful for validation)
+                embedding_vector = embedding_data.get('embedding')
+                if not embedding_vector or not isinstance(embedding_vector, list):
+                    logger.error(
+                        f"Invalid or missing embedding vector in embedding_data for article {article_id}")
+                    return False
+
+                # Insert into embeddings table only
+                inserted_into_embeddings = embeddings.insert_embedding(
+                    conn, article_id, embedding_data)
+
+                return inserted_into_embeddings
+            except Exception as e:
+                logger.error(
+                    f"Unexpected error during embedding insertion for article {article_id}: {e}", exc_info=True)
+                if conn:  # Check if conn was acquired
+                    conn.rollback()
+                return False
             finally:
                 self.release_connection(conn)
-        return False
+        return False  # Failed to get connection
 
     def batch_insert_embeddings(self, embeddings_data: List[Dict[str, Any]]) -> Dict[str, int]:
         """
-        Insert multiple embeddings into the database in batches.
+        Insert multiple embeddings into the 'embeddings' table in batches.
+        (Removed synchronization with the 'articles' table).
 
         Args:
-            embeddings_data: List of dictionaries with article_id and embedding data
+            embeddings_data: List of dictionaries, each with 'article_id' and 'embedding' data.
 
         Returns:
-            Dict[str, int]: Dictionary with success and failure counts
+            Dict[str, int]: Dictionary with success and failure counts for the embeddings table insertion.
         """
         conn = self.get_connection()
-        if conn:
-            try:
-                return embeddings.batch_insert_embeddings(conn, embeddings_data)
-            finally:
-                self.release_connection(conn)
-        return {"success": 0, "failure": 0}
+        if not conn:
+            logger.error(
+                "Failed to get database connection for batch insert embeddings.")
+            return {"success": 0, "failure": len(embeddings_data)}
+
+        try:
+            # Perform batch insert into 'embeddings' table
+            # The module function embeddings.batch_insert_embeddings should handle commit/rollback
+            batch_insert_result = embeddings.batch_insert_embeddings(
+                conn, embeddings_data)
+
+            # Return the result directly from the module function call
+            return batch_insert_result
+
+        except Exception as e:
+            logger.error(
+                f"Unexpected error during batch embedding insertion: {e}", exc_info=True)
+            # Attempt rollback if an unexpected error occurs at this level
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception as rb_err:
+                    logger.error(
+                        f"Rollback failed during batch insert error handling: {rb_err}")
+            # Assume all failed if an unexpected error occurs
+            return {"success": 0, "failure": len(embeddings_data)}
+        finally:
+            self.release_connection(conn)
 
     def get_all_embeddings(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """
@@ -590,47 +633,90 @@ class ReaderDBClient:
                 self.release_connection(conn)
         return None
 
-    def get_similar_articles(self, embedding: List[float], limit: int = 10) -> List[Dict[str, Any]]:
+    def get_embeddings_for_articles(self, article_ids: List[int]) -> List[Dict[str, Any]]:
         """
-        Get articles similar to the provided embedding.
+        Get embeddings for a specific list of article IDs.
+
+        Args:
+            article_ids: List of article IDs to fetch embeddings for.
+
+        Returns:
+            List[Dict[str, Any]]: List of embedding data dictionaries
+                                 (e.g., [{'article_id': id, 'embedding': [..]}]),
+                                 or an empty list if no embeddings found or error.
+        """
+        if not article_ids:
+            logger.warning(
+                "get_embeddings_for_articles called with empty list")
+            return []
+
+        conn = self.get_connection()
+        if conn:
+            try:
+                # Use the get_embeddings_for_articles function from the embeddings module
+                return embeddings.get_embeddings_for_articles(conn, article_ids)
+            except Exception as e:
+                logger.error(
+                    f"Error fetching embeddings for articles {article_ids}: {e}", exc_info=True)
+                return []  # Return empty list on error
+            finally:
+                self.release_connection(conn)
+        return []  # Return empty list if connection fails
+
+    def find_similar_articles(self, embedding: List[float], limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Find articles similar to the provided embedding using vector search on the 'embeddings' table
+        and joining with the 'articles' table.
 
         Args:
             embedding: Embedding vector to compare
             limit: Maximum number of similar articles to return
 
         Returns:
-            List[Dict[str, Any]]: List of similar articles with similarity scores
+            List[Dict[str, Any]]: List of similar articles with similarity scores and article details.
         """
         conn = self.get_connection()
         if conn:
             try:
                 cursor = conn.cursor()
 
-                # Use pgvector to find similar articles
-                cursor.execute("""
-                    SELECT a.id, a.title, a.pub_date, a.domain, 
-                           1 - (e.vector <=> %s) as similarity
+                # Query embeddings table and JOIN articles
+                # Select desired columns from articles table
+                sql_query = """
+                    SELECT 
+                        a.id, 
+                        a.title, 
+                        a.content, -- Include content for Haystack Document
+                        a.pub_date, 
+                        a.domain, 
+                        1 - (e.embedding <=> %s::vector) as similarity -- Ensure type casting if needed
                     FROM embeddings e
                     JOIN articles a ON e.article_id = a.id
-                    ORDER BY e.vector <=> %s ASC
+                    WHERE e.embedding IS NOT NULL -- Ensure we only compare valid embeddings
+                    ORDER BY similarity DESC -- Order by calculated similarity
                     LIMIT %s;
-                """, (embedding, embedding, limit))
+                """
+                cursor.execute(sql_query, (embedding, limit))
 
-                similar_articles = []
-                for row in cursor.fetchall():
-                    similar_articles.append({
-                        'id': row[0],
-                        'title': row[1],
-                        'pub_date': row[2],
-                        'domain': row[3],
-                        'similarity': row[4]
-                    })
+                # Fetch results and format as dictionaries
+                columns = [desc[0] for desc in cursor.description]
+                similar_articles = [dict(zip(columns, row))
+                                    for row in cursor.fetchall()]
 
                 cursor.close()
+                logger.info(
+                    f"Found {len(similar_articles)} similar articles using vector search.")
                 return similar_articles
+            except Exception as e:
+                logger.error(
+                    f"Error in find_similar_articles: {e}", exc_info=True)
+                # Rollback if necessary? Depends if connection is managed by caller
+                # or if this is a standalone transaction.
+                # For safety, assume caller manages transaction or it's auto-commit.
+                return []  # Return empty list on error
             finally:
                 self.release_connection(conn)
-        return []
+        return []  # Return empty list if connection fails
 
     # Cluster operations
     def insert_cluster(self, name: str = None, description: Optional[str] = None,
@@ -808,10 +894,11 @@ class ReaderDBClient:
     # Essay operations
     def insert_essay(self, essay: Dict[str, Any]) -> Optional[int]:
         """
-        Insert an essay into the database.
+        Insert an essay into the database using the revised schema.
 
         Args:
-            essay: The essay data
+            essay: The essay data dictionary, matching the revised 'essays' table schema.
+                   See src/database/schema.md for expected keys.
 
         Returns:
             int or None: The new essay ID if successful, None otherwise
@@ -819,18 +906,25 @@ class ReaderDBClient:
         conn = self.get_connection()
         if conn:
             try:
+                # Delegate to the updated essays module function
                 return essays.insert_essay(conn, essay)
             finally:
                 self.release_connection(conn)
         return None
 
-    def link_essay_entity(self, essay_id: int, entity_id: int) -> bool:
+    def link_essay_entity(self, essay_id: int, entity_id: int,
+                          mention_count: int = 1,
+                          relevance_score: Optional[float] = None,
+                          first_mention_offset: Optional[int] = None) -> bool:
         """
-        Link an essay to an entity.
+        Link an essay to an entity using the revised schema.
 
         Args:
             essay_id: ID of the essay
             entity_id: ID of the entity
+            mention_count: Number of times entity mentioned in this essay
+            relevance_score: Calculated relevance of entity within this essay
+            first_mention_offset: Character offset of the first mention
 
         Returns:
             bool: True if successful, False otherwise
@@ -838,7 +932,11 @@ class ReaderDBClient:
         conn = self.get_connection()
         if conn:
             try:
-                return essays.link_essay_entity(conn, essay_id, entity_id)
+                # Delegate to the updated essays module function
+                return essays.link_essay_entity(
+                    conn, essay_id, entity_id,
+                    mention_count, relevance_score, first_mention_offset
+                )
             finally:
                 self.release_connection(conn)
         return False

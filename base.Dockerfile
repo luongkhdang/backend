@@ -21,7 +21,7 @@ COPY requirements.txt .
 # Use --mount=type=cache for better caching during the base image build
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir torch==2.3.0 transformers==4.41.1 sentencepiece==0.2.0 \
+    && pip install --no-cache-dir torch==2.3.0 transformers==4.41.1 sentencepiece==0.2.0 accelerate hf_xet \
     && pip install --no-cache-dir scikit-learn==1.3.2 pandas==2.2.0 numpy~=1.26.4 \
     && pip install --no-cache-dir docker
 

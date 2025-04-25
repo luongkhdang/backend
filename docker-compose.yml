@@ -52,8 +52,6 @@ services:
       GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT: ${GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT:-2048}
       GEMINI_EMBEDDING_OUTPUT_DIMENSION: ${GEMINI_EMBEDDING_OUTPUT_DIMENSION:-768}
       GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE: ${GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE:-1500}
-      # --- Add connection string for Haystack --- #
-      PG_CONN_STR: "postgresql://postgres:postgres@postgres:5432/reader_db"
 
       # --- Gemini Generation Models --- #
       # Shared limits
@@ -93,6 +91,8 @@ services:
       RUN_STEP2: ${RUN_STEP2:-true} # Controls Step 2 (Clustering)
       RUN_STEP3: ${RUN_STEP3:-true} # Controls Step 3 (Entity Extraction)
       RUN_STEP4: ${RUN_STEP4:-true} # Controls Step 4 (Data Export)
+      RUN_PHASE_2_STEPS: ${RUN_PHASE_2_STEPS:-true} # Master switch for step 5 (Essay Gen)
+      RUN_STEP5: ${RUN_STEP5:-true} # Controls Step 5 (RAG Essay Generation)
       # Local NLP Settings (Step 1.7 - Now always runs if Step 1 runs)
       LOCAL_NLP_MODEL: ${LOCAL_NLP_MODEL:-"facebook/bart-large-cnn"}
       MAX_SUMMARY_TOKENS: ${MAX_SUMMARY_TOKENS:-512}
@@ -196,18 +196,7 @@ services:
       READER_DB_NAME: reader_db
       READER_DB_USER: postgres
       READER_DB_PASSWORD: postgres
-      # Gemini API settings (also pass to backend if needed for future use)
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-YOUR_API_KEY_HERE}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-models/text-embedding-004}
-      GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE: ${GEMINI_EMBEDDING_RATE_LIMIT_PER_MINUTE:-1500}
-      # Generation Models (Main and Fallback might be useful)
-      GEMINI_FLASH_MODEL: ${GEMINI_FLASH_MODEL:-models/gemini-2.0-flash}
-      GEMINI_FLASH_RPM: ${GEMINI_FLASH_RPM:-15}
-      GEMINI_FLASH_LITE_MODEL: ${GEMINI_FLASH_LITE_MODEL:-models/gemini-2.0-flash-lite}
-      GEMINI_FLASH_LITE_RPM: ${GEMINI_FLASH_LITE_RPM:-30}
-      # Rate limit wait settings for intelligent model selection
-      GEMINI_MAX_WAIT_SECONDS: ${GEMINI_MAX_WAIT_SECONDS:-40}
-      # Step 3: Entity Extraction settings
+      # Step 3: Entity Extraction settings (Keep these as db_setup might initialize related tables/weights)
       RUN_STEP3: ${RUN_STEP3:-true}
       ENTITY_EXTRACTION_BATCH_SIZE: ${ENTITY_EXTRACTION_BATCH_SIZE:-10}
       ENTITY_MAX_PRIORITY_ARTICLES: ${ENTITY_MAX_PRIORITY_ARTICLES:-100}

@@ -40,6 +40,7 @@ from src.steps.step1 import run as run_step1
 from src.steps.step2 import run as run_step2
 from src.steps.step3 import run as run_step3  # run_step3 is now async
 from src.steps.step4 import run as run_step4  # run_step4 is now async
+from src.steps.step5 import run as run_step5  # run_step5 is async
 from src.steps.domain_goodness import calculate_domain_goodness_scores
 
 # Import network checker
@@ -153,6 +154,8 @@ async def main():  # Make main async
     run_step2_flag = os.getenv("RUN_STEP2", "true").lower() == "true"
     run_step3_flag = os.getenv("RUN_STEP3", "true").lower() == "true"
     run_step4_flag = os.getenv("RUN_STEP4", "true").lower() == "true"
+    run_phase_2 = os.getenv("RUN_PHASE_2_STEPS", "false").lower() == "true"
+    run_step5_flag = os.getenv("RUN_STEP5", "false").lower() == "true"
     # ----------------------------------------------
 
     # GPU Check (Log availability)
@@ -277,6 +280,33 @@ async def main():  # Make main async
                 logger.error(f"Step 4 failed with error: {e}", exc_info=True)
             finally:
                 logger.info("========= STEP 4 COMPLETE =========")
+
+            # --- Domain Goodness Calculation (Now at end of Phase 1) ---
+            logger.info(
+                "========= CALCULATING DOMAIN GOODNESS SCORES =========")
+            try:
+                from src.database.reader_db_client import ReaderDBClient
+                db_client = ReaderDBClient()
+                try:
+                    domain_status = calculate_domain_goodness_scores(db_client)
+                    logger.info(
+                        f"Domain goodness calculation: {domain_status}")
+
+                    if domain_status.get("top_domains"):
+                        logger.info("Top domains by goodness score:")
+                        for domain in domain_status["top_domains"]:
+                            logger.info(
+                                f"  {domain['domain']}: {domain['score']:.4f}")
+                finally:
+                    db_client.close()
+            except Exception as e:
+                logger.error(
+                    f"Domain goodness calculation failed: {e}", exc_info=True)
+            finally:
+                logger.info(
+                    "========= DOMAIN GOODNESS CALCULATION COMPLETE =========")
+            # -----------------------------------------------------------------------------
+
         else:
             logger.info("Skipping Step 4: Data Export (RUN_STEP4 not true)")
 
@@ -284,31 +314,34 @@ async def main():  # Make main async
         logger.info(
             "Skipping Phase 1 Steps (1-4) as RUN_PHASE_1_STEPS is not true.")
 
-    # --- Domain Goodness Calculation (Always runs if pipeline reaches this point) ---
-    logger.info("========= CALCULATING DOMAIN GOODNESS SCORES =========")
-    try:
-        from src.database.reader_db_client import ReaderDBClient
-        db_client = ReaderDBClient()
-        try:
-            domain_status = calculate_domain_goodness_scores(db_client)
-            logger.info(f"Domain goodness calculation: {domain_status}")
+    # --- Phase 2 Steps (Step 5) ---
+    if run_phase_2:
+        logger.info("Executing Phase 2 Steps (5)...")
 
-            if domain_status.get("top_domains"):
-                logger.info("Top domains by goodness score:")
-                for domain in domain_status["top_domains"]:
+        # Execute Step 5: RAG Essay Generation
+        if run_step5_flag:
+            logger.info(
+                "========= STARTING STEP 5: RAG ESSAY GENERATION =========")
+            try:
+                step5_status = await run_step5()  # run_step5 returns 0 on success
+                if step5_status == 0:
                     logger.info(
-                        f"  {domain['domain']}: {domain['score']:.4f}")
-        finally:
-            db_client.close()
-    except Exception as e:
-        logger.error(
-            f"Domain goodness calculation failed: {e}", exc_info=True)
-    finally:
-        logger.info(
-            "========= DOMAIN GOODNESS CALCULATION COMPLETE =========")
-    # -----------------------------------------------------------------------------
+                        "Step 5: RAG Essay Generation completed successfully.")
+                else:
+                    logger.warning(
+                        f"Step 5: RAG Essay Generation finished with exit code {step5_status}.")
+                # Add more detailed status reporting if run_step5 returns a dict later
+            except Exception as e:
+                logger.error(f"Step 5 failed with error: {e}", exc_info=True)
+            finally:
+                logger.info("========= STEP 5 COMPLETE =========")
+        else:
+            logger.info(
+                "Skipping Step 5: RAG Essay Generation (RUN_STEP5 not true)")
 
-    # Future steps (e.g., Step 5) would be executed here
+    else:
+        logger.info(
+            "Skipping Phase 2 Steps (5) as RUN_PHASE_2_STEPS is not true.")
 
     logger.info("DATA REFINERY PIPELINE COMPLETE")
     return 0

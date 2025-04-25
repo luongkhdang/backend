@@ -1,92 +1,86 @@
-# RAG Essay Generation Implementation Plan
+# Haystack Integration Refactoring Plan (Step 5)
 
-This plan outlines the steps to implement the Haystack-based RAG pipeline for generating essays with historical context using the Gemini API and your defined PostgreSQL schema.
+## 1. Problem Statement
 
-**Phase 1: Setup & Foundation (Est. 0.5 Day)**
+The current implementation in `step5.py` attempts to use Haystack's `PgvectorDocumentStore` and `PgvectorEmbeddingRetriever` to find relevant historical articles for RAG context. However, these components expect the article content and its vector embedding to reside in the _same_ database table (specified by `table_name` in `PgvectorDocumentStore`).
 
-1.  **Environment Setup:**
-    - **Dependencies:** Add `google-ai-haystack`, `pgvector-haystack`, `sentence-transformers`, and potentially `cohere-haystack` (if using CohereRanker) to `requirements.txt`.
-    - **Docker:** Rebuild the base image (`docker build -t article-transfer-base:latest -f base.Dockerfile .`) and the main image (`docker-compose build article-transfer`) to include the new dependencies.
-2.  **Configuration:**
-    - **`.env` / `docker-compose.yml`:** Ensure `GOOGLE_API_KEY` is correctly set. Add `PG_CONN_STR="postgresql://postgres:postgres@postgres:5432/reader_db"` (adjust if needed) to the `environment` section of the `article-transfer` service in `docker-compose.yml` so Haystack's `PgvectorDocumentStore` can connect. Verify other necessary ENV VARs (like embedding model names) are present.
-3.  **Database Schema Update:**
-    - **Essay Table:** Review the revised `essays` table proposal in `hayhay.md` (including `group_id`, `source_article_ids`, `model_name`, `generation_settings`, etc.) and apply necessary `ALTER TABLE` commands via a migration script (e.g., `src/database/migrations/001_update_essays_schema.sql`) or by updating `src/database/modules/schema.py`.
-    - **Articles Table (Embedding):** Add an `embedding VECTOR(768)` column to the `articles` table. This is required for `PgvectorDocumentStore`. Populate this column for historical articles intended for retrieval.
-    - **Migration Runner:** Ensure `db_setup.py` or a dedicated script runs the schema updates.
+Our database schema (`schema.md`) is normalized:
 
-**Phase 2: Core Haystack Components (Implemented in `src/haystack/haystack_client.py`) (Est. 0.5 Day)**
+- `articles` table: Stores article content and metadata.
+- `embeddings` table: Stores vector embeddings, linked via `article_id`.
 
-1.  **Document Store Initialization (`get_document_store`)**: Confirmed implemented. Initializes `PgvectorDocumentStore` pointing to the `articles` table and the `embedding` column.
-2.  **Custom Text Embedder (`GeminiTextEmbedder`, `get_text_embedder`)**: Confirmed implemented. Uses a custom Haystack component (`GeminiTextEmbedder`) that wraps `src.gemini.gemini_client.GeminiClient` to generate query embeddings with the model specified in the environment (`models/text-embedding-004`).
-3.  **Retriever Initialization (`get_embedding_retriever`)**: Confirmed implemented. Initializes `PgvectorEmbeddingRetriever` using the document store, `top_k=50`.
-4.  **Ranker Initialization (`get_ranker`)**: Confirmed implemented. Initializes `TransformersSimilarityRanker` (`cross-encoder/ms-marco-MiniLM-L-6-v2`), `top_k=20`.
-5.  **Prompt Builder Initialization (`get_prompt_builder`)**: Confirmed implemented. Initializes `PromptBuilder` using a template file path (default: `src/prompts/haystack_prompt.txt`).
-6.  **Generator Initialization (`get_gemini_generator`)**: Confirmed implemented. Initializes `GoogleAIGeminiGenerator` using the API key and model from environment (`models/gemini-2.0-flash-thinking-exp-01-21`).
-7.  **Pipeline Definitions (`build_retrieval_pipeline`, `build_retrieval_ranking_pipeline`)**: Confirmed implemented. Defines pipelines connecting embedder -> retriever and embedder -> retriever -> ranker.
-8.  **Pipeline Execution Wrappers (`run_article_retrieval`, `run_article_retrieval_and_ranking`)**: Confirmed implemented. Provides functions to easily run the retrieval or retrieval+ranking pipelines.
+This mismatch leads to errors:
 
-**Phase 3: Structured Data Retrieval (Implemented in `src/database/modules/haystack_db.py`) (Est. 0.5 Day)**
+- `UndefinedColumn`: When Haystack queries `articles` for an `embedding` column that isn't configured correctly or doesn't exist there initially.
+- `TypeError`: When trying to pass unsupported arguments (`embedding_table`, `embedding_column_name`, etc.) to the `PgvectorDocumentStore` constructor in an attempt to bridge the two tables.
+- `KeyError`: When Haystack's internal data converter (`_from_pg_to_haystack_documents`) tries to create `Document` objects from the retrieved rows and expects specific columns (`blob_data`, `blob_meta`) that don't exist in our `articles` table.
 
-1.  **Implement DB Query Functions (in `haystack_db.py`)**: Confirmed implemented. Contains standalone functions:
-    - `get_key_entities_for_group(conn, article_ids, top_n)`
-    - `get_related_events(conn, entity_ids, limit)`
-    - `get_related_policies(conn, entity_ids, limit)`
-    - `get_related_relationships(conn, entity_ids, limit)`
-      These functions take a connection object and parameters, execute SQL, and return raw results.
-2.  **Implement Result Formatting Helpers (in `haystack_db.py`)**: Confirmed implemented. Contains private helper functions:
-    - `_format_event(event_dict)`
-    - `_format_policy(policy_dict)`
-    - `_format_relationship(relationship_dict)` (includes parsing metadata for snippets)
-3.  **Implement Wrapper Methods (in `ReaderDBClient`)**: Confirmed implemented in `src/database/reader_db_client.py`. Wrapper methods like `get_formatted_related_events`, `get_formatted_related_policies`, etc., handle connection management, call the corresponding functions in `haystack_db.py`, and utilize the formatting helpers to return lists of strings.
+Adding columns like `embedding`, `blob_data`, `blob_meta` to the `articles` table is a workaround that modifies our schema solely to fit the default component's assumptions and adds redundancy/unused columns.
 
-**Phase 4: Context Assembly & Prompting (Est. 1 Day)**
+## 2. Chosen Strategy: Hybrid Approach
 
-1.  **Context Selection Logic** (To be implemented within `src/steps/step5.py`):
-    - After getting ranked historical docs from `haystack_client.run_article_retrieval_and_ranking` and formatted structured data summaries from `reader_db_client` (via its wrappers), implement logic to select the top N (e.g., 20) items total. This logic can prioritize item types (e.g., ensure at least 5 historical articles, 5 relationships) or use a simple combined ranking.
-2.  **Define Prompt Template** (Create/Populate `src/prompts/haystack_prompt.txt`):
-    - Create the detailed prompt structure as discussed in `hayhay.md`, including placeholders like `{group_rationale}`, `{key_questions}`, `{current_articles_summary}`, `{historical_articles}`, `{related_events}`, `{related_policies}`, `{entity_relationships}`. Define the final essay writing instruction clearly.
-3.  **Implement Context Assembly Logic** (To be implemented within `src/steps/step5.py`):
-    - Create a dedicated function `assemble_final_context(group_data, current_article_details, selected_historical_docs, formatted_structured_data) -> str`.
-    - This function fetches all necessary pieces:
-      - Group info (`group_rationale`, angles/theories derived from `frame_phrases` if needed) from `group_data`.
-      - Current article summaries (metadata + top snippets fetched via `reader_db_client`).
-      - Selected historical article content (from `selected_historical_docs`).
-      - Formatted structured data strings (events, policies, relationships).
-    - Formats everything into a single large string, using the structure defined in `haystack_prompt.txt`. Manage length carefully (summarization/truncation might be needed).
+We will adapt our Haystack usage by implementing a hybrid approach:
 
-**Phase 5: Orchestration & Output (Est. 1 Day)**
+1.  **Use Haystack for:**
+    - Generating query embeddings (`GeminiTextEmbedder` in `haystack_client.py`).
+    - Re-ranking retrieved documents (`TransformersSimilarityRanker` in `haystack_client.py`).
+2.  **Use Custom Logic (`ReaderDBClient`) for:**
+    - Performing the vector similarity search directly against our `embeddings` table.
+    - Fetching the corresponding article content and metadata from the `articles` table based on the search results.
+    - Constructing Haystack `Document` objects from the fetched data.
+3.  **Bypass:** We will no longer use `PgvectorDocumentStore` or `PgvectorEmbeddingRetriever` for the _retrieval_ step within the `run_article_retrieval_and_ranking` function.
 
-1.  **Modify/Confirm Generator Module (`src/gemini/modules/generator.py`)**: Existing `analyze_articles_with_prompt` seems suitable. Confirm it handles large prompts correctly with the specified model and returns the raw text response.
-2.  **Add Gemini Client Method (`src/gemini/gemini_client.py`)**: Add `generate_essay_from_prompt(self, full_prompt_text: str, ...)` method as planned, likely calling `generator.analyze_articles_with_prompt`.
-3.  **Implement Essay Saving (`src/database/modules/haystack_db.py` & `ReaderDBClient`)**: Confirmed implemented. `haystack_db.save_essay` handles the SQL INSERT, and `ReaderDBClient.save_essay` acts as the wrapper handling connections.
-4.  **Implement Group Iteration Script (`src/steps/step5.py`)**:
-    - Create `src/steps/step5.py`.
-    - Load `group.json`.
-    - Initialize `ReaderDBClient()` and `GeminiClient()`. Instantiate `HaystackClient` components as needed (or create a simple `HaystackClient` class).
-    - Loop through each group in `group.json`.
-    - Inside loop:
-      - Get `article_ids`, `group_rationale`.
-      - **Fetch Current Data:** Call `reader_db_client` for current article metadata/snippets.
-      - **Identify Key Entities:** Call `reader_db_client.get_key_entities_for_group`.
-      - **Fetch Structured Data:** Call `reader_db_client.get_formatted_related_events`, etc.
-      - **Fetch Historical Articles:** Call `haystack_client.run_article_retrieval_and_ranking`.
-      - **Select Context:** Apply selection logic (Phase 4.1).
-      - **Assemble Context:** Call `assemble_final_context` (Phase 4.3).
-      - **Generate Essay:** Call `gemini_client.generate_essay_from_prompt`.
-      - **Extract & Format:** Process the generator's response (essay text, maybe title).
-      - **Save Result:** Prepare `essay_data` dict and call `reader_db_client.save_essay`.
+This approach respects our existing database schema while leveraging Haystack's strengths for embedding and ranking.
 
-**Phase 6: Testing & Refinement (Ongoing)**
+## 3. Implementation Steps
 
-- Test each phase incrementally.
-- Validate database queries and formatting.
-- Test Haystack pipeline execution and results.
-- Analyze generated essay quality and context relevance.
-- Refine prompts, ranking, context selection, and summarization strategies based on results.
-- Monitor API costs and token usage.
+### Step 3.1: Enhance `ReaderDBClient` (`src/database/reader_db_client.py`)
 
-This detailed plan provides a clearer roadmap for implementation, assigning responsibilities to specific modules and outlining the data flow between `step5.py`, `reader_db_client.py`, `haystack_client.py`, and `gemini_client.py`/`generator.py`.
+- **Create New Method:** Add a method `find_similar_articles(self, embedding: List[float], top_k: int = 50) -> List[Dict[str, Any]]`.
+  - **Functionality:**
+    - Takes a query embedding vector and `top_k` as input.
+    - Executes a SQL query using `pgvector` operators (`<=>`) against the `embeddings` table.
+    - The query should `JOIN` `embeddings` with `articles` on `embeddings.article_id = articles.id`.
+    - Select necessary fields from `articles` (e.g., `id`, `title`, `content`, `pub_date`, `domain`) and the similarity score `(1 - (embeddings.embedding <=> %s)) as similarity`.
+    - Order the results by similarity (`embeddings.embedding <=> %s ASC`).
+    - Limit results by `top_k`.
+    - Fetch results and format them into a list of dictionaries. Each dictionary should represent a retrieved article and include its content, metadata, and similarity score.
 
-```
+### Step 3.2: Refactor `HaystackClient` (`src/haystack/haystack_client.py`)
 
-```
+- **Modify `run_article_retrieval_and_ranking`:**
+  - Keep the initialization of `GeminiTextEmbedder` (`embedder`) and `TransformersSimilarityRanker` (`ranker`).
+  - Keep the step where the query embedding is generated: `query_embedding = embedder.run(text=query_text)['embedding']`.
+  - **Remove** the initialization of `PgvectorDocumentStore` and `PgvectorEmbeddingRetriever` within this function.
+  - **Remove** the construction of the Haystack `Pipeline` that uses the retriever.
+  - Instantiate `ReaderDBClient`: `db_client = ReaderDBClient()`.
+  - Call the new method: `retrieved_articles_data = db_client.find_similar_articles(embedding=query_embedding, top_k=50)`. (Use a `top_k` sufficient for the ranker, e.g., 50).
+  - **Convert DB Results to Haystack Documents:** Iterate through `retrieved_articles_data`:
+    - For each dictionary, create a Haystack `Document` object:
+      - `content`: Map from the `content` field.
+      - `meta`: Populate with other relevant fields (`id`, `title`, `pub_date`, `domain`, etc.).
+      - `score`: Assign the `similarity` score from the database query result.
+    - Store these `Document` objects in a list (e.g., `retrieved_haystack_docs`).
+  - Call the ranker: `ranking_result = ranker.run(query=query_text, documents=retrieved_haystack_docs)`.
+  - Return the ranked documents: `return ranking_result['documents']`.
+  - Add appropriate error handling around the database call and document conversion.
+  - Close the `ReaderDBClient` connection if opened within the function scope (or ensure pool management handles it).
+- **Simplify/Comment `get_document_store`:**
+  - Revert its configuration to the simplest form (pointing to `articles`, assuming `embedding` column exists).
+  - Add comments explaining that this function is **not** used by the `run_article_retrieval_and_ranking` function for retrieval anymore but might be used for writing documents via Haystack elsewhere (if applicable).
+- **Cleanup (Optional):** Remove unused functions if they are no longer called (e.g., `get_embedding_retriever`, `build_retrieval_pipeline`, `build_retrieval_ranking_pipeline`, `run_article_retrieval`).
+
+### Step 3.3: Review `Step 5` (`src/steps/step5.py`)
+
+- Ensure the call signature used for `run_article_retrieval_and_ranking` matches the refactored function in `haystack_client.py`.
+- Confirm that the code correctly processes the list of Haystack `Document` objects returned by the refactored function. (Likely no changes needed here).
+
+## 4. Considerations & Follow-up
+
+- **Schema Redundancy:** The `articles.embedding`, `articles.blob_data`, and `articles.blob_meta` columns are now technically unnecessary for _this specific retrieval flow_. They can potentially be removed in a future cleanup phase **if and only if** no other process depends on them.
+- **Synchronization Logic:** The logic added to `ReaderDBClient.insert_embedding` and `batch_insert_embeddings` to update `articles.embedding` could also be removed _if_ the `articles.embedding` column is removed later. For now, keep the sync logic.
+- **Migration Script:** The `migrate_embeddings.py` script remains useful for ensuring the `articles.embedding` column is populated if needed for other reasons or if we revisit Haystack retrieval in the future.
+- **Performance:** Monitor the performance of the direct database query compared to the previous Haystack retriever approach.
+- **Error Handling:** Implement robust error handling in the new database query method and the refactored `haystack_client.py` function.
+
+This plan focuses on adapting our code to work reliably with Haystack where it fits our use case, rather than forcing schema changes to accommodate default component limitations.

@@ -56,8 +56,9 @@ def initialize_tables(conn) -> bool:
             extracted_entities BOOLEAN DEFAULT FALSE,
             is_hot BOOLEAN DEFAULT FALSE,
             cluster_id INTEGER,
-            frame_phrases TEXT[] NULL,
-            embedding VECTOR(768) NULL -- Added for Haystack integration
+            frame_phrases TEXT[] NULL
+            -- Removed: embedding VECTOR(768) NULL,
+            -- Removed: blob_data BYTEA NULL
             -- Note: Foreign key to clusters cannot be added here due to potential cyclic dependency
             -- or if clusters table might not exist yet. It could be added separately if needed.
         );

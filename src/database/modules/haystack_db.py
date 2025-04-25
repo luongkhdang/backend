@@ -1,4 +1,5 @@
 """
+# Removed Haystack version comment as this module is now Haystack-agnostic
 haystack_db.py - Database Integration Module for Haystack RAG Pipeline
 
 This module contains functions for database operations specifically required by the

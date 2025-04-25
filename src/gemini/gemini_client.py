@@ -5,10 +5,9 @@ gemini_client.py - Client for Google's Gemini API
 This module provides a client for Google's Gemini API, supporting both text embeddings
 and text generation with model selection and rate limiting.
 
-The client now supports extracting both entities and narrative frame phrases,
-which helps identify the dominant perspective or framing used in news articles.
-These frame phrases are short descriptors (2-4 words) representing how stories
-are presented (e.g., "economic impact", "national security", "moral obligation").
+Supports text embeddings, structured text generation (e.g., entity extraction),
+article analysis, and free-form text generation from prompts (e.g., essay generation).
+Includes model selection, rate limiting, and retry logic.
 
 Exported functions/classes:
 - GeminiClient: Class for interacting with the Gemini API
@@ -17,15 +16,18 @@ Exported functions/classes:
   - generate_text_with_prompt(self, article_content: str, processing_tier: int, retries: int = 3, initial_delay: float = 1.0, model_override: Optional[str] = None) -> Optional[Dict[str, Any]]: Generates text based on article content and a prompt, using model selection logic.
   - generate_text_with_prompt_async(self, article_content: str, processing_tier: int, retries: int = 6, initial_delay: float = 1.0, model_override: Optional[str] = None, fallback_model: Optional[str] = None) -> Optional[Dict[str, Any]]: Async version of text generation method.
   - analyze_articles_with_prompt(self, articles_data: List[Dict[str, Any]], prompt_file_path: str, model_name: str, system_instruction: Optional[str] = None, temperature: float = 0.2, max_output_tokens: int = 8192, retries: int = 3, initial_delay: float = 1.0) -> Optional[str]: Analyzes a list of articles using a specified prompt template and returns structured JSON output.
+  - generate_essay_from_prompt(self, full_prompt_text: str, model_name: Optional[str] = None, ...) -> Optional[str]: Generates text (e.g., essay) from a full prompt string.
 
 Related files:
 - src/steps/step1.py: Uses this client for embedding generation.
 - src/steps/step3.py: Uses this client for text generation (entity and frame phrase extraction).
 - src/steps/step4.py: Uses this client for article analysis and grouping.
+- src/steps/step5.py: Uses this client for essay generation.
 - src/database/reader_db_client.py: Stores generated embeddings, extracted entities, and frame phrases.
 - src/utils/rate_limit.py: Provides the RateLimiter class used by this client.
 - src/prompts/entity_extraction_prompt.txt: Contains the prompt template for text generation.
 - src/prompts/step4.txt: Contains the prompt template for article analysis.
+- src/prompts/haystack_prompt.txt: Contains the prompt template for essay generation.
 """
 
 import google.generativeai as genai
@@ -51,6 +53,7 @@ except ImportError:
 
 # Import the function from the new generator module
 from src.gemini.modules.generator import analyze_articles_with_prompt as generator_analyze_articles
+from src.gemini.modules.generator import generate_text_from_prompt as generator_generate_text
 
 # Add import for robust JSON parser
 from src.utils.json_parser import parse_json, extract_json_from_text, safe_loads
@@ -65,7 +68,13 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
-    """Client for interacting with Google's Gemini API."""
+    """
+    Client for interacting with Google's Gemini API.
+
+    Supports text embeddings, structured text generation (e.g., entity extraction),
+    article analysis, and free-form text generation from prompts (e.g., essay generation).
+    Includes model selection, rate limiting, and retry logic.
+    """
 
     # Define model preferences and fallback logic
     # Order matters: Best/Preferred first
@@ -946,4 +955,63 @@ class GeminiClient:
             retries=retries,
             initial_delay=initial_delay,
             rate_limiter=self.rate_limiter
+        )
+
+    async def generate_essay_from_prompt(self,
+                                         full_prompt_text: str,
+                                         model_name: Optional[str] = None,
+                                         system_instruction: Optional[str] = None,
+                                         temperature: float = 0.7,
+                                         max_output_tokens: int = 8192,
+                                         save_debug_info: bool = True,
+                                         debug_info_prefix: str = "essay_prompt") -> Optional[str]:
+        """
+        Generates text (e.g., an essay) based on a fully assembled prompt string.
+
+        Delegates to the generator module's `generate_text_from_prompt` function.
+
+        Args:
+            full_prompt_text (str): The complete prompt text to send to the model.
+            model_name (Optional[str]): Specific Gemini model to use (e.g., "models/gemini-1.5-flash").
+                                        Defaults to a model suitable for generation if None.
+            system_instruction (Optional[str]): System instruction to guide the AI's persona/task.
+            temperature (float): Sampling temperature (0.0-1.0). Higher values for more creativity.
+            max_output_tokens (int): Maximum tokens for the generated essay.
+            save_debug_info (bool): Whether to save prompt/usage metadata for debugging.
+            debug_info_prefix (str): Prefix for debug file names.
+
+        Returns:
+            Optional[str]: The generated essay text, or None if generation failed.
+        """
+        # Use provided model or select a default generation model
+        # Using FLASH_THINKING as default, similar to get_gemini_generator in haystack_client
+        default_gen_model = os.getenv("GEMINI_FLASH_THINKING_MODEL",
+                                      "models/gemini-2.0-flash-thinking-exp-01-21")
+        effective_model_name = model_name or default_gen_model
+
+        # Default system instruction tailored for essay generation if none provided
+        default_system_instruction = """
+        You are an expert analytical writer tasked with synthesizing information.
+        Follow the instructions precisely and generate a coherent, well-structured text based *only* on the provided context.
+        """
+        actual_system_instruction = system_instruction or default_system_instruction
+
+        logger.info(
+            f"Delegating essay generation to generator module (model: {effective_model_name})")
+
+        # Delegate to the generator module, passing necessary parameters including rate limiter
+        # Note: generate_text_from_prompt handles retries internally if configured
+        # The client-level retry logic in generate_text_with_prompt_async isn't directly applied here,
+        # but the underlying generator function can have its own simple retry if needed (currently it doesn't).
+        # The main retry/fallback logic happens in generate_text_with_prompt_async for structured generation.
+        # This essay generation is treated as a more direct call.
+        return await generator_generate_text(
+            full_prompt_text=full_prompt_text,
+            model_name=effective_model_name,
+            system_instruction=actual_system_instruction,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            rate_limiter=self.rate_limiter,  # Pass the client's rate limiter
+            save_debug_info=save_debug_info,
+            debug_info_prefix=debug_info_prefix
         )

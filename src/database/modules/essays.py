@@ -31,12 +31,14 @@ logger = logging.getLogger(__name__)
 
 def insert_essay(conn, essay: Dict[str, Any]) -> Optional[int]:
     """
-    Insert an essay into the database.
+    Insert an essay into the database using the revised schema.
 
     Args:
         conn: Database connection
-        essay: The essay data to insert (expects 'type', 'title', 'content', 
-               optionally 'article_id', 'layer_depth', 'cluster_id', 'tags')
+        essay: The essay data to insert. Expected keys match the revised schema:
+               'group_id', 'cluster_id', 'type', 'title', 'content',
+               'source_article_ids', 'model_name', 'generation_settings',
+               'input_token_count', 'output_token_count', 'tags', 'prompt_template_hash'.
 
     Returns:
         int or None: The new essay ID if successful, None otherwise
@@ -44,31 +46,52 @@ def insert_essay(conn, essay: Dict[str, Any]) -> Optional[int]:
     try:
         cursor = conn.cursor()
 
-        # Extract essay data using correct schema fields
+        # Extract essay data based on the revised schema
+        # Required or should have default? Assuming required by calling code.
+        group_id = essay.get('group_id')
+        cluster_id = essay.get('cluster_id')  # Optional FK
         essay_type = essay.get('type', 'unknown')  # Required
         title = essay.get('title', '')  # Required, default empty
         content = essay.get('content', '')  # Required, default empty
-        article_id = essay.get('article_id')  # Optional
-        layer_depth = essay.get('layer_depth')  # Optional
-        cluster_id = essay.get('cluster_id')  # Optional
-        tags = essay.get('tags')  # Optional (list of strings)
+        source_article_ids = essay.get(
+            'source_article_ids')  # Optional INTEGER[]
+        model_name = essay.get('model_name')  # Optional TEXT
+        generation_settings = essay.get(
+            'generation_settings')  # Optional JSONB
+        input_token_count = essay.get('input_token_count')  # Optional INTEGER
+        output_token_count = essay.get(
+            'output_token_count')  # Optional INTEGER
+        tags = essay.get('tags')  # Optional TEXT[]
+        prompt_template_hash = essay.get(
+            'prompt_template_hash')  # Optional TEXT
 
-        # Insert the essay using correct columns
+        # Convert generation_settings dict to JSON string if necessary
+        gen_settings_json = json.dumps(
+            generation_settings) if generation_settings else None
+
+        # Insert the essay using the revised columns
         cursor.execute("""
             INSERT INTO essays (
-                type, article_id, title, content, layer_depth, cluster_id, tags 
+                group_id, cluster_id, type, title, content,
+                source_article_ids, model_name, generation_settings,
+                input_token_count, output_token_count, tags, prompt_template_hash
                 -- created_at uses DEFAULT CURRENT_TIMESTAMP
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """, (
+            group_id,
+            cluster_id,
             essay_type,
-            article_id,
             title,
             content,
-            layer_depth,
-            cluster_id,
-            tags  # Pass list directly, psycopg2 handles TEXT[]
+            source_article_ids,  # Pass list directly for INTEGER[]
+            model_name,
+            gen_settings_json,  # Pass JSON string for JSONB
+            input_token_count,
+            output_token_count,
+            tags,  # Pass list directly for TEXT[]
+            prompt_template_hash
         ))
 
         new_id = cursor.fetchone()[0]
@@ -76,7 +99,7 @@ def insert_essay(conn, essay: Dict[str, Any]) -> Optional[int]:
         cursor.close()
 
         logger.info(
-            f"Successfully inserted essay {new_id} of type '{essay_type}'.")
+            f"Successfully inserted essay {new_id} of type '{essay_type}' for group '{group_id}'.")
         return new_id
 
     except Exception as e:
@@ -85,14 +108,20 @@ def insert_essay(conn, essay: Dict[str, Any]) -> Optional[int]:
         return None
 
 
-def link_essay_entity(conn, essay_id: int, entity_id: int) -> bool:
+def link_essay_entity(conn, essay_id: int, entity_id: int,
+                      mention_count: int = 1,
+                      relevance_score: Optional[float] = None,
+                      first_mention_offset: Optional[int] = None) -> bool:
     """
-    Link an essay to an entity.
+    Link an essay to an entity, including new fields from the revised schema.
 
     Args:
         conn: Database connection
         essay_id: ID of the essay
         entity_id: ID of the entity
+        mention_count: Number of times entity mentioned in this essay
+        relevance_score: Calculated relevance of entity within this essay
+        first_mention_offset: Character offset of the first mention
 
     Returns:
         bool: True if successful, False otherwise
@@ -100,24 +129,45 @@ def link_essay_entity(conn, essay_id: int, entity_id: int) -> bool:
     try:
         cursor = conn.cursor()
 
-        # Insert the link, do nothing on conflict. No RETURNING clause.
+        # Insert the link with new fields, update on conflict if needed (or just DO NOTHING)
+        # Option 1: Simple insert, ignore conflict (assumes first link is definitive or updates happen elsewhere)
         cursor.execute("""
             INSERT INTO essay_entities (
-                essay_id, entity_id
+                essay_id, entity_id, mention_count_in_essay, relevance_score, first_mention_offset
             )
-            VALUES (%s, %s)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (essay_id, entity_id) DO NOTHING;
         """, (
             essay_id,
-            entity_id
+            entity_id,
+            mention_count,
+            relevance_score,
+            first_mention_offset
         ))
 
-        # Assume success if no exception is raised.
-        # cursor.rowcount might be 0 if conflict occurred, but that's not an error here.
+        # Option 2: Update on conflict (if subsequent mentions should update counts/scores)
+        # cursor.execute("""
+        #     INSERT INTO essay_entities (
+        #         essay_id, entity_id, mention_count_in_essay, relevance_score, first_mention_offset
+        #     )
+        #     VALUES (%s, %s, %s, %s, %s)
+        #     ON CONFLICT (essay_id, entity_id) DO UPDATE SET
+        #         mention_count_in_essay = essay_entities.mention_count_in_essay + EXCLUDED.mention_count_in_essay,
+        #         relevance_score = GREATEST(essay_entities.relevance_score, EXCLUDED.relevance_score), -- Example: keep highest score
+        #         -- first_mention_offset typically wouldn't be updated
+        #         first_mention_offset = COALESCE(essay_entities.first_mention_offset, EXCLUDED.first_mention_offset);
+        # """, (
+        #     essay_id,
+        #     entity_id,
+        #     mention_count,
+        #     relevance_score,
+        #     first_mention_offset
+        # ))
+
         conn.commit()
         cursor.close()
         logger.debug(
-            f"Attempted to link essay {essay_id} to entity {entity_id}.")
+            f"Attempted to link essay {essay_id} to entity {entity_id} with count {mention_count}.")
         return True
 
     except Exception as e:
@@ -129,7 +179,7 @@ def link_essay_entity(conn, essay_id: int, entity_id: int) -> bool:
 
 def get_essay_by_id(conn, essay_id: int) -> Optional[Dict[str, Any]]:
     """
-    Get an essay by its ID.
+    Get an essay by its ID using the revised schema.
 
     Args:
         conn: Database connection
@@ -141,9 +191,13 @@ def get_essay_by_id(conn, essay_id: int) -> Optional[Dict[str, Any]]:
     try:
         cursor = conn.cursor()
 
-        # Get the essay using correct schema columns
+        # Select all columns from the revised essays schema
         cursor.execute("""
-            SELECT id, type, article_id, title, content, layer_depth, cluster_id, created_at, tags
+            SELECT
+                id, group_id, cluster_id, type, title, content,
+                source_article_ids, model_name, generation_settings,
+                input_token_count, output_token_count, created_at, tags,
+                prompt_template_hash
             FROM essays
             WHERE id = %s
         """, (essay_id,))
@@ -157,8 +211,19 @@ def get_essay_by_id(conn, essay_id: int) -> Optional[Dict[str, Any]]:
         # Convert row to dictionary using column names
         columns = [desc[0] for desc in cursor.description]
         essay_data = dict(zip(columns, row))
-        cursor.close()
 
+        # Parse generation_settings from JSON string back to dict/list
+        if 'generation_settings' in essay_data and essay_data['generation_settings']:
+            try:
+                essay_data['generation_settings'] = json.loads(
+                    essay_data['generation_settings'])
+            except json.JSONDecodeError:
+                logger.warning(
+                    f"Failed to parse generation_settings JSON for essay {essay_id}")
+                # Keep the raw string or set to None/Error indicator? Keep raw for now.
+                pass
+
+        cursor.close()
         return essay_data
 
     except Exception as e:
@@ -168,7 +233,7 @@ def get_essay_by_id(conn, essay_id: int) -> Optional[Dict[str, Any]]:
 
 def get_essays_by_cluster(conn, cluster_id: int) -> List[Dict[str, Any]]:
     """
-    Get all essays associated with a cluster.
+    Get all essays associated with a cluster using the revised schema.
 
     Args:
         conn: Database connection
@@ -180,9 +245,13 @@ def get_essays_by_cluster(conn, cluster_id: int) -> List[Dict[str, Any]]:
     try:
         cursor = conn.cursor()
 
-        # Get essays for the cluster using correct schema columns
+        # Select all columns from the revised essays schema
         cursor.execute("""
-            SELECT id, type, article_id, title, content, layer_depth, cluster_id, created_at, tags
+            SELECT
+                id, group_id, cluster_id, type, title, content,
+                source_article_ids, model_name, generation_settings,
+                input_token_count, output_token_count, created_at, tags,
+                prompt_template_hash
             FROM essays
             WHERE cluster_id = %s
             ORDER BY created_at DESC
@@ -191,7 +260,18 @@ def get_essays_by_cluster(conn, cluster_id: int) -> List[Dict[str, Any]]:
         essays = []
         columns = [desc[0] for desc in cursor.description]
         for row in cursor.fetchall():
-            essays.append(dict(zip(columns, row)))
+            essay_data = dict(zip(columns, row))
+            # Parse generation_settings from JSON string back to dict/list
+            if 'generation_settings' in essay_data and essay_data['generation_settings']:
+                try:
+                    essay_data['generation_settings'] = json.loads(
+                        essay_data['generation_settings'])
+                except json.JSONDecodeError:
+                    logger.warning(
+                        f"Failed to parse generation_settings JSON for essay {essay_data.get('id')}")
+                    # Keep the raw string or set to None/Error indicator? Keep raw for now.
+                    pass
+            essays.append(essay_data)
 
         cursor.close()
         return essays
@@ -200,3 +280,8 @@ def get_essays_by_cluster(conn, cluster_id: int) -> List[Dict[str, Any]]:
         logger.error(
             f"Error retrieving essays for cluster {cluster_id}: {e}", exc_info=True)
         return []
+
+# Note: The `save_essay` function used by step5 seems to be handled by
+# the `haystack_db.py` module and its wrapper in `ReaderDBClient`.
+# The `insert_essay` function here is updated for potential other uses
+# or direct calls that might expect this module's interface.

@@ -41,5 +41,6 @@ pandas==2.2.0  # Data manipulation for clustering
 
 # Haystack dependencies
 sentence-transformers>=3.0.1  # Added for Haystack ranker/embedder options
-google-ai-haystack==0.4.0     # Updated for Gemini integration (Plan version)
-pgvector-haystack==0.1.1      # Updated for Pgvector integration (Plan version) 
+haystack-ai>=2.0.0         # Core Haystack 2.x package
+haystack-integrations-google-ai>=0.3.0 # Correct package for Google AI components
+# pgvector-haystack==3.2.0      # No longer needed as we don't use PgvectorDocumentStore/Retriever 
