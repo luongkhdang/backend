@@ -21,7 +21,8 @@ beautifulsoup4==4.13.3  # Latest stable version as of April 2024
 spacy==3.7.5  # Latest version compatible with Python 3.10 in Dockerfile 
 
 # AI and embeddings
-google-generativeai>=0.7.2
+# google-generativeai>=0.7.2 # Removed, replaced by google-genai
+google-genai==1.12.1
 
 # Local NLP (Transformers)
 transformers==4.41.1
@@ -40,7 +41,7 @@ pandas==2.2.0  # Data manipulation for clustering
 # accelerate==0.30.0 
 
 # Haystack dependencies
-sentence-transformers>=3.0.1  # Added for Haystack ranker/embedder options
-haystack-ai>=2.0.0         # Core Haystack 2.x package
+sentence-transformers==4.1.0  # Added for Haystack ranker/embedder options
+haystack-ai==2.13.1         # Core Haystack 2.x package
 google-ai-haystack>=5.1.0  
 # pgvector-haystack==3.2.0      # No longer needed as we don't use PgvectorDocumentStore/Retriever 

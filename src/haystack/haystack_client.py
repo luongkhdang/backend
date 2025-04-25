@@ -1,21 +1,25 @@
 """
-haystack_client.py - Haystack RAG Pipeline Client (Refactored)
+haystack_client.py - Haystack 2.x RAG Pipeline Client (Refactored)
 
 This module provides an interface primarily focused on using Haystack 2.x components
-for **ranking** retrieved documents and potentially preparing prompts for essay generation.
+(target: haystack-ai==2.13.1) for **ranking** retrieved documents and potentially
+preparing prompts for essay generation. It leverages the `google-ai-haystack` integration
+package (target: >=5.1.0) for the Gemini generator.
+
 It assumes **retrieval** is handled externally (e.g., via ReaderDBClient) based on custom logic.
 
 Exported functions:
 - get_ranker(): Returns configured Ranker component (TransformersSimilarityRanker).
 - get_prompt_builder(template_path): Returns PromptBuilder component.
-- get_gemini_generator(): Returns GoogleAIGeminiGenerator component (kept for potential use in Step 5).
-- run_article_retrieval_and_ranking(query_text, article_ids): Implements the new custom retrieval and ranking strategy.
+- get_gemini_generator(): Returns GoogleAIGeminiGenerator component.
+- run_article_retrieval_and_ranking(query_text, article_ids): Implements custom retrieval (via ReaderDBClient) and ranking (via Haystack Ranker).
 
 Related files:
-- src/database/reader_db_client.py: Database client, now responsible for retrieval.
-- src/gemini/gemini_client.py: Gemini API client for model access.
+- src/database/reader_db_client.py: Database client, responsible for retrieval.
+- src/gemini/gemini_client.py: Gemini API client (potentially used alongside or instead of GoogleAIGeminiGenerator).
 - src/prompts/haystack_prompt.txt: Template for essay generation.
 - src/steps/step5.py: Main script that uses this client.
+- requirements.txt: Specifies haystack-ai and google-ai-haystack versions.
 """
 
 import os
@@ -24,12 +28,15 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import numpy as np  # Added for embedding averaging
 
-# Haystack imports (only necessary ones)
+# Haystack imports (corrected for Haystack 2.x)
+# Document location confirmed in 2.x
 from haystack.dataclasses import Document
+# Component locations confirmed in 2.x
 from haystack.components.rankers import TransformersSimilarityRanker
-from haystack.components.builders import PromptBuilder
+from haystack.components.builders.prompt_builder import PromptBuilder  # More specific path
 
-# Haystack integrations (only necessary ones)
+# Haystack integrations (Assuming path is correct for google-ai-haystack >= 5.1.0)
+# Linter will verify this
 from haystack_integrations.components.generators.google_ai import GoogleAIGeminiGenerator
 
 # Import ReaderDBClient for custom retrieval
@@ -116,14 +123,17 @@ def get_gemini_generator() -> GoogleAIGeminiGenerator:
         logger.error("GEMINI_API_KEY environment variable not set")
         raise ValueError("GEMINI_API_KEY environment variable not set")
 
-    # Get model name from environment or use default
-    model_name = os.getenv("GEMINI_FLASH_THINKING_MODEL",
-                           "models/gemini-2.0-flash-thinking-exp-01-21")
+    # Get model name from environment or use default, ensuring SHORT ID is used
+    model_full_name = os.getenv("GEMINI_FLASH_THINKING_MODEL",
+                                # Default to a known good ID if env var is missing
+                                "gemini-1.5-flash-latest")
+    # Extract short ID (e.g., gemini-1.5-flash-latest) in case prefix was included in env var
+    model_short_id = model_full_name.split('/')[-1]
 
-    # Initialize the generator
+    # Initialize the generator using the short model ID
     generator = GoogleAIGeminiGenerator(
         api_key=api_key,
-        model=model_name,
+        model=model_short_id,  # Pass short ID
         generation_kwargs={
             "temperature": 0.7,
             "top_p": 0.9,
@@ -132,7 +142,7 @@ def get_gemini_generator() -> GoogleAIGeminiGenerator:
     )
 
     logger.info(
-        f"Initialized GoogleAIGeminiGenerator with model: {model_name}")
+        f"Initialized GoogleAIGeminiGenerator with model: {model_short_id}")
     return generator
 
 

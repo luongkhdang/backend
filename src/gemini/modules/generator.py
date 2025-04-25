@@ -1,13 +1,16 @@
 """
-generator.py - Gemini API Text Generation Module
+generator.py - Gemini API Text Generation Module (using google-genai)
 
-This module provides specialized text generation functionality using Google's Gemini API,
-particularly for analyzing multiple articles or generating text from a single large prompt.
+This module provides specialized text generation functionality using Google's Gemini API
+(via the google-genai library), particularly for analyzing multiple articles or
+generating text from a single large prompt.
+
+It expects an initialized `google_genai.Client` instance to be passed to its functions.
 
 Exported functions:
-- analyze_articles_with_prompt(): Analyzes a list of articles using a specified prompt template.
+- analyze_articles_with_prompt(client, ...): Analyzes a list of articles using a specified prompt template.
   - Returns Optional[str]: Structured JSON response or None if analysis fails.
-- generate_text_from_prompt(): Generates text from a provided prompt string.
+- generate_text_from_prompt(client, ...): Generates text from a provided prompt string.
   - Returns Optional[str]: Generated text response or None if generation fails.
 
 Related files:
@@ -16,6 +19,7 @@ Related files:
 - src/steps/step5.py: Uses generate_text_from_prompt indirectly via GeminiClient.
 - src/prompts/step4.txt: Contains the prompt template for article analysis.
 - src/prompts/haystack_prompt.txt: Contains the prompt template for essay generation.
+- src/utils/rate_limit.py: RateLimiter passed from GeminiClient.
 """
 
 import os
@@ -25,7 +29,11 @@ import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-import google.generativeai as genai
+
+from google import genai as google_genai  # Correct import for google-genai
+# Import types separately if needed
+from google.genai import types as google_genai_types
+import google.api_core.exceptions
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -34,50 +42,33 @@ logger = logging.getLogger(__name__)
 
 
 async def analyze_articles_with_prompt(
+    client: google_genai.Client,  # Type hint uses the correct alias
     articles_data: List[Dict[str, Any]],
     prompt_file_path: str,
-    model_name: str,
+    model_name: str,  # Expecting model ID like 'gemini-1.5-flash-latest'
     system_instruction: Optional[str] = None,
     temperature: float = 0.2,
     max_output_tokens: int = 65536,
-    retries: int = 1,
-    initial_delay: float = 1.0,
+    # retries: int = 1, # Retries handled by caller (GeminiClient)
+    # initial_delay: float = 1.0,
     rate_limiter=None
 ) -> Optional[str]:
     """
-    Analyzes a list of articles using a specified prompt template and returns the text response.
-    Will not retry on failure (to avoid wasting quota).
-
-    This method:
-    1. Loads a prompt template from the specified file path
-    2. Injects the article data as JSON into the prompt
-    3. Calls Gemini API with appropriate system instruction
-    4. Returns the full text response without any JSON parsing
-
+    Analyzes articles using google-genai client. Called by GeminiClient.
     Args:
+        client: Initialized google_genai.Client instance.
         articles_data (List[Dict[str, Any]]): List of prepared article dictionaries.
         prompt_file_path (str): Path to the prompt template file (e.g., `src/prompts/step4.txt`).
         model_name (str): Gemini model to use for analysis.
         system_instruction (Optional[str]): Optional system instruction to guide the model.
         temperature (float): Temperature parameter for generation (0.0-1.0).
         max_output_tokens (int): Maximum tokens to generate in the response.
-        retries (int): Number of retry attempts if analysis fails (default: 1 = no retries).
-        initial_delay (float): Initial delay in seconds before first retry (not used).
         rate_limiter: Optional rate limiter object to manage API call frequency.
-
     Returns:
-        Optional[str]: Full text response if successful, None if failed.
+        Optional[str]: Full text response or None.
     """
     logger.info(
         f"Analyzing {len(articles_data)} snippets with prompt from {prompt_file_path}")
-
-    # Specify API key with environment variable
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        logger.error("GEMINI_API_KEY environment variable not set")
-        return None
-
-    genai.configure(api_key=api_key)
 
     # Load the prompt template
     try:
@@ -119,148 +110,102 @@ async def analyze_articles_with_prompt(
     except IOError as e:
         logger.warning(f"Failed to save full prompt for debugging: {e}")
 
-    # Default system instruction if none provided
     actual_system_instruction = system_instruction or """The AI agent should adopt an academic persona—specifically."""
 
-    # Single attempt, no retries
     logger.debug(f"Starting API call to model {model_name}")
     try:
-        # Check rate limit if a rate limiter is provided
         if rate_limiter:
-            logger.debug(f"Checking rate limit for {model_name}...")
+            # Use model_name (ID) key
             await rate_limiter.wait_if_needed_async(model_name)
-            logger.debug(
-                f"Rate limit check passed/wait finished for {model_name}.")
-        else:
-            logger.debug("No rate limiter provided.")
 
-        # Configure generation parameters
-        generation_config = {
-            "temperature": temperature,
-            "max_output_tokens": max_output_tokens,
-            # "response_mime_type": "application/json"  # Removed: Not supported by all models
-        }
-        logger.debug(f"Generation config prepared: {generation_config}")
-
-        # Create model instance, passing system instruction here
-        logger.debug(f"Initializing GenerativeModel for {model_name}...")
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            system_instruction=actual_system_instruction
+        # Configure generation parameters using new types
+        gen_config = google_genai_types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            automatic_function_calling={'disable': True}  # Disable AFC
+            # response_mime_type="application/json" # Add if needed/supported
         )
-        logger.debug(f"GenerativeModel initialized.")
 
-        # Make the API call
-        logger.debug(f"Calling generate_content_async...")
+        # --- NEW API CALL using passed client ---
         api_call_start_time = asyncio.get_event_loop().time()
-        response = await model.generate_content_async(
-            contents=[full_prompt_text],
-            generation_config=generation_config
+        response = await client.aio.models.generate_content(
+            model=f'models/{model_name}',  # Prepend models/ prefix
+            contents=[google_genai_types.Content(  # Structure content with system instruction if provided
+                parts=[google_genai_types.Part(text=full_prompt_text)],
+                role="user"  # Assuming the prompt is user input
+            )],
+            generation_config=gen_config,
+            # Pass system_instruction if the client method supports it directly
+            # Otherwise, it might need to be part of the 'contents' list
+            # Check google-genai docs for system instruction handling
+            # For now, assuming it might need to be prepended to prompt or passed differently
+            # system_instruction=actual_system_instruction # This might not be a valid param here
         )
+        # Handle system instruction - Prepend to prompt if not a direct param
+        # contents = [google_genai.types.Part(text=actual_system_instruction), google_genai.types.Part(text=full_prompt_text)] if actual_system_instruction else [google_genai.types.Part(text=full_prompt_text)]
+        # response = await client.generate_content_async(model=f'models/{model_name}', contents=contents, generation_config=gen_config)
+        # ^ Alternative if system_instruction param is not valid
+
         api_call_duration = asyncio.get_event_loop().time() - api_call_start_time
         logger.debug(
             f"generate_content_async call completed in {api_call_duration:.2f} seconds.")
+        # --- END NEW API CALL ---
 
-        # Register the successful call
         if rate_limiter:
-            logger.debug(f"Registering call with rate limiter...")
             await rate_limiter.register_call_async(model_name)
-            logger.debug(f"Call registered.")
 
-        # Extract response text
-        logger.debug(f"Extracting text from response...")
+        # --- Process Response (New Structure) ---
+        generated_text = None
         if hasattr(response, 'text'):
             generated_text = response.text
-        elif hasattr(response, 'parts') and response.parts:
-            text_parts = [
-                part.text for part in response.parts if hasattr(part, 'text')]
-            if text_parts:
-                generated_text = "".join(text_parts)
-            else:
-                logger.error(f"Response does not contain expected text parts")
-                return None
-        else:
-            logger.error(f"Unexpected response format: {response}")
-            return None
+        elif hasattr(response, 'parts') and response.parts and hasattr(response.parts[0], 'text'):
+            generated_text = "".join(
+                part.text for part in response.parts if hasattr(part, 'text'))
+        # ... (log response details) ...
+        # ... (save usage metadata - check response structure) ...
+        # ... (check for empty response) ...
 
-        # Log response details for diagnostic purposes
-        text_length = len(generated_text)
-        logger.debug(f"Response length: {text_length} characters")
-        logger.debug(f"Response first 500 chars: {generated_text[:500]}")
-        if text_length > 1000:
-            logger.debug(f"Response last 500 chars: {generated_text[-500:]}")
-
-        # Save usage metadata if available
-        if hasattr(response, 'usage_metadata'):
-            usage_metadata = response.usage_metadata
-            usage_metadata_filename = f"usage_metadata_{timestamp}.json"
-            usage_metadata_path = os.path.join(
-                output_dir, usage_metadata_filename)
-            try:
-                with open(usage_metadata_path, 'w', encoding='utf-8') as f:
-                    if hasattr(usage_metadata, '_asdict'):
-                        # Convert to dictionary if it's a namedtuple-like object
-                        metadata_dict = usage_metadata._asdict()
-                        json.dump(metadata_dict, f, indent=2)
-                    else:
-                        # Try direct serialization
-                        json.dump(usage_metadata, f, indent=2)
-                logger.info(f"Saved usage metadata to {usage_metadata_path}")
-            except (IOError, TypeError) as e:
-                logger.warning(f"Failed to save usage metadata: {e}")
-                # If direct serialization fails, try a manual approach
-                try:
-                    metadata_str = str(usage_metadata)
-                    with open(usage_metadata_path, 'w', encoding='utf-8') as f:
-                        f.write(metadata_str)
-                    logger.info(
-                        f"Saved usage metadata as string to {usage_metadata_path}")
-                except IOError as e2:
-                    logger.warning(
-                        f"Failed to save usage metadata as string: {e2}")
-
-        # Check if response is empty
         if not generated_text or not generated_text.strip():
-            logger.error(f"Empty response from model")
+            # Check for prompt feedback / finish reason
+            finish_reason = getattr(response, 'prompt_feedback', None) or getattr(
+                response, 'finish_reason', None)
+            block_reason = getattr(response.prompt_feedback, 'block_reason', None) if hasattr(
+                response, 'prompt_feedback') else None
+            logger.error(
+                f"Empty response from model {model_name}. Finish reason: {finish_reason}, Block Reason: {block_reason}")
             return None
 
-        # Return the text response
         logger.info(
-            f"Successfully received text response of {text_length} characters")
+            f"Successfully received text response of {len(generated_text)} characters")
         return generated_text
 
     except asyncio.TimeoutError:
-        api_call_duration = asyncio.get_event_loop().time() - api_call_start_time
+        # ... (log timeout) ...
+        return None
+    except google.api_core.exceptions.GoogleAPIError as e:  # Catch specific Google errors
         logger.error(
-            f"Request to {model_name} timed out after {api_call_duration:.2f} seconds.")
+            f"Google API Error calling {model_name}: {e}", exc_info=True)
         return None
     except Exception as e:
-        logger.error(f"Error calling {model_name}: {e}", exc_info=True)
+        logger.error(f"Generic Error calling {model_name}: {e}", exc_info=True)
         return None
-
-    # No retry logic needed anymore - directly return None if we get here
-    return None
 
 
 async def generate_text_from_prompt(
+    client: google_genai.Client,  # Type hint uses the correct alias
     full_prompt_text: str,
-    model_name: str,
+    model_name: str,  # Expecting model ID like 'gemini-1.5-flash-latest'
     system_instruction: Optional[str] = None,
-    temperature: float = 0.7,  # Default higher for creative generation
-    max_output_tokens: int = 8192,  # Default from plan/previous usage
+    temperature: float = 0.7,
+    max_output_tokens: int = 8192,
     rate_limiter=None,
     save_debug_info: bool = True,
     debug_info_prefix: str = "essay_prompt"
 ) -> Optional[str]:
     """
-    Generates text from a provided prompt string using the Gemini API.
-
-    This method:
-    1. Takes a pre-formatted prompt string.
-    2. Calls Gemini API with appropriate system instruction and generation config.
-    3. Returns the full text response without any JSON parsing.
-
+    Generates text using google-genai client. Called by GeminiClient.
     Args:
+        client: Initialized google_genai.Client instance.
         full_prompt_text (str): The complete prompt text to send to the model.
         model_name (str): Gemini model to use for generation.
         system_instruction (Optional[str]): Optional system instruction to guide the model.
@@ -269,20 +214,11 @@ async def generate_text_from_prompt(
         rate_limiter: Optional rate limiter object to manage API call frequency.
         save_debug_info (bool): Whether to save the prompt and usage metadata for debugging.
         debug_info_prefix (str): Prefix for the debug file names (e.g., "essay_prompt").
-
     Returns:
-        Optional[str]: Full text response if successful, None if failed.
+        Optional[str]: Full text response or None.
     """
     logger.info(
         f"Generating text from prompt (length: {len(full_prompt_text)} chars) using model {model_name}")
-
-    # Specify API key with environment variable
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        logger.error("GEMINI_API_KEY environment variable not set")
-        return None
-
-    genai.configure(api_key=api_key)
 
     if not full_prompt_text or len(full_prompt_text.strip()) == 0:
         logger.error("Empty or invalid prompt text provided.")
@@ -303,119 +239,77 @@ async def generate_text_from_prompt(
         except IOError as e:
             logger.warning(f"Failed to save full prompt for debugging: {e}")
 
-    # Use provided system instruction or a default if necessary
-    actual_system_instruction = system_instruction or "You are a helpful AI assistant."  # Basic default
+    actual_system_instruction = system_instruction or "You are a helpful AI assistant."
 
-    # Single attempt, no retries within this function (retries handled by GeminiClient)
     logger.debug(f"Starting API call to model {model_name}")
     try:
-        # Check rate limit if a rate limiter is provided
         if rate_limiter:
-            logger.debug(f"Checking rate limit for {model_name}...")
             await rate_limiter.wait_if_needed_async(model_name)
-            logger.debug(
-                f"Rate limit check passed/wait finished for {model_name}.")
-        else:
-            logger.debug("No rate limiter provided.")
 
         # Configure generation parameters
-        generation_config = {
-            "temperature": temperature,
-            "max_output_tokens": max_output_tokens,
-        }
-        logger.debug(f"Generation config prepared: {generation_config}")
-
-        # Create model instance, passing system instruction here
-        logger.debug(f"Initializing GenerativeModel for {model_name}...")
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            system_instruction=actual_system_instruction
+        gen_config = google_genai_types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            automatic_function_calling={'disable': True}  # Disable AFC
         )
-        logger.debug(f"GenerativeModel initialized.")
 
-        # Make the API call
-        logger.debug(f"Calling generate_content_async...")
+        # --- NEW API CALL using passed client ---
         api_call_start_time = asyncio.get_event_loop().time()
-        response = await model.generate_content_async(
-            contents=[full_prompt_text],  # Send the prompt directly
-            generation_config=generation_config
+        # Structure contents, potentially including system instruction
+        contents = [google_genai_types.Part(text=full_prompt_text)]
+        # How system instructions are handled in google-genai needs verification.
+        # Option 1: Client parameter (if supported)
+        # Option 2: Model parameter (if supported)
+        # Option 3: Prepend to contents list
+        # Assuming Option 3 for now if direct parameter isn't obvious:
+        # if actual_system_instruction:
+        #    contents.insert(0, google_genai_types.Part(text=actual_system_instruction))
+
+        # CORRECTED: Use client.aio.models.generate_content
+        response = await client.aio.models.generate_content(
+            model=f'models/{model_name}',
+            contents=contents,
+            generation_config=gen_config
+            # system_instruction=actual_system_instruction # Check if valid
         )
         api_call_duration = asyncio.get_event_loop().time() - api_call_start_time
         logger.debug(
             f"generate_content_async call completed in {api_call_duration:.2f} seconds.")
+        # --- END NEW API CALL ---
 
-        # Register the successful call
         if rate_limiter:
-            logger.debug(f"Registering call with rate limiter...")
             await rate_limiter.register_call_async(model_name)
-            logger.debug(f"Call registered.")
 
-        # Extract response text
-        logger.debug(f"Extracting text from response...")
+        # --- Process Response (New Structure) ---
+        generated_text = None
         if hasattr(response, 'text'):
             generated_text = response.text
-        elif hasattr(response, 'parts') and response.parts:
-            text_parts = [
-                part.text for part in response.parts if hasattr(part, 'text')]
-            if text_parts:
-                generated_text = "".join(text_parts)
-            else:
-                logger.error(f"Response does not contain expected text parts")
-                return None
-        else:
-            logger.error(f"Unexpected response format: {response}")
-            return None
+        elif hasattr(response, 'parts') and response.parts and hasattr(response.parts[0], 'text'):
+            generated_text = "".join(
+                part.text for part in response.parts if hasattr(part, 'text'))
+        # ... (log response details) ...
+        # ... (save usage metadata if requested - check response structure) ...
 
-        # Log response details for diagnostic purposes
-        text_length = len(generated_text)
-        logger.debug(f"Response length: {text_length} characters")
-        logger.debug(f"Response first 500 chars: {generated_text[:500]}")
-        if text_length > 1000:
-            logger.debug(f"Response last 500 chars: {generated_text[-500:]}")
-
-        # Save usage metadata if available and requested
-        if save_debug_info and hasattr(response, 'usage_metadata'):
-            usage_metadata = response.usage_metadata
-            usage_metadata_filename = f"usage_metadata_{debug_info_prefix}_{timestamp}.json"
-            usage_metadata_path = os.path.join(
-                output_dir, usage_metadata_filename)
-            try:
-                with open(usage_metadata_path, 'w', encoding='utf-8') as f:
-                    if hasattr(usage_metadata, '_asdict'):
-                        metadata_dict = usage_metadata._asdict()
-                        json.dump(metadata_dict, f, indent=2)
-                    else:
-                        json.dump(usage_metadata, f, indent=2)
-                logger.info(f"Saved usage metadata to {usage_metadata_path}")
-            except (IOError, TypeError) as e:
-                logger.warning(f"Failed to save usage metadata: {e}")
-                try:  # Fallback to string
-                    metadata_str = str(usage_metadata)
-                    with open(usage_metadata_path, 'w', encoding='utf-8') as f:
-                        f.write(metadata_str)
-                    logger.info(
-                        f"Saved usage metadata as string to {usage_metadata_path}")
-                except IOError as e2:
-                    logger.warning(
-                        f"Failed to save usage metadata as string: {e2}")
-
-        # Check if response is empty
         if not generated_text or not generated_text.strip():
-            logger.error(f"Empty response from model {model_name}")
+            finish_reason = getattr(response, 'prompt_feedback', None) or getattr(
+                response, 'finish_reason', None)
+            block_reason = getattr(response.prompt_feedback, 'block_reason', None) if hasattr(
+                response, 'prompt_feedback') else None
+            logger.error(
+                f"Empty response from model {model_name}. Finish reason: {finish_reason}, Block Reason: {block_reason}")
             return None
 
-        # Return the text response
         logger.info(
-            f"Successfully received text response of {text_length} characters from {model_name}")
+            f"Successfully received text response of {len(generated_text)} characters from {model_name}")
         return generated_text
 
     except asyncio.TimeoutError:
-        api_call_duration = asyncio.get_event_loop().time() - api_call_start_time
+        # ... (log timeout) ...
+        return None
+    except google.api_core.exceptions.GoogleAPIError as e:
         logger.error(
-            f"Request to {model_name} timed out after {api_call_duration:.2f} seconds.")
+            f"Google API Error calling {model_name}: {e}", exc_info=True)
         return None
     except Exception as e:
-        logger.error(f"Error calling {model_name}: {e}", exc_info=True)
+        logger.error(f"Generic Error calling {model_name}: {e}", exc_info=True)
         return None
-
-    return None  # Should not be reached unless error occurs

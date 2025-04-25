@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Don't try to access __version__ for hdbscan as it doesn't expose it directly
 RUN python -c "import transformers; print(f'Successfully installed transformers {transformers.__version__}')" \
     && python -c "import torch; print(f'Successfully installed torch {torch.__version__}')" \
-    && python -c "import google.generativeai; print('Successfully installed google.generativeai')" \
+    && python -c "import google.genai; print('Successfully installed google.genai')" \
     && python -c "import hdbscan; print('Successfully installed hdbscan')" \
     && python -c "import sklearn; print(f'Successfully installed scikit-learn {sklearn.__version__}')" \
     && python -c "import pandas; print(f'Successfully installed pandas {pandas.__version__}')" \

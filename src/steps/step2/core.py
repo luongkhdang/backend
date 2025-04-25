@@ -263,6 +263,8 @@ def run() -> Dict[str, Any]:
                 X = X[:min_length]
                 article_ids = list(article_ids)[:min_length]
                 pub_dates = list(pub_dates)[:min_length]
+                # ALSO TRIM the original embeddings list/tuple to maintain consistency
+                embeddings = embeddings[:min_length]
                 logger.info(f"Arrays trimmed to match at length {min_length}")
 
             # Now perform the clustering with synced arrays

@@ -25,6 +25,7 @@ import logging
 import json
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
+import numpy as np  # Import numpy for type checking
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -236,9 +237,20 @@ def get_all_embeddings_with_pub_date(conn, limit: Optional[int] = None) -> List[
 
         embeddings = []
         for row in cursor.fetchall():
+            embedding_value = row[1]
+            # Convert numpy array to list if necessary
+            if isinstance(embedding_value, np.ndarray):
+                embedding_value = embedding_value.tolist()
+            elif not isinstance(embedding_value, list):
+                # Log unexpected types other than list or ndarray
+                logger.warning(
+                    f"Unexpected embedding type fetched from DB for article {row[0]}: {type(embedding_value)}")
+                # Attempt conversion or skip? Skipping for now.
+                continue  # Skip this row if type is unexpected
+
             embeddings.append({
                 'article_id': row[0],
-                'embedding': row[1],
+                'embedding': embedding_value,  # Use the potentially converted list
                 'pub_date': row[2],
             })
 
