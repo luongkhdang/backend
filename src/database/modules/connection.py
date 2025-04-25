@@ -40,15 +40,6 @@ except ImportError:
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Register the pgvector adapter globally if psycopg2 is available
-if PSYCOPG2_AVAILABLE and register_vector:
-    try:
-        register_vector()
-        logger.info(
-            "Successfully registered pgvector adapter for psycopg2 globally.")
-    except Exception as e:
-        logger.error(f"Failed to register pgvector adapter globally: {e}")
-
 
 def initialize_connection_pool(db_config: Dict[str, Any]) -> Optional[Any]:
     """

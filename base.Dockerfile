@@ -25,6 +25,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     && pip install --no-cache-dir scikit-learn==1.3.2 pandas==2.2.0 numpy~=1.26.4 \
     && pip install --no-cache-dir docker
 
+# Explicitly install and verify psycopg2-binary and pgvector
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir psycopg2-binary>=2.9.9 pgvector>=0.2.3 \
+    && echo "psycopg2-binary and pgvector explicitly installed"
+
 # Install hdbscan separately for better error visibility
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir hdbscan==0.8.36 \
@@ -38,7 +43,9 @@ RUN python -c "import transformers; print(f'Successfully installed transformers 
     && python -c "import hdbscan; print('Successfully installed hdbscan')" \
     && python -c "import sklearn; print(f'Successfully installed scikit-learn {sklearn.__version__}')" \
     && python -c "import pandas; print(f'Successfully installed pandas {pandas.__version__}')" \
-    && python -c "import spacy; print('Successfully installed spacy')"
+    && python -c "import spacy; print('Successfully installed spacy')" \
+    && python -c "import psycopg2; print(f'Successfully installed and imported psycopg2 {psycopg2.__version__}')" \
+    && python -c "import pgvector; print('Successfully installed and imported pgvector')"
 
 # Download spaCy model - kept separate as it's a different tool
 RUN python -m spacy download en_core_web_lg \
