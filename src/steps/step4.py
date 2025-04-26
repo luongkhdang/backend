@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 # Model to use for analysis
-ANALYSIS_MODEL = "models/qweqweqwe"
+ANALYSIS_MODEL = "models/gemini-2.0-flash-exp"
 # Prompt file path
 PROMPT_FILE = "src/prompts/step4.txt"
 

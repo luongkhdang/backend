@@ -98,25 +98,24 @@ async def analyze_articles_with_prompt(
     actual_system_instruction = system_instruction or """The AI agent should adopt an academic persona—specifically."""
 
     # --- Retry Logic --- #
+    # Updated: Remove Thinking attempts based on API errors
     attempts_config = [
-        # Attempt 1: Thinking + Grounding
-        {"thinking": True, "grounding": True, "name": "Thinking+Grounding"},
-        # Attempt 2: Thinking only
-        {"thinking": True, "grounding": False, "name": "Thinking"},
-        # Attempt 3: Base (No Thinking, No Grounding)
-        {"thinking": False, "grounding": False, "name": "Base"}
+        # Attempt 1: Grounding (using google_search)
+        {"grounding": True, "name": "Grounding"},
+        # Attempt 2: Base (No Grounding)
+        {"grounding": False, "name": "Base"}
     ]
 
     last_error = None
 
     for i, attempt_config in enumerate(attempts_config):
         attempt_num = i + 1
-        use_thinking = attempt_config["thinking"]
         use_grounding = attempt_config["grounding"]
         attempt_name = attempt_config["name"]
 
         logger.info(
-            f"[{model_name}] Attempt {attempt_num}/3 ({attempt_name}) for prompt analysis.")
+            # Updated attempt count
+            f"[{model_name}] Attempt {attempt_num}/{len(attempts_config)} ({attempt_name}) for prompt analysis.")
 
         try:
             # Rate Limit Check (before each attempt)
@@ -129,38 +128,31 @@ async def analyze_articles_with_prompt(
                 "max_output_tokens": max_output_tokens,
                 "automatic_function_calling": {'disable': True}
             }
-            tools_list = None
-
-            if use_thinking:
-                try:
-                    gen_config_kwargs["thinking_config"] = google_genai_types.ThinkingConfig(
-                        include_thoughts=True)
-                    logger.debug(
-                        f"[{model_name}] Attempt {attempt_num}: Enabling Thinking.")
-                except AttributeError:
-                    logger.warning(
-                        f"[{model_name}] Attempt {attempt_num}: Cannot enable Thinking (AttributeError). Skipping for this attempt.")
-                    # If ThinkingConfig fails, we can't proceed with this attempt configuration
-                    if i < len(attempts_config) - 1:  # If not the last attempt
-                        logger.warning(
-                            f"[{model_name}] Skipping attempt {attempt_num} due to Thinking config error.")
-                        last_error = AttributeError("ThinkingConfig not found")
-                        continue  # Move to next attempt configuration
-                    else:
-                        raise  # Reraise if it's the last attempt
+            # Tool list is now defined separately for the API call itself if grounding is used
+            tools_list_for_api_call = None
 
             if use_grounding:
                 try:
-                    tools_list = [google_genai_types.Tool(
-                        google_search_retrieval=google_genai_types.GoogleSearchRetrieval()
+                    # Prepare tools list with the correct parameter for grounding
+                    tools_list_for_api_call = [google_genai_types.Tool(
+                        # Use google_search as per API error message
+                        google_search=google_genai_types.GoogleSearch()
                     )]
                     logger.debug(
-                        f"[{model_name}] Attempt {attempt_num}: Enabling Grounding.")
+                        f"[{model_name}] Attempt {attempt_num}: Enabling Grounding via tools list.")
+                    # Do NOT add tools to gen_config_kwargs here, pass separately to generate_content
                 except AttributeError:
                     logger.warning(
-                        f"[{model_name}] Attempt {attempt_num}: Cannot enable Grounding (AttributeError). Skipping Grounding for this attempt.")
-                    tools_list = None  # Ensure tools are None if grounding fails
+                        f"[{model_name}] Attempt {attempt_num}: Cannot prepare Grounding tools (AttributeError). Skipping Grounding.")
+                    tools_list_for_api_call = None  # Ensure it's None
+                    # If grounding fails to prepare, we might want to skip this attempt or proceed without it
+                    # For now, let's proceed without grounding if preparation fails
+                    if attempt_name == "Grounding":  # If this *was* the grounding attempt
+                        logger.warning(
+                            f"[{model_name}] Proceeding with Base configuration due to grounding preparation error.")
+                        use_grounding = False  # Fallback to base implicitly by tools_list being None
 
+            # Create the config object with only applicable kwargs (temp, tokens, etc.)
             gen_config = google_genai_types.GenerateContentConfig(
                 **gen_config_kwargs)
             # --- End Dynamic Configuration --- #
@@ -172,7 +164,7 @@ async def analyze_articles_with_prompt(
                 contents=[google_genai_types.Content(
                     parts=[google_genai_types.Part(text=full_prompt_text)], role="user")],
                 config=gen_config,
-                tools=tools_list
+                tools=tools_list_for_api_call  # Pass tools list directly here if grounding enabled
             )
             api_call_duration = asyncio.get_event_loop().time() - api_call_start_time
             logger.debug(
@@ -184,18 +176,12 @@ async def analyze_articles_with_prompt(
 
             # --- Process Response --- #
             generated_text = ""
-            thoughts_log = []
             try:
                 if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
                     for part in response.candidates[0].content.parts:
-                        if hasattr(part, 'thought') and part.thought is True:
-                            if part.text:
-                                thoughts_log.append(part.text.strip())
-                        elif hasattr(part, 'text'):
-                            generated_text += part.text
-                if thoughts_log:
-                    logger.debug(
-                        f"[{model_name}] Attempt {attempt_num} Thoughts: {' | '.join(thoughts_log)}")
+                        if not (hasattr(part, 'thought') and part.thought is True):
+                            if hasattr(part, 'text'):
+                                generated_text += part.text
             except Exception as proc_e:
                 logger.error(
                     f"[{model_name}] Attempt {attempt_num}: Error processing response parts: {proc_e}", exc_info=True)
@@ -212,7 +198,7 @@ async def analyze_articles_with_prompt(
                     f"[{model_name}] Attempt {attempt_num} ({attempt_name}) resulted in empty text. Finish Reason: {finish_reason}. Retrying if possible.")
                 last_error = ValueError(
                     f"Empty response text (Finish Reason: {finish_reason})")
-                # Continue to next attempt in the loop
+                # Continue to next attempt
 
         except google.api_core.exceptions.GoogleAPIError as e:
             logger.warning(
@@ -276,22 +262,24 @@ async def generate_text_from_prompt(
     actual_system_instruction = system_instruction or "You are a helpful AI assistant."
 
     # --- Retry Logic --- #
+    # Updated: Remove Thinking attempts based on API errors
     attempts_config = [
-        {"thinking": True, "grounding": True, "name": "Thinking+Grounding"},
-        {"thinking": True, "grounding": False, "name": "Thinking"},
-        {"thinking": False, "grounding": False, "name": "Base"}
+        # Attempt 1: Grounding (using google_search)
+        {"grounding": True, "name": "Grounding"},
+        # Attempt 2: Base (No Grounding)
+        {"grounding": False, "name": "Base"}
     ]
 
     last_error = None
 
     for i, attempt_config in enumerate(attempts_config):
         attempt_num = i + 1
-        use_thinking = attempt_config["thinking"]
         use_grounding = attempt_config["grounding"]
         attempt_name = attempt_config["name"]
 
         logger.info(
-            f"[{model_name}] Attempt {attempt_num}/3 ({attempt_name}) for text generation.")
+            # Updated attempt count
+            f"[{model_name}] Attempt {attempt_num}/{len(attempts_config)} ({attempt_name}) for text generation.")
 
         try:
             # Rate Limit Check
@@ -304,37 +292,31 @@ async def generate_text_from_prompt(
                 "max_output_tokens": max_output_tokens,
                 "automatic_function_calling": {'disable': True}
             }
-            tools_list = None
-
-            if use_thinking:
-                try:
-                    gen_config_kwargs["thinking_config"] = google_genai_types.ThinkingConfig(
-                        include_thoughts=True)
-                    logger.debug(
-                        f"[{model_name}] Attempt {attempt_num}: Enabling Thinking.")
-                except AttributeError:
-                    logger.warning(
-                        f"[{model_name}] Attempt {attempt_num}: Cannot enable Thinking (AttributeError). Skipping for this attempt.")
-                    if i < len(attempts_config) - 1:
-                        logger.warning(
-                            f"[{model_name}] Skipping attempt {attempt_num} due to Thinking config error.")
-                        last_error = AttributeError("ThinkingConfig not found")
-                        continue
-                    else:
-                        raise
+            # Tool list is now defined separately for the API call itself if grounding is used
+            tools_list_for_api_call = None
 
             if use_grounding:
                 try:
-                    tools_list = [google_genai_types.Tool(
-                        google_search_retrieval=google_genai_types.GoogleSearchRetrieval()
+                    # Prepare tools list with the correct parameter for grounding
+                    tools_list_for_api_call = [google_genai_types.Tool(
+                        # Use google_search as per API error message
+                        google_search=google_genai_types.GoogleSearch()
                     )]
                     logger.debug(
-                        f"[{model_name}] Attempt {attempt_num}: Enabling Grounding.")
+                        f"[{model_name}] Attempt {attempt_num}: Enabling Grounding via tools list.")
+                    # Do NOT add tools to gen_config_kwargs here, pass separately to generate_content
                 except AttributeError:
                     logger.warning(
-                        f"[{model_name}] Attempt {attempt_num}: Cannot enable Grounding (AttributeError). Skipping Grounding for this attempt.")
-                    tools_list = None
+                        f"[{model_name}] Attempt {attempt_num}: Cannot prepare Grounding tools (AttributeError). Skipping Grounding.")
+                    tools_list_for_api_call = None  # Ensure it's None
+                    # If grounding fails to prepare, we might want to skip this attempt or proceed without it
+                    # For now, let's proceed without grounding if preparation fails
+                    if attempt_name == "Grounding":  # If this *was* the grounding attempt
+                        logger.warning(
+                            f"[{model_name}] Proceeding with Base configuration due to grounding preparation error.")
+                        use_grounding = False  # Fallback to base implicitly by tools_list being None
 
+            # Create the config object with only applicable kwargs (temp, tokens, etc.)
             gen_config = google_genai_types.GenerateContentConfig(
                 **gen_config_kwargs)
             # --- End Dynamic Configuration --- #
@@ -343,12 +325,11 @@ async def generate_text_from_prompt(
             api_call_start_time = asyncio.get_event_loop().time()
             contents = [google_genai_types.Content(
                 parts=[google_genai_types.Part(text=full_prompt_text)])]
-            # Note: System instructions are handled differently. Add if needed based on SDK/API specifics.
             response = await client.aio.models.generate_content(
                 model=f'models/{model_name}',
                 contents=contents,
                 config=gen_config,
-                tools=tools_list
+                tools=tools_list_for_api_call  # Pass tools list directly here if grounding enabled
             )
             api_call_duration = asyncio.get_event_loop().time() - api_call_start_time
             logger.debug(
@@ -360,18 +341,12 @@ async def generate_text_from_prompt(
 
             # --- Process Response --- #
             generated_text = ""
-            thoughts_log = []
             try:
                 if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
                     for part in response.candidates[0].content.parts:
-                        if hasattr(part, 'thought') and part.thought is True:
-                            if part.text:
-                                thoughts_log.append(part.text.strip())
-                        elif hasattr(part, 'text'):
-                            generated_text += part.text
-                if thoughts_log:
-                    logger.debug(
-                        f"[{model_name}] Attempt {attempt_num} Thoughts: {' | '.join(thoughts_log)}")
+                        if not (hasattr(part, 'thought') and part.thought is True):
+                            if hasattr(part, 'text'):
+                                generated_text += part.text
             except Exception as proc_e:
                 logger.error(
                     f"[{model_name}] Attempt {attempt_num}: Error processing response parts: {proc_e}", exc_info=True)

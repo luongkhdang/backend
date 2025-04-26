@@ -43,7 +43,7 @@ BATCH_SIZE = int(os.getenv("ENTITY_EXTRACTION_BATCH_SIZE", "10"))
 # Error handling constants
 MAX_CONSECUTIVE_FAILURES = 3
 FAILURE_COOLDOWN_SECONDS = 30
-INTER_BATCH_DELAY_SECONDS = 10  # Delay between batches
+INTER_BATCH_DELAY_SECONDS = 40  # Delay between batches
 
 # --- Helper Function for Time Formatting ---
 
@@ -198,7 +198,7 @@ async def run() -> Dict[str, Any]:
             rebalanced_tier_counts = {0: 0, 1: 0, 2: 0}
 
             # --- Tier 0 ---
-            tier0_target = int(target_batch_size * 0.4)  # Approx 40%
+            tier0_target = int(target_batch_size * 0.5)  # Approx 50%
             tier0_added = 0
             temp_articles_tier0 = []
             remaining_articles_after_tier0 = []
@@ -213,7 +213,7 @@ async def run() -> Dict[str, Any]:
             articles = remaining_articles_after_tier0  # Update remaining articles
 
             # --- Tier 1 ---
-            tier1_target = int(target_batch_size * 0.5)  # Approx 50%
+            tier1_target = int(target_batch_size * 0.4)  # Approx 40%
             tier1_added = 0
             temp_articles_tier1 = []
             remaining_articles_after_tier1 = []
@@ -496,8 +496,8 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
 
     Calculates the Combined_Priority_Score = (0.65 * cluster_hotness_score) + (0.35 * goodness_score)
     and assigns articles to processing tiers based on their ranking:
-    - Tier 0: Top ~30%
-    - Tier 1: Next ~50%
+    - Tier 0: Top ~40%
+    - Tier 1: Next ~40%
     - Tier 2: Remainder ~20%
 
     Args:
@@ -579,17 +579,17 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
         # Assign processing tiers based on percentages of the sorted list
         total_articles = len(sorted_articles)
         # Calculate tier cutoffs based on percentages
-        tier0_cutoff = int(total_articles * 0.3)  # Top 30%
-        # Top 80% (so next 50% after tier0)
+        tier0_cutoff = int(total_articles * 0.4)  # Top 40%
+        # Next 40% (up to 80% cumulative)
         tier1_cutoff = int(total_articles * 0.8)
 
         for i, article in enumerate(sorted_articles):
             if i < tier0_cutoff:
-                article['processing_tier'] = 0  # Top 30% - Highest quality
+                article['processing_tier'] = 0  # Top 40%
             elif i < tier1_cutoff:
-                article['processing_tier'] = 1  # Next 50% - Medium quality
+                article['processing_tier'] = 1  # Next 40%
             else:
-                article['processing_tier'] = 2  # Bottom 20% - Standard quality
+                article['processing_tier'] = 2  # Bottom 20%
 
         # Count articles in each tier for logging
         tier0_count = sum(
@@ -600,8 +600,8 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
             1 for a in sorted_articles if a.get('processing_tier') == 2)
 
         logger.info(
-            f"Prioritized {len(sorted_articles)} articles: {tier0_count} in tier 0 (30%), "
-            f"{tier1_count} in tier 1 (50%), {tier2_count} in tier 2 (20%)")
+            f"Prioritized {len(sorted_articles)} articles: {tier0_count} in tier 0 (40%), "
+            f"{tier1_count} in tier 1 (40%), {tier2_count} in tier 2 (20%)")
 
         return sorted_articles
 
