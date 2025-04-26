@@ -95,7 +95,7 @@ class GeminiClient:
         """
         Initialize the google-genai API client.
         Loads API key, model IDs, RPM limits, and token limits from environment variables.
-        Initializes the client and the rate limiter.
+        Initializes the client (forcing v1alpha API version) and the rate limiter.
         """
         # Load environment variables
         load_dotenv()
@@ -107,57 +107,64 @@ class GeminiClient:
             logger.critical(error_msg)
             raise ValueError(error_msg)
 
-        # --- Initialize the google-genai client --- #
+        # --- Initialize the google-genai client (Force v1alpha for potential Thinking use) --- #
         try:
-            self.client = google_genai.Client(api_key=api_key)
-            logger.info("google-genai client initialized successfully.")
+            # Force v1alpha since Thinking might be attempted
+            http_opts = {'api_version': 'v1alpha'}
+            self.client = google_genai.Client(
+                api_key=api_key, http_options=http_opts)
+            logger.info(
+                "google-genai client initialized successfully (Using forced API version: v1alpha).")
         except Exception as e:
-            error_msg = f"Failed to initialize google-genai client: {e}"
+            error_msg = f"Failed to initialize google-genai client (forcing v1alpha): {e}"
             logger.critical(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
 
         # --- Embedding Model Configuration --- #
-        # Note: Embedding model ID now includes models/ prefix from env var
         self.embedding_model_id = os.getenv(
             "GEMINI_EMBEDDING_MODEL_ID", "models/text-embedding-004")
         self.embedding_rpm_limit = int(
             os.getenv("GEMINI_EMBEDDING_RPM", "1500"))
         self.default_task_type = os.getenv(
-            "GEMINI_EMBEDDING_TASK_TYPE", "CLUSTERING")  # Still used for default
+            "GEMINI_EMBEDDING_TASK_TYPE", "CLUSTERING")
         self.embedding_input_token_limit = int(
             os.getenv("GEMINI_EMBEDDING_INPUT_TOKEN_LIMIT", "2048"))
 
-        # --- Generation Model Configuration (Read all defined models) --- #
+        # --- Generation Model Configuration (Read RPMs only) --- #
         self.gen_input_token_limit = int(
             os.getenv("GEMINI_GEN_INPUT_TOKEN_LIMIT", "1048576"))
         self.gen_output_token_limit = int(
             os.getenv("GEMINI_GEN_OUTPUT_TOKEN_LIMIT", "8192"))
 
-        # Dictionary to store model details (ID -> RPM)
+        # Dictionary to store model RPM limits for RateLimiter
         model_rpm_limits = {}
 
-        # Embedding model
+        # Embedding model RPM limit
         if self.embedding_model_id:
+            # Use full ID for embedding key consistency
             model_rpm_limits[self.embedding_model_id] = self.embedding_rpm_limit
             logger.debug(
                 f"Loaded Embedding Model: {self.embedding_model_id} (RPM: {self.embedding_rpm_limit})")
 
-        # Generation models (load if ID and RPM are defined)
+        # Generation models (load ID and RPM)
         gen_model_configs = [
-            # Added Flash Exp, using 10 RPM as proxy
             ("GEMINI_FLASH_EXP", "gemini-2.0-flash-exp", 10),
             ("GEMINI_FLASH", "gemini-2.0-flash", 15),
             ("GEMINI_FLASH_LITE", "gemini-2.0-flash-lite", 30),
-            ("GEMINI_PREVIEW", "gemini-2.5-flash-preview-04-17", 10)  # Future use
+            ("GEMINI_PREVIEW", "gemini-2.5-flash-preview-04-17", 10)
         ]
 
-        self.available_gen_models = []  # Store available model IDs
+        self.available_gen_models = []  # Store available model IDs (short IDs)
+
         for prefix, default_id, default_rpm in gen_model_configs:
             model_id = os.getenv(f"{prefix}_MODEL_ID", default_id)
             rpm_str = os.getenv(f"{prefix}_RPM")
+            # Removed reading of THINKING/GROUNDING flags here
+
             if model_id and rpm_str:
                 try:
                     rpm = int(rpm_str)
+                    # Store RPM for rate limiter (use short ID)
                     model_rpm_limits[model_id] = rpm
                     self.available_gen_models.append(model_id)
                     logger.debug(
@@ -170,41 +177,38 @@ class GeminiClient:
                     f"{prefix}_RPM environment variable not set for model {model_id}. Using hardcoded default RPM: {default_rpm}")
                 model_rpm_limits[model_id] = default_rpm
                 self.available_gen_models.append(model_id)
+                logger.debug(
+                    f"Loaded Generation Model: {model_id} (RPM: {default_rpm})")
 
-        # --- Preferred Model Order and Fallback (IDs WITHOUT prefix)--- #
-
-        pref_1 = os.getenv("GEMINI_MODEL_PREF_1",  # New default
-                           "gemini-2.0-flash-exp")
+        # --- Preferred Model Order and Fallback --- #
+        pref_1 = os.getenv("GEMINI_MODEL_PREF_1", "gemini-2.0-flash-exp")
         pref_2 = os.getenv("GEMINI_MODEL_PREF_2", "gemini-2.0-flash")
         pref_3 = os.getenv("GEMINI_MODEL_PREF_3", "gemini-2.0-flash-lite")
         self.fallback_model_id = os.getenv(
             "GEMINI_FALLBACK_MODEL_ID", "gemini-2.0-flash")
 
-        # Build the preferred model list dynamically based on availability
         self.preferred_model_ids = []
         for pref_model in [pref_1, pref_2, pref_3]:
-            if pref_model in model_rpm_limits:
+            if pref_model in self.available_gen_models:
                 self.preferred_model_ids.append(pref_model)
             else:
                 logger.warning(
                     f"Preferred model {pref_model} not found in loaded configs. Skipping.")
 
-        # Ensure fallback model is available and has an RPM limit
-        if self.fallback_model_id not in model_rpm_limits:
+        if self.fallback_model_id not in self.available_gen_models:
             logger.warning(
-                f"Fallback model {self.fallback_model_id} specified in env var is not available or has no RPM limit. Attempting to use first preferred model as fallback.")
+                f"Fallback model {self.fallback_model_id} specified is not available or has no RPM limit. Attempting to use first preferred model as fallback.")
             if self.preferred_model_ids:
                 self.fallback_model_id = self.preferred_model_ids[0]
                 logger.debug(f"Using {self.fallback_model_id} as fallback.")
             else:
-                # Critical fallback if no models configured properly
                 logger.error(
-                    "No valid generation models configured with RPM limits. Rate limiting will be ineffective.")
-                # Assign a dummy fallback ID to avoid errors, but log the issue
-                self.fallback_model_id = "gemini-2.0-flash"  # Default dummy
+                    "No valid generation models configured. Rate limiting/fallback ineffective.")
+                self.fallback_model_id = "gemini-2.0-flash"  # Dummy
                 if self.fallback_model_id not in model_rpm_limits:
-                    # Add dummy limit
+                    # Add dummy RPM
                     model_rpm_limits[self.fallback_model_id] = 15
+                    self.available_gen_models.append(self.fallback_model_id)
 
         logger.debug(f"Preferred model order: {self.preferred_model_ids}")
         logger.debug(f"Fallback model: {self.fallback_model_id}")
@@ -214,18 +218,16 @@ class GeminiClient:
             "GEMINI_MAX_WAIT_SECONDS", str(self.DEFAULT_MAX_RATE_LIMIT_WAIT_SECONDS)))
         self.emergency_fallback_wait_seconds = float(
             os.getenv("EMERGENCY_FALLBACK_WAIT_SECONDS", "120.0"))
-        logger.debug(
-            f"Maximum rate limit wait time set to {self.max_rate_limit_wait_seconds} seconds")
-        # Add reserved slots for emergency fallback
         self.reserved_fallback_slots = int(
             os.getenv("GEMINI_RESERVED_FALLBACK_SLOTS", "2"))
         logger.debug(
-            f"Reserving {self.reserved_fallback_slots} RPM slots for fallback model {self.fallback_model_id}")
+            f"Rate Limit Config: Max Wait={self.max_rate_limit_wait_seconds}s, Emergency Wait={self.emergency_fallback_wait_seconds}s, Reserved Slots={self.reserved_fallback_slots}")
 
         # --- Initialize Rate Limiter --- #
         if RateLimiter:
+            # Pass the consolidated RPM limits (embedding + generation)
             self.rate_limiter = RateLimiter(
-                model_rpm_limits, client_instance=self)  # Pass self
+                model_rpm_limits, client_instance=self)
             logger.debug(
                 f"GeminiClient initialized with RateLimiter. Config: {model_rpm_limits}")
         else:
@@ -727,8 +729,6 @@ class GeminiClient:
                             parsed_json_result = parsed_json
                             break  # Success! Exit inner loop
                         else:
-                            logger.warning(
-                                f"[{model_id}] JSON parsing failed: {error}")
                             extracted_json, extract_error = extract_json_from_text(
                                 generated_text)
                             if not extract_error:
@@ -868,35 +868,33 @@ class GeminiClient:
                                            model_name: str,  # Expecting model ID like 'gemini-1.5-flash-latest'
                                            system_instruction: Optional[str] = None,
                                            temperature: float = 0.2,
-                                           # Made Optional
-                                           max_output_tokens: Optional[int] = None,
-                                           retries: int = 3,
-                                           initial_delay: float = 1.0) -> Optional[str]:
+                                           max_output_tokens: Optional[int] = None) -> Optional[str]:
         """
         Delegates article analysis to the generator module.
-        Ensures the model name/ID passed is compatible with the generator module's expectations.
+        The generator module now handles retry logic including fallback without thinking/grounding.
         Uses the configured output token limit as default if not specified.
         """
         # Determine effective output token limit
         effective_max_output_tokens = max_output_tokens if max_output_tokens is not None else self.gen_output_token_limit
 
-        model_id = model_name.split('/')[-1]
+        model_id = model_name.split('/')[-1]  # Use short ID
+        # Removed lookup for thinking/grounding flags
+
         # Define default system instruction here
         default_system_instruction = """The AI agent should adopt an academic persona—specifically."""
         actual_system_instruction = system_instruction if system_instruction is not None else default_system_instruction
         logger.info(
+            # Removed flags from log
             f"Delegating article analysis to generator module (model: {model_id})")
         return await generator_analyze_articles(
             client=self.client,  # Pass the initialized client
             articles_data=articles_data,
             prompt_file_path=prompt_file_path,
-            model_name=model_id,  # Pass the ID
+            model_name=model_id,  # Pass the short ID
             system_instruction=actual_system_instruction,
             temperature=temperature,
             max_output_tokens=effective_max_output_tokens,
-            # Retries now handled within GeminiClient methods calling this
-            # retries=retries,
-            # initial_delay=initial_delay,
+            # Removed thinking_enabled/grounding_enabled flags
             rate_limiter=self.rate_limiter
         )
 
@@ -905,35 +903,37 @@ class GeminiClient:
                                          model_name: Optional[str] = None,
                                          system_instruction: Optional[str] = None,
                                          temperature: float = 0.7,
-                                         # Made Optional
                                          max_output_tokens: Optional[int] = None,
                                          save_debug_info: bool = True,
                                          debug_info_prefix: str = "essay_prompt") -> Optional[str]:
         """
         Delegates essay generation to the generator module.
-        Ensures the model name/ID passed is compatible with the generator module's expectations.
+        The generator module now handles retry logic including fallback without thinking/grounding.
         Uses the configured preferred model and output token limit as defaults.
         """
         # Determine effective model and output token limit
-        # Default to first preferred model if available, else fallback
         default_gen_model_id = self.preferred_model_ids[
             0] if self.preferred_model_ids else self.fallback_model_id
         effective_model_id = model_name.split(
             '/')[-1] if model_name else default_gen_model_id
         effective_max_output_tokens = max_output_tokens if max_output_tokens is not None else self.gen_output_token_limit
 
+        # Removed lookup for thinking/grounding flags
+
         # Define default system instruction here
         default_essay_system_instruction = """You are an expert analytical writer tasked with synthesizing information. Follow the instructions precisely and generate a coherent, well-structured text based *only* on the provided context."""
         actual_system_instruction = system_instruction or default_essay_system_instruction
         logger.info(
+            # Removed flags from log
             f"Delegating essay generation to generator module (model: {effective_model_id})")
         return await generator_generate_text(
             client=self.client,  # Pass the initialized client
             full_prompt_text=full_prompt_text,
-            model_name=effective_model_id,  # Pass the ID
+            model_name=effective_model_id,  # Pass the short ID
             system_instruction=actual_system_instruction,
             temperature=temperature,
             max_output_tokens=effective_max_output_tokens,
+            # Removed thinking_enabled/grounding_enabled flags
             rate_limiter=self.rate_limiter,
             save_debug_info=save_debug_info,
             debug_info_prefix=debug_info_prefix
