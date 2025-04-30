@@ -60,7 +60,6 @@ services:
       # --- Gemini Generation Models (Current Use) ---
       # Shared Limits
       GEMINI_GEN_INPUT_TOKEN_LIMIT: ${GEMINI_GEN_INPUT_TOKEN_LIMIT:-1048576}
-      GEMINI_GEN_OUTPUT_TOKEN_LIMIT: ${GEMINI_GEN_OUTPUT_TOKEN_LIMIT:-8192}
 
       # Model: gemini-2.0-flash-exp (Now highest priority)
       GEMINI_FLASH_EXP_MODEL_ID: ${GEMINI_FLASH_EXP_MODEL_ID:-gemini-2.0-flash-exp}
@@ -94,7 +93,6 @@ services:
       GEMINI_PREVIEW_RPD: ${GEMINI_PREVIEW_RPD:-500}
       GEMINI_PREVIEW_THINKING: ${GEMINI_PREVIEW_THINKING:-true}
       GEMINI_PREVIEW_GROUNDING: ${GEMINI_PREVIEW_GROUNDING:-true}
-      GEMINI_PREVIEW_OUTPUT_TOKEN_LIMIT: ${GEMINI_PREVIEW_OUTPUT_TOKEN_LIMIT:-65536}
 
       # --- Model Selection Preferences ---
       GEMINI_MODEL_PREF_1: ${GEMINI_MODEL_PREF_1:-gemini-2.0-flash-exp} # NEW Highest priority
@@ -109,7 +107,7 @@ services:
       # Debug flag for imports
       PYTHONDEBUG: "1"
       # Step Execution Control
-      RUN_PHASE_1_STEPS: ${RUN_PHASE_1_STEPS:-true} # Master switch for steps 1-4
+      RUN_PHASE_1_STEPS: ${RUN_PHASE_1_STEPS:-false} # Master switch for steps 1-4
       RUN_STEP1: ${RUN_STEP1:-true} # Controls Step 1
       RUN_STEP2: ${RUN_STEP2:-true} # Controls Step 2 (Clustering)
       RUN_STEP3: ${RUN_STEP3:-true} # Controls Step 3 (Entity Extraction)

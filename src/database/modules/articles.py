@@ -655,34 +655,40 @@ def get_publication_dates_for_articles(conn, article_ids: List[int]) -> Dict[int
 
 def get_recent_unprocessed_articles(conn, days: int = 2, limit: int = 2000) -> List[Dict[str, Any]]:
     """
-    Get recent unprocessed articles.
+    Get recent articles that haven't been processed for entity extraction,
+    ordered by publication date descending.
 
     Args:
         conn: Database connection
-        days: Number of days to look back
+        days: Number of days to look back for articles
         limit: Maximum number of articles to return
 
     Returns:
-        List of article dictionaries
+        List of article dictionaries, including 'content_length'
     """
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, domain, cluster_id, content
+        cutoff_date = datetime.now() - timedelta(days=days)
+
+        query = """
+            SELECT
+                id, title, domain, pub_date, cluster_id, content,
+                LENGTH(content) AS content_length
             FROM articles
-            WHERE extracted_entities = FALSE
-            AND pub_date >= (CURRENT_DATE - INTERVAL '%s DAYS')
+            WHERE pub_date >= %s AND processed_at IS NULL
             ORDER BY pub_date DESC
-            LIMIT %s
-        """, (days, limit))
+            LIMIT %s;
+        """
+        cursor.execute(query, (cutoff_date, limit))
 
         columns = [desc[0] for desc in cursor.description]
         articles = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        cursor.close()
 
+        cursor.close()
         return articles
+
     except Exception as e:
-        logger.error(f"Error fetching recent unprocessed articles: {e}")
+        logger.error(f"Error retrieving recent unprocessed articles: {e}")
         return []
 
 

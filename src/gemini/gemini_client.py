@@ -133,8 +133,6 @@ class GeminiClient:
         # --- Generation Model Configuration (Read RPMs only) --- #
         self.gen_input_token_limit = int(
             os.getenv("GEMINI_GEN_INPUT_TOKEN_LIMIT", "1048576"))
-        self.gen_output_token_limit = int(
-            os.getenv("GEMINI_GEN_OUTPUT_TOKEN_LIMIT", "8192"))
 
         # Dictionary to store model RPM limits for RateLimiter
         model_rpm_limits = {}
@@ -542,7 +540,7 @@ class GeminiClient:
                     logger.warning(
                         f"SYNC: Generic error (Attempt {model_attempt}/{max_model_retries}) using {model_id}: {e}", exc_info=True)
                     if model_attempt < max_model_retries and total_attempts < retries:
-                        jitter = random.random() * 0.5 + 0.5
+                        jitter = random.random() * 0.5 + 20
                         sleep_time = current_delay * jitter
                         time.sleep(sleep_time)
                         current_delay *= 1.5
@@ -799,62 +797,48 @@ class GeminiClient:
                 self.fallback_model_id)  # Use the instance fallback
             if emergency_model_id and self.rate_limiter:
                 logger.info(
-                    f"Attempting emergency fallback with {emergency_model_id} using emergency wait time: {self.emergency_fallback_wait_seconds}s")
-                try:
-                    await self.rate_limiter.wait_if_needed_async(emergency_model_id, max_wait_seconds=self.emergency_fallback_wait_seconds)
-                    if self.rate_limiter.is_allowed(emergency_model_id):
-                        logger.info(
-                            f"[{emergency_model_id}] Emergency Rate limit check passed. Making final API call attempt.")
-                        # --- Final API Call Attempt ---
-                        api_call_timeout_seconds = 120
-                        gen_config = google_genai.types.GenerateContentConfig(
-                            temperature=0.1, automatic_function_calling={'disable': True})
-                        response = await asyncio.wait_for(
-                            self.client.aio.models.generate_content(
-                                model=f'models/{emergency_model_id}', contents=[full_prompt], config=gen_config),
-                            timeout=api_call_timeout_seconds
-                        )
-                        await self.rate_limiter.register_call_async(emergency_model_id)
-                        # --- Process Emergency Response ---
-                        generated_text = None
-                        if hasattr(response, 'text'):
-                            generated_text = response.text
-                        elif hasattr(response, 'parts') and response.parts and hasattr(response.parts[0], 'text'):
-                            generated_text = "".join(
-                                part.text for part in response.parts if hasattr(part, 'text'))
+                    f"[{emergency_model_id}] Emergency Rate limit check passed. Making final API call attempt.")
+                # --- Final API Call Attempt ---
+                api_call_timeout_seconds = 120
+                gen_config = google_genai.types.GenerateContentConfig(
+                    temperature=0.1, automatic_function_calling={'disable': True})
+                response = await asyncio.wait_for(
+                    self.client.aio.models.generate_content(
+                        model=f'models/{emergency_model_id}', contents=[full_prompt], config=gen_config),
+                    timeout=api_call_timeout_seconds
+                )
+                await self.rate_limiter.register_call_async(emergency_model_id)
+                # --- Process Emergency Response ---
+                generated_text = None
+                if hasattr(response, 'text'):
+                    generated_text = response.text
+                elif hasattr(response, 'parts') and response.parts and hasattr(response.parts[0], 'text'):
+                    generated_text = "".join(
+                        part.text for part in response.parts if hasattr(part, 'text'))
 
-                        if generated_text:
-                            parsed_json, error = parse_json(generated_text)
-                            if not error:
+                if generated_text:
+                    parsed_json, error = parse_json(generated_text)
+                    if not error:
+                        logger.info(
+                            f"Successfully parsed JSON response from EMERGENCY FALLBACK {emergency_model_id}")
+                        parsed_json_result = parsed_json
+                    else:  # Try extraction on fallback
+                        extracted_json, extract_error = extract_json_from_text(
+                            generated_text)
+                        if not extract_error:
+                            parsed_json, error = parse_json(
+                                extracted_json)
+                            if not error and parsed_json:
                                 logger.info(
-                                    f"Successfully parsed JSON response from EMERGENCY FALLBACK {emergency_model_id}")
+                                    f"Successfully parsed EXTRACTED JSON response from EMERGENCY FALLBACK {emergency_model_id}")
                                 parsed_json_result = parsed_json
-                            else:  # Try extraction on fallback
-                                extracted_json, extract_error = extract_json_from_text(
-                                    generated_text)
-                                if not extract_error:
-                                    parsed_json, error = parse_json(
-                                        extracted_json)
-                                    if not error and parsed_json:
-                                        logger.info(
-                                            f"Successfully parsed EXTRACTED JSON response from EMERGENCY FALLBACK {emergency_model_id}")
-                                        parsed_json_result = parsed_json
-                        if not parsed_json_result:
-                            logger.error(
-                                f"[{emergency_model_id}] Emergency fallback attempt failed to produce parsable JSON.")
-                        # --- End Process Emergency Response ---
-                    else:
-                        logger.error(
-                            f"[{emergency_model_id}] Still rate limited even after emergency wait. Cannot proceed.")
-                except Exception as e:
+                if not parsed_json_result:
                     logger.error(
-                        f"[{emergency_model_id}] Error during emergency fallback attempt: {e}", exc_info=True)
-            elif not emergency_model_id:
+                        f"[{emergency_model_id}] Emergency fallback attempt failed to produce parsable JSON.")
+                # --- End Process Emergency Response ---
+            else:
                 logger.error(
-                    "Cannot perform emergency fallback: Instance fallback model ID is not configured.")
-            elif not self.rate_limiter:
-                logger.warning(
-                    "Cannot perform emergency fallback rate limit check: RateLimiter not available.")
+                    f"[{emergency_model_id}] Still rate limited even after emergency wait. Cannot proceed.")
         # --- End Emergency Fallback Attempt ---
 
         if parsed_json_result is None:
@@ -868,15 +852,12 @@ class GeminiClient:
                                            model_name: str,  # Expecting model ID like 'gemini-1.5-flash-latest'
                                            system_instruction: Optional[str] = None,
                                            temperature: float = 0.2,
-                                           max_output_tokens: Optional[int] = None) -> Optional[str]:
+                                           ) -> Optional[str]:
         """
         Delegates article analysis to the generator module.
         The generator module now handles retry logic including fallback without thinking/grounding.
         Uses the configured output token limit as default if not specified.
         """
-        # Determine effective output token limit
-        effective_max_output_tokens = max_output_tokens if max_output_tokens is not None else self.gen_output_token_limit
-
         model_id = model_name.split('/')[-1]  # Use short ID
         # Removed lookup for thinking/grounding flags
 
@@ -893,8 +874,6 @@ class GeminiClient:
             model_name=model_id,  # Pass the short ID
             system_instruction=actual_system_instruction,
             temperature=temperature,
-            max_output_tokens=effective_max_output_tokens,
-            # Removed thinking_enabled/grounding_enabled flags
             rate_limiter=self.rate_limiter
         )
 
@@ -903,7 +882,6 @@ class GeminiClient:
                                          model_name: Optional[str] = None,
                                          system_instruction: Optional[str] = None,
                                          temperature: float = 0.7,
-                                         max_output_tokens: Optional[int] = None,
                                          save_debug_info: bool = True,
                                          debug_info_prefix: str = "essay_prompt") -> Optional[str]:
         """
@@ -911,14 +889,11 @@ class GeminiClient:
         The generator module now handles retry logic including fallback without thinking/grounding.
         Uses the configured preferred model and output token limit as defaults.
         """
-        # Determine effective model and output token limit
+        # Determine effective model
         default_gen_model_id = self.preferred_model_ids[
             0] if self.preferred_model_ids else self.fallback_model_id
         effective_model_id = model_name.split(
             '/')[-1] if model_name else default_gen_model_id
-        effective_max_output_tokens = max_output_tokens if max_output_tokens is not None else self.gen_output_token_limit
-
-        # Removed lookup for thinking/grounding flags
 
         # Define default system instruction here
         default_essay_system_instruction = """You are an expert analytical writer tasked with synthesizing information. Follow the instructions precisely and generate a coherent, well-structured text based *only* on the provided context."""
@@ -932,8 +907,6 @@ class GeminiClient:
             model_name=effective_model_id,  # Pass the short ID
             system_instruction=actual_system_instruction,
             temperature=temperature,
-            max_output_tokens=effective_max_output_tokens,
-            # Removed thinking_enabled/grounding_enabled flags
             rate_limiter=self.rate_limiter,
             save_debug_info=save_debug_info,
             debug_info_prefix=debug_info_prefix

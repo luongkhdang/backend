@@ -37,9 +37,10 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 # Model to use for analysis
-ANALYSIS_MODEL = "models/gemini-2.0-flash-exp"
-# Prompt file path
-PROMPT_FILE = "src/prompts/step4.txt"
+ANALYSIS_MODEL = "models/gemini-2.5-flash-preview-04-17"
+# Remove PROMPT_FILE constant, load directly
+# PROMPT_FILE = "src/prompts/step4.txt"
+PROMPT_FILE_PATH = "src/prompts/step4.txt"  # Keep path for loading
 
 
 async def run() -> Dict[str, Any]:  # Changed to async def
@@ -172,34 +173,90 @@ async def run() -> Dict[str, Any]:  # Changed to async def
                 datetime.now() - start_time).total_seconds()
             return status
 
-        # Step 3: Call the GeminiClient for analysis
-        # Note: The actual implementation of analyze_articles_with_prompt is in src/gemini/modules/generator.py
-        logger.info(
-            f"Sending {len(articles_for_analysis)} prepared articles to Gemini for analysis...")
-        # Convert the articles list to a JSON string
+        # --- Step 3 Preparation: Load prompt, inject date, prepare final text --- #
+        logger.info(f"Loading prompt template from {PROMPT_FILE_PATH}")
+        try:
+            with open(PROMPT_FILE_PATH, 'r', encoding='utf-8') as f:
+                prompt_template = f.read()
+            if not prompt_template:
+                raise ValueError("Prompt template file is empty.")
+        except (IOError, FileNotFoundError) as e:
+            logger.error(f"Failed to load prompt template: {e}")
+            status["error"] = f"Failed to load prompt template: {e}"
+            status["runtime_seconds"] = (
+                datetime.now() - start_time).total_seconds()
+            return status
 
-        # Save a copy of the input data for debugging
+        # Inject today's date
+        today_date_str = datetime.now().strftime("%Y-%m-%d")
+        prompt_template = prompt_template.replace(
+            "{TODAY_DATE}", today_date_str)
+        logger.debug("Injected today's date into prompt template.")
+
+        # Prepare article data JSON
+        try:
+            articles_json = json.dumps(
+                articles_for_analysis, separators=(',', ':'), ensure_ascii=True)
+        except (TypeError, OverflowError) as e:
+            logger.error(f"Failed to serialize article data to JSON: {e}")
+            status["error"] = f"Failed to serialize article data: {e}"
+            status["runtime_seconds"] = (
+                datetime.now() - start_time).total_seconds()
+            return status
+
+        # Inject article data JSON
+        full_prompt_text = prompt_template.replace(
+            "{INPUT_DATA_JSON}", articles_json)
+        logger.debug(
+            f"Prepared full prompt text (length: {len(full_prompt_text)} chars).")
+
+        # Extract System Instruction/Persona from the loaded prompt template
+        # (Assuming it's defined between "## Persona:" and "Input Data Format:")
+        try:
+            persona_start = prompt_template.find("## Persona:")
+            persona_end = prompt_template.find("Input Data Format:")
+            if persona_start != -1 and persona_end != -1 and persona_end > persona_start:
+                step4_system_instruction = prompt_template[persona_start + len(
+                    "## Persona:"):persona_end].strip()
+                logger.debug("Extracted Step 4 system instruction/persona.")
+            else:
+                logger.warning(
+                    "Could not extract specific system instruction for Step 4 from prompt file. Using default.")
+                step4_system_instruction = None  # Let GeminiClient use its default
+        except Exception as e:
+            logger.warning(
+                f"Error extracting system instruction: {e}. Using default.")
+            step4_system_instruction = None
+
+        # Save a copy of the final prompt for debugging
         output_dir = "src/output/"
         os.makedirs(output_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        debug_filename = f"step4_input_data_{timestamp}.json"
+        debug_filename = f"step4_final_prompt_{timestamp}.txt"
         debug_path = os.path.join(output_dir, debug_filename)
-
         try:
             with open(debug_path, 'w', encoding='utf-8') as f:
-                f.write(json.dumps(articles_for_analysis))
-            logger.info(f"Saved input data for debugging to {debug_path}")
+                f.write(full_prompt_text)
+            logger.info(
+                f"Saved final prompt text for debugging to {debug_path}")
         except IOError as e:
-            logger.warning(f"Failed to write debug input file: {e}")
+            logger.warning(f"Failed to write debug prompt file: {e}")
 
-        analysis_result = await gemini_client.analyze_articles_with_prompt(
-            articles_data=articles_for_analysis,
-            prompt_file_path=PROMPT_FILE,
-            model_name=ANALYSIS_MODEL
-            # Using default system instruction and other params from GeminiClient method
+        # --- Step 4: Call the GeminiClient for analysis using the prepared full prompt --- #
+        logger.info(
+            f"Sending final prompt (length: {len(full_prompt_text)}) to Gemini for analysis...")
+
+        # Use generate_essay_from_prompt as it accepts a full prompt string
+        # Pass the extracted system instruction
+        analysis_result = await gemini_client.generate_essay_from_prompt(
+            full_prompt_text=full_prompt_text,
+            model_name=ANALYSIS_MODEL,
+            system_instruction=step4_system_instruction,  # Pass specific instruction
+            temperature=0.2,  # Set temperature appropriate for analysis
+            save_debug_info=False  # Already saved the prompt above
         )
 
-        # Step 4: Process and validate the response
+        # Step 5: Process and validate the response
         if analysis_result is None:
             logger.error("Gemini analysis failed after retries.")
             status["error"] = "Gemini analysis call failed."
@@ -214,31 +271,9 @@ async def run() -> Dict[str, Any]:  # Changed to async def
         # No longer counting groups as that was JSON-specific
         status["text_length"] = text_length
 
-        # Step 5: Save the analysis results as text
-        output_dir = "src/output/"
-        os.makedirs(output_dir, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # Changed to .txt
-        output_filename = f"step4_analysis_output_{timestamp}.txt"
-        output_path = os.path.join(output_dir, output_filename)
-
-        try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(analysis_result)  # Direct write, no JSON dump
-            logger.info(
-                f"Successfully saved Gemini analysis text to {output_path}")
-        except IOError as e:
-            logger.error(
-                f"Failed to write analysis output to {output_path}: {e}")
-            status["error"] = f"Failed to write output file: {e}"
-            status["runtime_seconds"] = (
-                datetime.now() - start_time).total_seconds()
-            return status
-
         # Step 6: Final success status update
         status["success"] = True
-        status["output_file"] = output_path
+        status["output_file"] = debug_path
         status["runtime_seconds"] = (
             datetime.now() - start_time).total_seconds()
 

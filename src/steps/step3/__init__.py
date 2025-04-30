@@ -45,6 +45,55 @@ MAX_CONSECUTIVE_FAILURES = 3
 FAILURE_COOLDOWN_SECONDS = 30
 INTER_BATCH_DELAY_SECONDS = 40  # Delay between batches
 
+# --- Length Scoring Function (New) ---
+
+
+def calculate_length_score(length_chars: Optional[int],
+                           min_viable: int = 2000,
+                           optimal_start: int = 4000,
+                           optimal_end: int = 18000,
+                           max_reasonable: int = 35000,
+                           long_article_min_score: float = 0.3) -> float:
+    """
+    Calculates a score (0.0-1.0) based on article character length.
+
+    Args:
+        length_chars: Character count of the article content.
+        min_viable: Below this length, score is 0.
+        optimal_start: Score ramps from 0 to 1 between min_viable and optimal_start.
+        optimal_end: Score is 1.0 between optimal_start and optimal_end.
+        max_reasonable: Score ramps from 1 down to long_article_min_score between optimal_end and max_reasonable.
+        long_article_min_score: Minimum score assigned to articles longer than max_reasonable.
+
+    Returns:
+        Normalized length score.
+    """
+    if not isinstance(length_chars, int) or length_chars <= 0:
+        # Handle cases where length wasn't fetched or content is empty/null
+        return 0.0
+
+    if length_chars < min_viable:
+        return 0.0
+    elif length_chars < optimal_start:
+        # Ensure divisor is not zero
+        if optimal_start == min_viable:
+            return 1.0  # Or 0.0 depending on desired edge case handling
+        # Linear increase from 0 to 1
+        return (length_chars - min_viable) / (optimal_start - min_viable)
+    elif length_chars <= optimal_end:
+        return 1.0
+    elif length_chars <= max_reasonable:
+        # Ensure divisor is not zero
+        if max_reasonable == optimal_end:
+            return long_article_min_score
+        # Linear decrease from 1 down to long_article_min_score
+        progress = (length_chars - optimal_end) / \
+            (max_reasonable - optimal_end)
+        return 1.0 - (1.0 - long_article_min_score) * progress
+    else:
+        # Score for very long articles
+        return long_article_min_score
+
 # --- Helper Function for Time Formatting ---
 
 
@@ -494,7 +543,7 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
     """
     Fetch unprocessed articles from yesterday and today and prioritize them based on combined score.
 
-    Calculates the Combined_Priority_Score = (0.65 * cluster_hotness_score) + (0.35 * goodness_score)
+    Calculates the Combined_Priority_Score = (0.375 * cluster_hotness_score) + (0.375 * domain_goodness_score) + (0.25 * length_score)
     and assigns articles to processing tiers based on their ranking:
     - Tier 0: Top ~40%
     - Tier 1: Next ~40%
@@ -510,6 +559,7 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
     try:
         # Get unprocessed articles from yesterday and today only
         try:
+            # Ensure the DB call returns 'content_length'
             articles = db_client.get_recent_day_unprocessed_articles()
             logger.info("Fetching articles published yesterday and today only")
         except Exception as e:
@@ -517,6 +567,7 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
                 f"Error fetching articles from yesterday and today: {e}")
             # Fallback to recent unprocessed articles with days limit
             logger.info("Falling back to recent unprocessed articles")
+            # Ensure fallback also returns 'content_length' (modify DB call if needed)
             articles = db_client.get_recent_unprocessed_articles(
                 days=DAYS_LOOKBACK, limit=ARTICLE_LIMIT)
 
@@ -549,9 +600,10 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
             cluster_hotness = db_client.get_cluster_hotness_scores(
                 cluster_ids_to_lookup)
 
-        # Calculate scores for each article using the specified weights
-        CLUSTER_WEIGHT = 0.65  # Weight for cluster hotness (65%)
-        DOMAIN_WEIGHT = 0.35   # Weight for domain goodness (35%)
+        # Calculate scores for each article using the updated weights
+        CLUSTER_WEIGHT = 0.375  # Weight for cluster hotness (37.5%)
+        DOMAIN_WEIGHT = 0.375   # Weight for domain goodness (37.5%)
+        LENGTH_WEIGHT = 0.25    # Weight for article length (25%)
 
         for article in articles:
             # Get domain goodness score (default 0.5 if missing)
@@ -563,13 +615,20 @@ def _prioritize_articles(db_client: ReaderDBClient, domain_scores: Dict[str, flo
             cluster_hotness_score = cluster_hotness.get(
                 cluster_id, 0.0) if cluster_id else 0.0
 
-            # Calculate combined score
+            # Get content length and calculate length score
+            content_length = article.get('content_length')  # Fetched in Step 1
+            length_score = calculate_length_score(
+                content_length)  # Use function from Step 2
+
+            # Calculate combined score with length included
             combined_score = (CLUSTER_WEIGHT * cluster_hotness_score +
-                              DOMAIN_WEIGHT * domain_goodness_score)
+                              DOMAIN_WEIGHT * domain_goodness_score +
+                              LENGTH_WEIGHT * length_score)
 
             # Store scores in article dict for debugging and future use
             article['domain_goodness_score'] = domain_goodness_score
             article['cluster_hotness_score'] = cluster_hotness_score
+            article['length_score'] = length_score  # Store the new score
             article['combined_score'] = combined_score
 
         # Sort articles by combined score (descending)

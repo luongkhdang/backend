@@ -1,217 +1,213 @@
 {
-  "Processed_date": "2025-04-23 5:04 PM",
+  "Processed_date": "2025-04-29",
   "article_groups": {
     "group_1": {
-      "group_rationale": "Examines the explicit connections drawn between international trade disputes, particularly tariffs, and the operational or financial performance of specific corporations, highlighting the direct impact of geopolitical decisions on market actors. Aligns strongly with Trace Power.",
-      "article_ids": [131548, 132102, 130380, 131604]
+      "group_rationale": "Focuses on articles published on the specific dates of April 29th and 30th, 2025, allowing for analysis of concurrent event reporting and immediate news cycles. Primarily aligns with See Sparks and Interpret Ambiguity.",
+      "article_ids": [134429, 134435, 134427, 133610, 133611, 133613, 133614, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_2": {
-      "group_rationale": "Analyzes the framing of legal challenges and investigations involving politically significant figures or entities, considering potential biases and the selective presentation of evidence. Primarily aligns with Recognize Framing and Trace Power.",
-      "article_ids": [130392, 130478, 130436, 131656, 130350, 130435]
+      "group_rationale": "Gathers diverse reports from various domains (AP, NBC, Fortune, ZeroHedge, etc.) covering recent events, useful for comparing source perspectives and identifying broad trends. Primarily aligns with Recognize Framing and Interpret Ambiguity.",
+      "article_ids": [134429, 134435, 134427, 133610, 133611, 133613, 133614, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_3": {
-      "group_rationale": "Investigates the unfolding dynamics of the conflict in Ukraine, focusing on resource allocation (aid), military capabilities, and the international political maneuvering surrounding the war effort. Aligns with Trace Power and Hold Competing Truths.",
-      "article_ids": [131664, 130453, 131618, 131600, 130444]
+      "group_rationale": "Collects articles focusing on humanitarian crises, aid delivery challenges, and refugee movements resulting from conflict or disaster situations globally. Primarily aligns with Hold Competing Truths and Interpret Ambiguity.",
+      "article_ids": [133613, 134435, 133611, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_4": {
-      "group_rationale": "Focuses on the narratives and strategic considerations surrounding US foreign policy decisions, particularly regarding aid allocation and military posturing in conflict zones like Ukraine and the Middle East. Aligns with Recognize Framing and Trace Power.",
-      "article_ids": [131664, 130453, 130366, 131618, 131600, 130444, 130488]
+      "group_rationale": "Covers developments related to specific industries or economic sectors beyond technology, such as manufacturing, agriculture, or services, noting policy impacts. Primarily aligns with Interpret Ambiguity and See Sparks.",
+      "article_ids": [134427, 133610, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_5": {
-      "group_rationale": "Tracks evolving tensions and power projections in the Middle East, particularly concerning Iran's actions, Israeli responses, and the broader regional security implications. Primarily aligns with Trace Power.",
-      "article_ids": [130366, 131612, 130488, 130440]
+      "group_rationale": "Documents political rhetoric and policy proposals emerging from US political campaigns and governmental bodies, noting shifts in stated priorities and ideological positioning over time. Primarily aligns with Recognize Framing and Trace Power.",
+      "article_ids": [134429, 134427, 133610, 134435, 133614, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_6": {
-      "group_rationale": "Explores the interplay between economic performance indicators (corporate earnings, market trends) and macroeconomic policy signals (potential Fed actions, guidance), highlighting areas of uncertainty. Aligns with Interpret Ambiguity and Trace Power.",
-      "article_ids": [132108, 132102, 131548, 131649, 130442, 131604, 130484]
+      "group_rationale": "Surfaces subtle indicators and potentially overlooked details within reports on economic data releases (e.g., inflation, employment) and market reactions, encouraging closer examination of underlying trends. Primarily aligns with See Sparks and Interpret Ambiguity.",
+      "article_ids": [134427, 133610, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_7": {
-      "group_rationale": "Examines the discourse and legal maneuvering surrounding Diversity, Equity, and Inclusion (DEI) initiatives, particularly focusing on challenges and defenses within corporate and potentially other institutional settings. Aligns with Recognize Framing and Hold Competing Truths.",
-      "article_ids": [130436, 130418]
+      "group_rationale": "Collates diverse perspectives on the social impacts of political and economic policies, highlighting testimonies and local reports alongside official statements to foster nuanced understanding. Primarily aligns with Hold Competing Truths and See Sparks.",
+      "article_ids": [134435, 133611, 133614, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 133613, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_8": {
-      "group_rationale": "Analyzes the political and legal battles over abortion access in the United States, tracking legislative actions, judicial rulings, and the framing used by opposing sides. Aligns with Recognize Framing and Trace Power.",
-      "article_ids": [130360, 130350]
+      "group_rationale": "Tracks reporting on international legal frameworks and human rights issues within conflict zones and authoritarian states, noting challenges in verification and enforcement. Primarily aligns with Interpret Ambiguity and Trace Power.",
+      "article_ids": [134435, 133613, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_9": {
-      "group_rationale": "Focuses on specific legal cases and their progression through the judicial system, highlighting procedural aspects and the arguments being presented, often reflecting broader societal or political tensions. Aligns with Trace Power and See Sparks.",
-      "article_ids": [130392, 130478, 130435, 130350, 130493]
+      "group_rationale": "Examines the specific actions and statements attributed to key political figures (e.g., Trump, Biden) regarding domestic and foreign policy, facilitating analysis of their decision-making patterns and influence. Primarily aligns with Trace Power.",
+      "article_ids": [134429, 134427, 133610, 134435, 133614, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_10": {
-      "group_rationale": "Investigates the complex relationship between technology companies, national security concerns, and regulatory pressures, exemplified by the situation involving TikTok and US policy. Aligns with Trace Power and Interpret Ambiguity.",
-      "article_ids": [130487, 130443]
+      "group_rationale": "Focuses on the narratives surrounding US military and security policies, including budget allocations, program changes, and the justification frameworks presented to the public. Primarily aligns with Recognize Framing.",
+      "article_ids": [134429, 134435, 133613, 134427, 133610, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_11": {
-      "group_rationale": "Tracks public statements and policy discussions regarding US economic conditions, including inflation, employment, and potential central bank responses, revealing competing narratives about economic health. Aligns with Recognize Framing and Hold Competing Truths.",
-      "article_ids": [130442, 131649, 130380]
+      "group_rationale": "Tracks developments in US-China relations, encompassing economic competition (tariffs, tech), diplomatic exchanges, and military posturing in relevant regions. Primarily aligns with Trace Power and Hold Competing Truths.",
+      "article_ids": [133610, 134427, 134435, 134429, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_12": {
-      "group_rationale": "Considers the implications of US political discourse and potential policy shifts (e.g., related to trade, foreign aid) for international relations and global economic stability. Aligns with Interpret Ambiguity and Trace Power.",
-      "article_ids": [131548, 131664, 130453, 130484, 130380, 131604]
+      "group_rationale": "Collects reporting on legislative activities and policy implementation within the US government structure, including actions by Congress and federal agencies. Primarily aligns with Trace Power.",
+      "article_ids": [134429, 134435, 134427, 133610, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_13": {
-      "group_rationale": "Examines the domestic political landscape in the US, focusing on electoral dynamics, legislative actions, and key policy debates shaping the current political environment. Aligns with Trace Power.",
-      "article_ids": [130360, 131656, 130443, 130350, 130418, 130444, 130488, 130442]
+      "group_rationale": "Highlights instances of surprising claims, unexpected silences, or contradictory statements within news reports concerning political and economic events, prompting deeper inquiry. Primarily aligns with See Sparks.",
+      "article_ids": [134429, 134427, 133610, 134435, 133613, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_14": {
-      "group_rationale": "Focuses on corporate financial reporting and market analysis, including earnings announcements and analyst perspectives on company outlooks, often reflecting broader economic trends. Aligns with Trace Power and See Sparks.",
-      "article_ids": [132108, 132102, 131604]
+      "group_rationale": "Focuses on the role and statements of international organizations (e.g., UN, NATO) and non-governmental organizations in addressing global conflicts and humanitarian crises. Primarily aligns with Trace Power and Interpret Ambiguity.",
+      "article_ids": [134435, 133613, 133611, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_15": {
-      "group_rationale": "Highlights the legal and ethical controversies surrounding institutions, including allegations of misconduct or negligence and the subsequent legal or public responses. Aligns with Recognize Framing and Trace Power.",
-      "article_ids": [130478, 130436]
+      "group_rationale": "Examines media coverage itself, comparing headlines, source selection, and narrative emphasis across different outlets reporting on the same core events. Primarily aligns with Recognize Framing.",
+      "article_ids": [134435, 134429, 133613, 134427, 133610, 133614, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_16": {
-      "group_rationale": "Analyzes geopolitical tensions involving major powers, particularly focusing on actions and rhetoric concerning Russia, China, and Iran in relation to US interests and global stability. Aligns with Trace Power and Hold Competing Truths.",
-      "article_ids": [131618, 130366, 131612, 130484, 130440, 130487]
+      "group_rationale": "Analyzes reporting on public opinion, protests, and civil society responses to government actions or significant socio-political events globally. Primarily aligns with Trace Power and Hold Competing Truths.",
+      "article_ids": [134435, 133614, 133611, 134429, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_17": {
-      "group_rationale": "Explores discussions around international trade dynamics beyond bilateral US-China issues, including European perspectives and broader concerns about global supply chains and protectionism. Aligns with Hold Competing Truths and Interpret Ambiguity.",
-      "article_ids": [130484, 131548, 130380]
+      "group_rationale": "Focuses on the situation in Ukraine, including military developments, international aid efforts, and diplomatic negotiations, juxtaposing reports from involved parties. Primarily aligns with Hold Competing Truths and Trace Power.",
+      "article_ids": [134435, 133613, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_18": {
-      "group_rationale": "Focuses on security incidents and military activities in specific geographical hotspots, signaling shifts in regional power balances or conflict intensity. Primarily aligns with Trace Power.",
-      "article_ids": [130366, 131612, 131600, 130440]
+      "group_rationale": "Documents discussions related to energy markets, including oil prices, renewable energy initiatives, and geopolitical factors influencing energy supply and policy. Primarily aligns with Trace Power and Interpret Ambiguity.",
+      "article_ids": [134427, 133610, 134435, 134429, 133613, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_19": {
-      "group_rationale": "Examines the role and influence of international bodies and alliances (e.g., NATO) in addressing global conflicts and security challenges, particularly concerning the Ukraine war. Aligns with Trace Power.",
-      "article_ids": [131618, 130453]
+      "group_rationale": "Covers incidents related to domestic security, law enforcement actions, and criminal justice matters, particularly where they intersect with political discourse or policy debates. Primarily aligns with See Sparks and Interpret Ambiguity.",
+      "article_ids": [133611, 134429, 134435, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_20": {
-      "group_rationale": "Investigates reporting on environmental incidents and the regulatory or scientific responses, potentially highlighting gaps in understanding or enforcement. Aligns with See Sparks and Interpret Ambiguity.",
-      "article_ids": [130493, 131639]
+      "group_rationale": "Explores historical contexts and anniversaries of significant geopolitical events, analyzing how their legacies are framed and utilized in contemporary discussions. Primarily aligns with Recognize Framing and Hold Competing Truths.",
+      "article_ids": [134435, 134429, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_21": {
-      "group_rationale": "Looks at the intersection of law, individual rights, and government action, particularly concerning high-profile legal cases or policy decisions impacting civil liberties. Aligns with Recognize Framing and Trace Power.",
-      "article_ids": [130392, 130360, 131656, 130350, 130443]
+      "group_rationale": "Examines reporting on corporate behavior, including specific company policies (e.g., Amazon's tariff cost display), executive statements, and market performance data. Primarily aligns with Trace Power and See Sparks.",
+      "article_ids": [134427, 133610, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_22": {
-      "group_rationale": "Examines the role of technology and digital platforms in shaping political discourse and facing regulatory scrutiny, focusing on issues like content moderation and foreign influence. Aligns with Trace Power and Recognize Framing.",
-      "article_ids": [130487, 130443, 130418]
+      "group_rationale": "Analyzes the narratives and policy implications surrounding public health issues, including government responses, scientific debates, and personal experiences framed within political contexts. Primarily aligns with Recognize Framing and Hold Competing Truths.",
+      "article_ids": [133614, 133611, 134435, 134429, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_23": {
-      "group_rationale": "Considers the impact of political decisions and rhetoric on specific sectors of the economy, such as manufacturing, technology, or aerospace. Aligns with Trace Power.",
-      "article_ids": [131548, 132102, 130380, 132108]
+      "group_rationale": "Tracks geopolitical developments in the Asia-Pacific region beyond direct US-China confrontation, including regional alliances, economic integration efforts, and internal political dynamics. Primarily aligns with Trace Power and Interpret Ambiguity.",
+      "article_ids": [134435, 133610, 134427, 134429, 133613, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_24": {
-      "group_rationale": "Analyzes the narratives surrounding public figures facing legal or ethical scrutiny, considering how media and political actors frame their actions and culpability. Aligns with Recognize Framing.",
-      "article_ids": [130392, 131656, 130435]
+      "group_rationale": "Focuses on reporting related to European political and economic affairs, including EU policies, national elections, and responses to global events like the Ukraine war. Primarily aligns with Trace Power and Recognize Framing.",
+      "article_ids": [134435, 134429, 133613, 134427, 133610, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_25": {
-      "group_rationale": "Focuses on the legislative process within the US government, tracking the progress and political maneuvering around key bills and funding appropriations. Aligns with Trace Power.",
-      "article_ids": [131664, 130443, 130444, 130488]
+      "group_rationale": "Collates articles discussing cultural or identity politics debates within the US, analyzing the terminology used and the policy stakes presented by different sides. Primarily aligns with Recognize Framing.",
+      "article_ids": [134429, 134435, 133614, 133611, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_26": {
-      "group_rationale": "Examines US foreign relations and policy towards key allies and adversaries, particularly in Europe and the Middle East, highlighting shifts in diplomatic or military strategy. Aligns with Trace Power and Hold Competing Truths.",
-      "article_ids": [130453, 130366, 131618, 131612, 130484, 130444, 130488]
+      "group_rationale": "Examines the intersection of technology and society, including discussions on AI ethics, social media's role in politics, and the impact of tech advancements on daily life and governance. Primarily aligns with Hold Competing Truths and Interpret Ambiguity.",
+      "article_ids": [133610, 134427, 133614, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_27": {
-      "group_rationale": "Investigates the economic consequences and strategic implications of ongoing international conflicts, considering impacts on global markets, aid flows, and diplomatic relations. Aligns with Interpret Ambiguity and Trace Power.",
-      "article_ids": [131664, 130366, 131618, 131600, 130488, 130440]
+      "group_rationale": "Focuses on financial markets, including stock performance, investment trends, cryptocurrency news, and commentary from financial analysts and institutions. Primarily aligns with See Sparks and Interpret Ambiguity.",
+      "article_ids": [133610, 134427, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_28": {
-      "group_rationale": "Tracks developments related to criminal justice, including high-profile trials, investigations into alleged misconduct, and policy debates around law enforcement. Aligns with Trace Power and See Sparks.",
-      "article_ids": [130392, 130478, 131656, 130435]
+      "group_rationale": "Tracks reporting on labor issues, including strikes, unionization efforts, wage negotiations, and employment statistics, highlighting worker perspectives and corporate responses. Primarily aligns with Trace Power and Hold Competing Truths.",
+      "article_ids": [134427, 133610, 134435, 134429, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_29": {
-      "group_rationale": "Analyzes the intersection of corporate strategy, market conditions, and technological innovation, particularly within the tech and industrial sectors. Aligns with Trace Power and Interpret Ambiguity.",
-      "article_ids": [132108, 132102, 131548, 131604]
+      "group_rationale": "Covers environmental policy debates, climate change reporting, natural disasters, and the geopolitical dimensions of resource management and conservation efforts. Primarily aligns with Interpret Ambiguity and Recognize Framing.",
+      "article_ids": [133611, 134435, 134429, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_30": {
-      "group_rationale": "Focuses on the role of specific government agencies and legislation in addressing societal issues, from environmental protection to legal oversight. Aligns with Trace Power.",
-      "article_ids": [130493, 130478, 130360, 130443, 130350]
+      "group_rationale": "Examines issues related to education policy, school systems, and debates concerning curriculum or institutional governance, often reflecting broader societal tensions. Primarily aligns with Recognize Framing and See Sparks.",
+      "article_ids": [133611, 134429, 134435, 133614, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_31": {
-      "group_rationale": "Examines public and institutional responses to social issues and anxieties, ranging from controversies over diversity initiatives to coping mechanisms for widespread concerns. Aligns with Recognize Framing and Interpret Ambiguity.",
-      "article_ids": [130436, 130418, 131553]
+      "group_rationale": "Focuses on the Israel-Lebanon/Hezbollah dimension of the Middle East conflict, tracking military exchanges, political statements, and regional spillover concerns. Primarily aligns with Trace Power and See Sparks.",
+      "article_ids": [133613, 134435, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_32": {
-      "group_rationale": "Considers potential indicators of economic stress or uncertainty, including market volatility, specific industry slowdowns, and expressed anxieties. Aligns with Interpret Ambiguity and See Sparks.",
-      "article_ids": [132102, 131548, 130442, 131553, 131604]
+      "group_rationale": "Analyzes US economic indicators and Federal Reserve policy signals, assessing their interpretation by markets and potential impacts on domestic and global economic stability. Primarily aligns with Interpret Ambiguity and Trace Power.",
+      "article_ids": [134427, 133610, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_33": {
-      "group_rationale": "Highlights legal disputes involving government bodies or policies, showcasing challenges to regulations, laws, or administrative actions. Aligns with Trace Power.",
-      "article_ids": [130478, 130360, 130436, 130350, 130443]
+      "group_rationale": "Documents specific policy actions or executive decisions attributed to the current US administration, examining their stated rationale and reported consequences. Primarily aligns with Trace Power.",
+      "article_ids": [134429, 134435, 134427, 133610, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_34": {
-      "group_rationale": "Tracks international diplomatic efforts and statements concerning ongoing conflicts, particularly the messaging directed towards allies and adversaries. Aligns with Recognize Framing and Trace Power.",
-      "article_ids": [130453, 131618, 131612, 130484, 130444]
+      "group_rationale": "Focuses on campaign strategies, polling data, and media narratives related to the upcoming US presidential election cycle, highlighting key players and voter demographics. Primarily aligns with Recognize Framing and Trace Power.",
+      "article_ids": [134429, 134427, 133610, 134435, 133614, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_35": {
-      "group_rationale": "Analyzes the framing of political responsibility and accountability in relation to foreign policy decisions and conflict outcomes. Aligns with Recognize Framing.",
-      "article_ids": [131664, 130453, 131600, 130488]
+      "group_rationale": "Gathers reporting on global trade dynamics, including specific disputes (e.g., tariffs), negotiations, and the performance of international supply chains. Primarily aligns with Trace Power and Interpret Ambiguity.",
+      "article_ids": [134427, 133610, 134435, 134429, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_36": {
-      "group_rationale": "Investigates the challenges and complexities faced by specific industries (e.g., automotive, aerospace) due to global economic factors like trade policies and supply chain disruptions. Aligns with Trace Power and Interpret Ambiguity.",
-      "article_ids": [131548, 132102]
+      "group_rationale": "Presents contrasting viewpoints and expert analyses on major economic trends or policy proposals, fostering an understanding of complexity and uncertainty. Primarily aligns with Hold Competing Truths.",
+      "article_ids": [134427, 133610, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_37": {
-      "group_rationale": "Examines controversies related to social policies and cultural values within institutions, including legal challenges and public debate. Aligns with Recognize Framing and Hold Competing Truths.",
-      "article_ids": [130436, 130418, 130360]
+      "group_rationale": "Highlights reporting gaps, ambiguous statements, or areas of significant uncertainty in coverage of geopolitical conflicts and diplomatic efforts. Primarily aligns with Interpret Ambiguity.",
+      "article_ids": [133613, 134435, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_38": {
-      "group_rationale": "Focuses on the intersection of technology, business strategy, and market performance, highlighting innovation and competitive dynamics. Aligns with Trace Power.",
-      "article_ids": [132108, 130487]
+      "group_rationale": "Focuses on the activities and influence of specific non-state actors (e.g., corporations, NGOs, armed groups) within the international system. Primarily aligns with Trace Power.",
+      "article_ids": [134427, 133610, 134437, 133613, 134435, 134429, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_39": {
-      "group_rationale": "Analyzes the communication strategies and public narratives employed by political figures and institutions during legal proceedings or policy debates. Aligns with Recognize Framing.",
-      "article_ids": [130392, 131656, 130350, 130443]
+      "group_rationale": "Tracks the specific language and framing devices used in political communication, particularly during campaign seasons or policy rollouts. Primarily aligns with Recognize Framing.",
+      "article_ids": [134429, 134427, 133610, 134435, 133614, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_40": {
-      "group_rationale": "Considers the impact of judicial decisions and legal frameworks on contentious social issues like abortion and institutional accountability. Aligns with Trace Power and Recognize Framing.",
-      "article_ids": [130360, 130350, 130478, 130392]
+      "group_rationale": "Isolates small but potentially significant details or quotes within broader news reports that might indicate underlying shifts or tensions. Primarily aligns with See Sparks.",
+      "article_ids": [134429, 134427, 133610, 134435, 133613, 133611, 133614, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_41": {
-      "group_rationale": "Explores the relationship between environmental events, scientific monitoring, and regulatory frameworks designed to protect natural resources and public health. Aligns with Trace Power and Interpret Ambiguity.",
-      "article_ids": [130493, 131639]
+      "group_rationale": "Presents multiple valid, yet conflicting, narratives or interpretations concerning a single complex event or policy decision, encouraging cognitive flexibility. Primarily aligns with Hold Competing Truths.",
+      "article_ids": [134435, 133613, 133614, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_42": {
-      "group_rationale": "Tracks the flow of military and financial aid in international conflicts, examining the political debates and strategic rationale behind such support. Aligns with Trace Power.",
-      "article_ids": [131664, 130453, 130444]
+      "group_rationale": "Focuses on the role of specific government agencies (e.g., Department of Defense, State Department) in policy execution and public communication. Primarily aligns with Trace Power.",
+      "article_ids": [134429, 134435, 133611, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_43": {
-      "group_rationale": "Examines the interplay between US domestic politics and its foreign policy actions, particularly how internal debates influence international engagements. Aligns with Trace Power and Interpret Ambiguity.",
-      "article_ids": [131664, 130443, 130444, 130488, 130487]
+      "group_rationale": "Covers developments related to specific industries or economic sectors beyond technology, such as manufacturing, agriculture, or services, noting policy impacts. Primarily aligns with Interpret Ambiguity and See Sparks.",
+      "article_ids": [134427, 133610, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_44": {
-      "group_rationale": "Analyzes reporting on alleged misconduct and accountability within powerful institutions, including government agencies and corporations. Aligns with Trace Power and See Sparks.",
-      "article_ids": [130478, 130435]
+      "group_rationale": "Analyzes the reporting and political discourse surrounding legal challenges, court rulings, and judicial appointments affecting policy or individual rights. Primarily aligns with Trace Power and Recognize Framing.",
+      "article_ids": [134435, 134429, 133614, 133611, 134427, 133610, 133613, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_45": {
-      "group_rationale": "Focuses on geopolitical maneuvering and security concerns in the Asia-Pacific region, including issues related to China and regional stability. Aligns with Trace Power.",
-      "article_ids": [130487, 130484, 131612]
+      "group_rationale": "Tracks reporting on cybersecurity threats, data breaches, and governmental or corporate responses to digital security challenges. Primarily aligns with See Sparks and Interpret Ambiguity.",
+      "article_ids": [134427, 133610, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_46": {
-      "group_rationale": "Investigates the economic discourse surrounding trade policy, focusing on arguments about protectionism, competitiveness, and impacts on domestic industries. Aligns with Recognize Framing and Hold Competing Truths.",
-      "article_ids": [131548, 130380, 131604]
+      "group_rationale": "Covers political and economic developments in Latin America, Africa, or other regions not explicitly covered in broader groups, noting connections to global powers. Primarily aligns with Trace Power and Interpret Ambiguity.",
+      "article_ids": [134435, 133613, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_47": {
-      "group_rationale": "Examines the challenges of information verification and narrative control in conflict zones, highlighting potential discrepancies or strategic communication efforts. Aligns with Interpret Ambiguity and Recognize Framing.",
-      "article_ids": [131618, 131600, 130440]
+      "group_rationale": "Collects articles focusing on humanitarian crises, aid delivery challenges, and refugee movements resulting from conflict or disaster situations globally. Primarily aligns with Hold Competing Truths and Interpret Ambiguity.",
+      "article_ids": [133613, 134435, 133611, 134429, 134427, 133610, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_48": {
-      "group_rationale": "Considers the broader societal mood reflected in discussions about personal well-being, anxieties, and responses to perceived external stressors. Aligns with Interpret Ambiguity and See Sparks.",
-      "article_ids": [131553, 130442]
+      "group_rationale": "Aggregates reporting on infrastructure projects, transportation networks, and related government spending or policy initiatives. Primarily aligns with Trace Power and See Sparks.",
+      "article_ids": [133611, 134427, 133610, 134437, 134429, 134435, 134438, 134436, 133607, 133613, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_49": {
-      "group_rationale": "Tracks legal and political developments concerning high-profile individuals associated with the executive branch or electoral politics. Aligns with Trace Power.",
-      "article_ids": [131656, 130435]
+      "group_rationale": "Gathers diverse reports from various domains (AP, NBC, Fortune, ZeroHedge, etc.) covering recent events, useful for comparing source perspectives and identifying broad trends. Primarily aligns with Recognize Framing and Interpret Ambiguity.",
+      "article_ids": [134429, 134435, 134427, 133610, 133611, 133613, 133614, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_50": {
-      "group_rationale": "Analyzes the intersection of environmental concerns and governmental/regulatory responses, including monitoring and legislative actions. Aligns with Trace Power and Interpret Ambiguity.",
-      "article_ids": [130493, 130478]
+      "group_rationale": "Focuses on articles published on the specific dates of April 29th and 30th, 2025, allowing for analysis of concurrent event reporting and immediate news cycles. Primarily aligns with See Sparks and Interpret Ambiguity.",
+      "article_ids": [134429, 134435, 134427, 133610, 133611, 133613, 133614, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_51": {
-      "group_rationale": "Focuses on the specific mechanisms and legal instruments used in policy implementation, such as tariffs or specific legislative acts, and their stated objectives or contested impacts. Aligns with Trace Power and See Sparks.",
-      "article_ids": [131548, 130443, 130360, 131604]
+      "group_rationale": "Collates articles mentioning key geopolitical entities like the US, Israel, and associated governmental or military bodies, enabling tracking of state actions and interactions. Primarily aligns with Trace Power.",
+      "article_ids": [134435, 133613, 134429, 133611, 134427, 133610, 134437, 134438, 134436, 133607, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 133614, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     },
     "group_52": {
-      "group_rationale": "Examines emerging corporate controversies or legal challenges that may signal broader shifts in corporate governance, social responsibility debates, or regulatory environments. Aligns with See Sparks and Trace Power.",
-      "article_ids": [130436, 132108, 130418]
-    },
-    "group_53": {
-      "group_rationale": "Groups articles potentially peripheral or lacking strong thematic links to core geopolitical/economic events, requiring interpretation to connect them to broader trends or representing distinct local/specific issues. Primarily relevant for Interpret Ambiguity or See Sparks if subtle connections exist.",
-      "article_ids": [131553, 131639]
+      "group_rationale": "Groups articles mentioning prominent political figures (e.g., Donald Trump, RFK Jr.) allowing analysis of their public statements, reported actions, and media portrayal across various contexts. Primarily aligns with Trace Power and Recognize Framing.",
+      "article_ids": [134429, 134427, 133610, 133614, 134435, 134437, 134438, 134436, 133607, 133613, 133611, 134439, 134433, 134431, 134430, 134428, 133609, 133608, 133612, 134432, 134434, 134440, 134441, 134442, 134443, 134444, 134445, 134446, 134447, 134448, 134449, 134450]
     }
   }
 }

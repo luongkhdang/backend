@@ -32,6 +32,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import hashlib
 import sys
+from datetime import datetime
 
 # Assuming standard project structure
 from src.database.reader_db_client import ReaderDBClient
@@ -259,12 +260,22 @@ def assemble_final_context(group_rationale: str,
             f"Error loading prompt template {prompt_template_path}: {e}")
         return None
 
+    # Inject today's date
+    today_date_str = datetime.now().strftime("%Y-%m-%d")
+    template = template.replace("{TODAY_DATE}", today_date_str)
+    logger.debug("Injected today's date into prompt template.")
+
     # Format Current articles context into a detailed string
     current_articles_str_list = []
+    DOMAINS_TO_REPLACE = {"news.google.com", "biztoc.com"}
+    REPLACEMENT_DOMAIN = "variety sources"
+
     for i, article in enumerate(current_articles_summary):
         s = f"Current Article {i+1} (ID: {article.get('id', 'N/A')}):\n"
         s += f"  Title: {article.get('title', 'N/A')}\n"
-        s += f"  Source: {article.get('domain', 'N/A')} ({article.get('pub_date', 'N/A')})\n"
+        domain_val = article.get('domain', 'N/A')
+        display_domain = REPLACEMENT_DOMAIN if domain_val in DOMAINS_TO_REPLACE else domain_val
+        s += f"  Source: {display_domain} ({article.get('pub_date', 'N/A')})\n"
 
         # Add filtered frame phrases
         if article.get('filtered_frame_phrases'):
@@ -299,6 +310,7 @@ def assemble_final_context(group_rationale: str,
             # Use title/domain/pub_date directly from doc.meta
             title = doc.meta.get('title', 'N/A')
             domain = doc.meta.get('domain', 'N/A')
+            display_domain = REPLACEMENT_DOMAIN if domain in DOMAINS_TO_REPLACE else domain
             pub_date = doc.meta.get('pub_date', 'N/A')
             # Get frame_phrases directly from doc.meta
             frame_phrases = doc.meta.get(
@@ -306,7 +318,7 @@ def assemble_final_context(group_rationale: str,
 
             s = f"Historical Article {i+1} (ID: {article_id if article_id else 'N/A'}):\n"
             s += f"  Title: {title}\n"
-            s += f"  Source: {domain} ({pub_date})\n"
+            s += f"  Source: {display_domain} ({pub_date})\n"
 
             # Add filtered frame phrases (using phrases from meta)
             if frame_phrases:  # Check if list is not None and not empty
@@ -376,9 +388,9 @@ def assemble_final_context(group_rationale: str,
     relationships_str = "\n".join(
         f"- {rel}" for rel in selected_relationships) if selected_relationships else "No relevant entity relationships identified."
 
-    # Substitute placeholders in the template
+    # Substitute remaining placeholders in the date-injected template
     try:
-        # Use str.replace for safer substitution if format specifiers clash
+        # Use str.replace for safer substitution
         final_prompt = template\
             .replace("{group_rationale}", group_rationale)\
             .replace("{current_articles_summary}", current_summary_str)\
@@ -387,25 +399,12 @@ def assemble_final_context(group_rationale: str,
             .replace("{related_policies}", policies_str)\
             .replace("{entity_relationships}", relationships_str)
 
-        # Alternative using .format() - ensure placeholders don't clash with content
-        # final_prompt = template.format(
-        #     group_rationale=group_rationale,
-        #     current_articles_summary=current_summary_str,
-        #     historical_articles=historical_context_str,
-        #     related_events=events_str,
-        #     related_policies=policies_str,
-        #     entity_relationships=relationships_str
-        #     # Add {key_questions} later if needed/derived
-        # )
         logger.info(
             f"Successfully assembled final prompt (length: {len(final_prompt)} chars)")
         return final_prompt
-    except KeyError as e:
-        logger.error(
-            f"Missing placeholder in prompt template {prompt_template_path}: {e}")
-        return None
     except Exception as e:
-        logger.error(f"Error formatting prompt template: {e}")
+        logger.error(
+            f"Error substituting placeholders in prompt template: {e}")
         return None
 
 
@@ -514,12 +513,12 @@ async def process_group(group_id: str, group_info: Dict[str, Any], db_client: Re
     # For simplicity, let's assume the client's default is used if not overridden.
     # The client method `generate_essay_from_prompt` selects the default.
     # We capture the default used by `generate_essay_from_prompt` for storage.
-    intended_model_name = os.getenv("GEMINI_FLASH_THINKING_MODEL",
-                                    "models/gemini-2.0-flash-exp")
+    intended_model_name = os.getenv("GEMINI_FLASH_EXP",
+                                    "models/gemini-2.5-flash-preview-04-17")
 
     essay_text = await gemini_client.generate_essay_from_prompt(
-        full_prompt_text=final_prompt
-        # Pass explicit model if needed: model_name=intended_model_name
+        full_prompt_text=final_prompt,
+        model_name=intended_model_name
     )
 
     if not essay_text:

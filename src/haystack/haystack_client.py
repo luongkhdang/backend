@@ -124,9 +124,9 @@ def get_gemini_generator() -> GoogleAIGeminiGenerator:
         raise ValueError("GEMINI_API_KEY environment variable not set")
 
     # Get model name from environment or use default, ensuring SHORT ID is used
-    model_full_name = os.getenv("GEMINI_FLASH_THINKING_MODEL",
+    model_full_name = os.getenv("GEMINI_FLASH_LITE_MODEL_ID",
                                 # Default to a known good ID if env var is missing
-                                "gemini-1.5-flash-latest")
+                                "gemini-2.0-flash-lite")
     # Extract short ID (e.g., gemini-1.5-flash-latest) in case prefix was included in env var
     model_short_id = model_full_name.split('/')[-1]
 
