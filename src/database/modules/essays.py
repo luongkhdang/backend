@@ -43,67 +43,61 @@ def insert_essay(conn, essay: Dict[str, Any]) -> Optional[int]:
     Returns:
         int or None: The new essay ID if successful, None otherwise
     """
+    # Define the columns to insert/update (excluding 'id' and default 'created_at')
+    columns = [
+        'group_id', 'cluster_id', 'type', 'title', 'content',
+        'source_article_ids', 'model_name', 'generation_settings',
+        'input_token_count', 'output_token_count', 'tags', 'prompt_template_hash'
+    ]
+    update_columns = [col for col in columns if col not in (
+        'group_id')]  # Exclude group_id from update
+
+    # Prepare the values and placeholders
+    values_tuple = (
+        essay.get('group_id'),
+        essay.get('cluster_id'),
+        essay.get('type', 'unknown'),
+        essay.get('title', ''),
+        essay.get('content', ''),
+        essay.get('source_article_ids'),
+        essay.get('model_name'),
+        json.dumps(essay.get('generation_settings')) if essay.get(
+            'generation_settings') else None,
+        essay.get('input_token_count'),
+        essay.get('output_token_count'),
+        essay.get('tags'),
+        essay.get('prompt_template_hash')
+    )
+
+    # Construct the UPSERT query
+    insert_cols_str = ", ".join(columns)
+    placeholders_str = ", ".join(['%s'] * len(columns))
+    # Construct the UPDATE SET part, excluding group_id
+    update_set_str = ", ".join(
+        [f"{col} = EXCLUDED.{col}" for col in update_columns])
+
+    sql = f"""
+        INSERT INTO essays ({insert_cols_str}, created_at)
+        VALUES ({placeholders_str}, NOW()) -- Use NOW() for created_at on insert
+        ON CONFLICT (group_id, DATE(created_at))
+        DO UPDATE SET {update_set_str},
+                      created_at = NOW() -- Explicitly update created_at on conflict too
+        RETURNING id;
+    """
+
     try:
         cursor = conn.cursor()
-
-        # Extract essay data based on the revised schema
-        # Required or should have default? Assuming required by calling code.
-        group_id = essay.get('group_id')
-        cluster_id = essay.get('cluster_id')  # Optional FK
-        essay_type = essay.get('type', 'unknown')  # Required
-        title = essay.get('title', '')  # Required, default empty
-        content = essay.get('content', '')  # Required, default empty
-        source_article_ids = essay.get(
-            'source_article_ids')  # Optional INTEGER[]
-        model_name = essay.get('model_name')  # Optional TEXT
-        generation_settings = essay.get(
-            'generation_settings')  # Optional JSONB
-        input_token_count = essay.get('input_token_count')  # Optional INTEGER
-        output_token_count = essay.get(
-            'output_token_count')  # Optional INTEGER
-        tags = essay.get('tags')  # Optional TEXT[]
-        prompt_template_hash = essay.get(
-            'prompt_template_hash')  # Optional TEXT
-
-        # Convert generation_settings dict to JSON string if necessary
-        gen_settings_json = json.dumps(
-            generation_settings) if generation_settings else None
-
-        # Insert the essay using the revised columns
-        cursor.execute("""
-            INSERT INTO essays (
-                group_id, cluster_id, type, title, content,
-                source_article_ids, model_name, generation_settings,
-                input_token_count, output_token_count, tags, prompt_template_hash
-                -- created_at uses DEFAULT CURRENT_TIMESTAMP
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id;
-        """, (
-            group_id,
-            cluster_id,
-            essay_type,
-            title,
-            content,
-            source_article_ids,  # Pass list directly for INTEGER[]
-            model_name,
-            gen_settings_json,  # Pass JSON string for JSONB
-            input_token_count,
-            output_token_count,
-            tags,  # Pass list directly for TEXT[]
-            prompt_template_hash
-        ))
-
+        cursor.execute(sql, values_tuple)
         new_id = cursor.fetchone()[0]
         conn.commit()
         cursor.close()
 
         logger.info(
-            f"Successfully inserted essay {new_id} of type '{essay_type}' for group '{group_id}'.")
+            f"Successfully upserted essay {new_id} of type \'{essay.get('type', 'unknown')}\' for group \'{essay.get('group_id')}\'.")
         return new_id
 
     except Exception as e:
-        logger.error(f"Error inserting essay: {e}", exc_info=True)
+        logger.error(f"Error upserting essay: {e}", exc_info=True)
         conn.rollback()
         return None
 

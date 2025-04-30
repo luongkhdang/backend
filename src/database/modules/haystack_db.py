@@ -24,6 +24,7 @@ Related files:
 - src/steps/step5.py: Script orchestrating the RAG process.
 """
 
+from src.database.modules import essays
 import logging
 import json
 from typing import List, Dict, Any, Tuple, Optional
@@ -33,6 +34,8 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Import the essays module to call its upsert function
 
 
 def get_key_entities_for_group(conn, article_ids: List[int], top_n: int = 10) -> List[Tuple]:
@@ -291,81 +294,28 @@ def _format_relationship(relationship: Dict[str, Any]) -> str:
 
 def save_essay(conn, essay_data: Dict[str, Any]) -> Optional[int]:
     """
-    Saves a generated essay to the database.
+    Saves a generated essay to the database using the upsert logic
+    defined in the essays module.
 
     Args:
         conn: Active database connection.
         essay_data: Dictionary containing essay data.
 
     Returns:
-        Optional[int]: New essay ID if successful, None otherwise.
+        Optional[int]: Essay ID (new or existing) if successful, None otherwise.
     """
     if not essay_data or 'content' not in essay_data or 'group_id' not in essay_data:
         logger.error("Missing required fields in essay_data for save_essay")
         return None
 
-    essay_id = None
+    # Delegate directly to the essays module's upsert function
+    # Transaction management (commit/rollback) is handled within essays.insert_essay
     try:
-        cursor = conn.cursor()
-        fields = []
-        values = []
-        placeholders = []
-
-        field_mapping = {
-            'group_id': 'group_id',
-            'cluster_id': 'cluster_id',
-            'type': 'type',
-            'title': 'title',
-            'content': 'content',
-            'model_name': 'model_name',
-            'input_token_count': 'input_token_count',
-            'output_token_count': 'output_token_count',
-            'prompt_template_hash': 'prompt_template_hash'
-        }
-
-        for db_field, data_field in field_mapping.items():
-            if data_field in essay_data and essay_data[data_field] is not None:
-                fields.append(db_field)
-                values.append(essay_data[data_field])
-                placeholders.append('%s')
-
-        if 'tags' in essay_data and essay_data['tags']:
-            fields.append('tags')
-            values.append(essay_data['tags'])
-            placeholders.append('%s')
-
-        if 'generation_settings' in essay_data:
-            fields.append('generation_settings')
-            gen_settings_json = json.dumps(essay_data['generation_settings'])
-            values.append(gen_settings_json)
-            placeholders.append('%s')
-
-        if 'source_article_ids' in essay_data:
-            fields.append('source_article_ids')
-            values.append(essay_data['source_article_ids'])
-            placeholders.append('%s')
-
-        fields.append('created_at')
-        values.append(datetime.now())
-        placeholders.append('%s')
-
-        fields_str = ', '.join(fields)
-        placeholders_str = ', '.join(placeholders)
-        query = f"INSERT INTO essays ({fields_str}) VALUES ({placeholders_str}) RETURNING id"
-
-        cursor.execute(query, values)
-        essay_id = cursor.fetchone()[0]
-        conn.commit()  # Commit inside the function for this specific operation
-        cursor.close()
-        logger.info(
-            f"Successfully saved essay with ID {essay_id} for group {essay_data.get('group_id')}")
+        essay_id = essays.insert_essay(conn, essay_data)
         return essay_id
-
     except Exception as e:
-        logger.error(f"Error in save_essay: {e}", exc_info=True)
-        # Rollback might be handled by the caller (ReaderDBClient), but can add here too
-        try:
-            conn.rollback()
-        except Exception as rb_e:
-            logger.error(f"Error during rollback in save_essay: {rb_e}")
+        # Log error at this level too, but rollback is handled by the called function
+        logger.error(
+            f"Error calling essays.insert_essay from haystack_db.save_essay: {e}", exc_info=True)
+        # Ensure we still return None on failure
         return None

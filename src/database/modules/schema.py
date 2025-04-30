@@ -129,7 +129,9 @@ def initialize_tables(conn) -> bool:
             output_token_count INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             tags TEXT[],
-            prompt_template_hash TEXT NULL
+            prompt_template_hash TEXT,
+            -- Add constraint for upsert logic based on group and day
+            CONSTRAINT unique_group_per_day UNIQUE (group_id, DATE(created_at))
         );
         """)
 
